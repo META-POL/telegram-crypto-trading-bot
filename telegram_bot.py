@@ -635,6 +635,7 @@ def main():
             WAITING_API_SECRET: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_secret)],
         },
         fallbacks=[CommandHandler('cancel', cancel)],
+        per_message=True,  # 경고 메시지 해결
     )
     
     app.add_handler(conv_handler)
