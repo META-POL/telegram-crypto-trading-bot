@@ -1,6 +1,6 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, MessageHandler, filters
 from trading_bot_unified import UnifiedSpotTrader
 from user_api_store import init_db, save_api, load_api
 import logging
@@ -9,8 +9,13 @@ import os
 # 채널 ID (실제 운영 채널 ID로 교체)
 CHANNEL_ID = -1002751102244
 
+# 대화 상태 정의
+WAITING_API_KEY = 1
+WAITING_API_SECRET = 2
+
 init_db()  # DB 초기화
 user_traders = {}
+user_api_setup = {}  # 사용자별 API 설정 상태 저장
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -51,6 +56,22 @@ def get_exchange_keyboard():
         ],
         [
             InlineKeyboardButton("Hyperliquid", callback_data="exchange_hyperliquid")
+        ],
+        [
+            InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_api_setup_keyboard():
+    """API 등록 키보드 생성"""
+    keyboard = [
+        [
+            InlineKeyboardButton("XT.com API 등록", callback_data="setup_api_xt"),
+            InlineKeyboardButton("Backpack API 등록", callback_data="setup_api_backpack")
+        ],
+        [
+            InlineKeyboardButton("Hyperliquid API 등록", callback_data="setup_api_hyperliquid")
         ],
         [
             InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")
@@ -104,7 +125,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not api_info:
             await query.edit_message_text(
                 f"❌ **{exchange.upper()} API가 등록되지 않았습니다.**\n\n"
-                f"먼저 `/setapi {exchange} [API_KEY] [API_SECRET]` 명령어로 API를 등록하세요.",
+                f"먼저 API 등록 버튼에서 API를 등록하세요.",
+                reply_markup=get_main_menu_keyboard(),
                 parse_mode='Markdown'
             )
             return
@@ -125,27 +147,29 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif query.data == "set_api":
-        help_text = """
-🔑 **API 등록 방법**
-
-다음 명령어로 API를 등록하세요:
-
-**XT.com:**
-`/setapi xt [API_KEY] [API_SECRET]`
-
-**Backpack:**
-`/setapi backpack [API_KEY] [PRIVATE_KEY]`
-
-**Hyperliquid:**
-`/setapi hyperliquid [API_KEY] [API_SECRET]`
-
-예시: `/setapi xt 5e917667-4856-4789-9d7b-1f55d2fa5f07 d48f7352c4a2e40a7f1a286f8319cba4ea33af4c`
-        """
         await query.edit_message_text(
-            help_text,
-            reply_markup=get_main_menu_keyboard(),
+            "🔑 **API 등록**\n\n등록할 거래소를 선택하세요:",
+            reply_markup=get_api_setup_keyboard(),
             parse_mode='Markdown'
         )
+    
+    elif query.data.startswith("setup_api_"):
+        exchange = query.data.split("_")[2]
+        user_api_setup[user_id] = {"exchange": exchange, "step": "api_key"}
+        
+        if exchange == 'backpack':
+            await query.edit_message_text(
+                f"🔑 **{exchange.upper()} API 등록**\n\n"
+                f"Backpack 공개키(API Key)를 입력하세요:",
+                parse_mode='Markdown'
+            )
+        else:
+            await query.edit_message_text(
+                f"🔑 **{exchange.upper()} API 등록**\n\n"
+                f"{exchange.upper()} API Key를 입력하세요:",
+                parse_mode='Markdown'
+            )
+        return WAITING_API_KEY
     
     elif query.data == "balance":
         trader = user_traders.get(user_id)
@@ -211,7 +235,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ❓ **도움말**
 
 **1. API 등록**
-먼저 `/setapi` 명령어로 본인 API를 등록하세요.
+"API 등록" 버튼을 눌러 거래소별로 API를 등록하세요.
 
 **2. 거래소 선택**
 "거래소 선택" 버튼을 눌러 사용할 거래소를 선택하세요.
@@ -231,10 +255,79 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
 
+async def handle_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """API Key 입력 처리"""
+    user_id = update.effective_user.id
+    api_key = update.message.text.strip()
+    
+    if user_id not in user_api_setup:
+        await update.message.reply_text("❌ API 등록이 시작되지 않았습니다. 메인 메뉴에서 다시 시작하세요.")
+        return ConversationHandler.END
+    
+    setup_info = user_api_setup[user_id]
+    exchange = setup_info["exchange"]
+    
+    # API Key 저장
+    user_api_setup[user_id]["api_key"] = api_key
+    user_api_setup[user_id]["step"] = "api_secret"
+    
+    if exchange == 'backpack':
+        await update.message.reply_text(
+            f"✅ Backpack 공개키가 저장되었습니다.\n\n"
+            f"이제 Backpack 비밀키(Private Key)를 입력하세요:"
+        )
+    else:
+        await update.message.reply_text(
+            f"✅ {exchange.upper()} API Key가 저장되었습니다.\n\n"
+            f"이제 {exchange.upper()} API Secret을 입력하세요:"
+        )
+    
+    return WAITING_API_SECRET
+
+async def handle_api_secret(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """API Secret 입력 처리"""
+    user_id = update.effective_user.id
+    api_secret = update.message.text.strip()
+    
+    if user_id not in user_api_setup:
+        await update.message.reply_text("❌ API 등록이 시작되지 않았습니다. 메인 메뉴에서 다시 시작하세요.")
+        return ConversationHandler.END
+    
+    setup_info = user_api_setup[user_id]
+    exchange = setup_info["exchange"]
+    api_key = setup_info["api_key"]
+    
+    # API 정보 저장
+    save_api(user_id, exchange, api_key, api_secret)
+    
+    # 설정 정보 삭제
+    del user_api_setup[user_id]
+    
+    await update.message.reply_text(
+        f"✅ **{exchange.upper()} API 등록이 완료되었습니다!**\n\n"
+        f"이제 거래소 선택에서 {exchange.upper()}를 사용할 수 있습니다.",
+        reply_markup=get_main_menu_keyboard(),
+        parse_mode='Markdown'
+    )
+    
+    return ConversationHandler.END
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """대화 취소"""
+    user_id = update.effective_user.id
+    if user_id in user_api_setup:
+        del user_api_setup[user_id]
+    
+    await update.message.reply_text(
+        "❌ API 등록이 취소되었습니다.",
+        reply_markup=get_main_menu_keyboard()
+    )
+    return ConversationHandler.END
+
 async def setapi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if len(context.args) < 3:
-        await update.message.reply_text("사용법: /setapi [xt|backpack|hyperliquid] [API_KEY] [API_SECRET or PRIVATE_KEY]")
+        await update.message.reply_text("사용법: /setapi [xt|backpack|hyperliquid] [API_KEY] [API_SECRET]")
         return
     ex, key, secret = context.args[0].lower(), context.args[1], context.args[2]
     save_api(user_id, ex, key, secret)
@@ -290,6 +383,18 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     token = os.environ.get('TELEGRAM_BOT_TOKEN', 'YOUR_TELEGRAM_BOT_TOKEN')
     app = ApplicationBuilder().token(token).build()
+    
+    # 대화 핸들러 (API 등록용)
+    conv_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(button_callback, pattern="^setup_api_")],
+        states={
+            WAITING_API_KEY: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_key)],
+            WAITING_API_SECRET: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_secret)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)],
+    )
+    
+    app.add_handler(conv_handler)
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CommandHandler('setapi', setapi))
     app.add_handler(CommandHandler('buy', buy))
