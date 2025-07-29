@@ -3,7 +3,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, MessageHandler, filters
 from trading_bot_unified import UnifiedSpotTrader
 from user_api_store import init_db, save_api, load_api
-import logging
 import os
 
 # 채널 ID (실제 운영 채널 ID로 교체)
@@ -43,6 +42,10 @@ def get_main_menu_keyboard():
         [
             InlineKeyboardButton("📊 매매 신호", callback_data="signals"),
             InlineKeyboardButton("💵 수익 확인", callback_data="profit")
+        ],
+        [
+            InlineKeyboardButton("📈 거래량 생성", callback_data="volume_trading"),
+            InlineKeyboardButton("⚙️ 리스크 설정", callback_data="risk_settings")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -79,10 +82,32 @@ def get_api_setup_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_trading_keyboard():
+    """매매 키보드 생성"""
+    keyboard = [
+        [
+            InlineKeyboardButton("📈 지정가 매수", callback_data="limit_buy"),
+            InlineKeyboardButton("📉 지정가 매도", callback_data="limit_sell")
+        ],
+        [
+            InlineKeyboardButton("⚡ 시장가 매수", callback_data="market_buy"),
+            InlineKeyboardButton("⚡ 시장가 매도", callback_data="market_sell")
+        ],
+        [
+            InlineKeyboardButton("🛑 스탑로스", callback_data="stop_loss"),
+            InlineKeyboardButton("🎯 익절매", callback_data="take_profit")
+        ],
+        [
+            InlineKeyboardButton("📊 거래량 생성", callback_data="volume_trading"),
+            InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """봇 시작"""
     welcome_text = """
-🤖 **통합 트레이딩 봇**
+🤖 **통합 트레이딩 봇 (개선된 버전)**
 
 원하는 기능을 선택하세요:
     """
@@ -107,7 +132,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if query.data == "main_menu":
         await query.edit_message_text(
-            "🤖 **통합 트레이딩 봇**\n\n원하는 기능을 선택하세요:",
+            "🤖 **통합 트레이딩 봇 (개선된 버전)**\n\n원하는 기능을 선택하세요:",
             reply_markup=get_main_menu_keyboard(),
             parse_mode='Markdown'
         )
@@ -171,6 +196,65 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return WAITING_API_KEY
     
+    elif query.data == "signals":
+        await query.edit_message_text(
+            "📊 **매매 신호**\n\n매매 방식을 선택하세요:",
+            reply_markup=get_trading_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == "volume_trading":
+        help_text = """
+📈 **거래량 생성 사용법**
+
+거래량 생성을 위한 자동 매수-매도 기능입니다.
+
+**명령어:**
+`/volume [심볼] [가격] [수량] [횟수]`
+
+**예시:**
+`/volume btc_usdt 30000 0.001 6`
+
+**동작 방식:**
+1. 지정가로 매수 주문
+2. 2초 대기
+3. 0.1% 낮은 가격으로 매도
+4. 3초 대기 후 다음 라운드
+5. 총 6회 반복
+
+**주의:** 거래량 생성용이므로 수익을 목적으로 하지 않습니다.
+        """
+        await query.edit_message_text(
+            help_text,
+            reply_markup=get_main_menu_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == "risk_settings":
+        help_text = """
+⚙️ **리스크 설정 사용법**
+
+**현재 리스크 설정 조회:**
+`/risk`
+
+**리스크 설정 변경:**
+`/setrisk [최대손실] [손절비율] [익절비율] [최대포지션]`
+
+**예시:**
+`/setrisk 100 5 10 1000`
+
+**설정 항목:**
+- 최대손실: 최대 허용 손실 (USDT)
+- 손절비율: 손절매 비율 (%)
+- 익절비율: 익절매 비율 (%)
+- 최대포지션: 최대 포지션 크기 (USDT)
+        """
+        await query.edit_message_text(
+            help_text,
+            reply_markup=get_main_menu_keyboard(),
+            parse_mode='Markdown'
+        )
+    
     elif query.data == "balance":
         trader = user_traders.get(user_id)
         if not trader:
@@ -201,38 +285,21 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         profit = trader.get_profit()
+        risk_info = trader.get_risk_info()
         await query.edit_message_text(
-            f"💵 **누적 수익**\n\n`{profit} USDT`",
-            reply_markup=get_main_menu_keyboard(),
-            parse_mode='Markdown'
-        )
-    
-    elif query.data == "signals":
-        help_text = """
-📊 **매매 신호 사용법**
-
-다음 명령어로 매매를 실행하세요:
-
-**매수:**
-`/buy [심볼] [가격] [수량] [횟수]`
-
-**매도:**
-`/sell [심볼] [가격] [수량] [횟수]`
-
-**매매 정지:**
-`/stop`
-
-예시: `/buy btc_usdt 30000 0.001 5`
-        """
-        await query.edit_message_text(
-            help_text,
+            f"💵 **수익 및 리스크 정보**\n\n"
+            f"**누적 수익:** `{profit} USDT`\n"
+            f"**리스크 레벨:** `{risk_info['risk_level']}`\n"
+            f"**최대 손실 한도:** `{risk_info['max_loss_limit']} USDT`\n"
+            f"**손절매 비율:** `{risk_info['stop_loss_percent']}%`\n"
+            f"**익절매 비율:** `{risk_info['take_profit_percent']}%`",
             reply_markup=get_main_menu_keyboard(),
             parse_mode='Markdown'
         )
     
     elif query.data == "help":
         help_text = """
-❓ **도움말**
+❓ **도움말 (개선된 버전)**
 
 **1. API 등록**
 "API 등록" 버튼을 눌러 거래소별로 API를 등록하세요.
@@ -241,11 +308,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 "거래소 선택" 버튼을 눌러 사용할 거래소를 선택하세요.
 
 **3. 매매 실행**
-- 잔고 조회: "잔고 조회" 버튼
-- 매수: `/buy [심볼] [가격] [수량] [횟수]`
-- 매도: `/sell [심볼] [가격] [수량] [횟수]`
-- 매매 정지: `/stop`
-- 수익 확인: "수익 확인" 버튼
+- **지정가 매수:** `/buy [심볼] [가격] [수량] [횟수]`
+- **지정가 매도:** `/sell [심볼] [가격] [수량] [횟수]`
+- **시장가 매수:** `/mbuy [심볼] [수량] [횟수]`
+- **시장가 매도:** `/msell [심볼] [수량] [횟수]`
+- **거래량 생성:** `/volume [심볼] [가격] [수량] [횟수]`
+- **스탑로스:** `/sl [심볼] [매수가격] [수량] [손절비율]`
+- **익절매:** `/tp [심볼] [매수가격] [수량] [익절비율]`
+- **매매 정지:** `/stop`
+- **주문 취소:** `/cancel [주문ID] [심볼]`
+- **주문 상태:** `/status [주문ID] [심볼]`
+
+**4. 리스크 관리**
+- **리스크 설정 조회:** `/risk`
+- **리스크 설정 변경:** `/setrisk [최대손실] [손절비율] [익절비율] [최대포지션]`
 
 **지원 거래소:** XT.com, Backpack, Hyperliquid
         """
@@ -347,8 +423,8 @@ async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("사용법: /buy [심볼] [가격] [수량] [횟수]")
         return
     symbol, price, qty, repeat = context.args[0], float(context.args[1]), float(context.args[2]), int(context.args[3])
-    result = trader.buy(symbol, price, qty, repeat)
-    await update.message.reply_text(f"✅ 매수 주문 완료:\n```\n{str(result)}\n```", parse_mode='Markdown')
+    result = trader.buy(symbol, price, qty, repeat, 'limit')
+    await update.message.reply_text(f"✅ 지정가 매수 주문 완료:\n```\n{str(result)}\n```", parse_mode='Markdown')
 
 async def sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -364,8 +440,175 @@ async def sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("사용법: /sell [심볼] [가격] [수량] [횟수]")
         return
     symbol, price, qty, repeat = context.args[0], float(context.args[1]), float(context.args[2]), int(context.args[3])
-    result = trader.sell(symbol, price, qty, repeat)
-    await update.message.reply_text(f"✅ 매도 주문 완료:\n```\n{str(result)}\n```", parse_mode='Markdown')
+    result = trader.sell(symbol, price, qty, repeat, 'limit')
+    await update.message.reply_text(f"✅ 지정가 매도 주문 완료:\n```\n{str(result)}\n```", parse_mode='Markdown')
+
+async def mbuy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """시장가 매수"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    if len(context.args) < 3:
+        await update.message.reply_text("사용법: /mbuy [심볼] [수량] [횟수]")
+        return
+    symbol, qty, repeat = context.args[0], float(context.args[1]), int(context.args[2])
+    result = trader.buy(symbol, 0, qty, repeat, 'market')
+    await update.message.reply_text(f"✅ 시장가 매수 주문 완료:\n```\n{str(result)}\n```", parse_mode='Markdown')
+
+async def msell(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """시장가 매도"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    if len(context.args) < 3:
+        await update.message.reply_text("사용법: /msell [심볼] [수량] [횟수]")
+        return
+    symbol, qty, repeat = context.args[0], float(context.args[1]), int(context.args[2])
+    result = trader.sell(symbol, 0, qty, repeat, 'market')
+    await update.message.reply_text(f"✅ 시장가 매도 주문 완료:\n```\n{str(result)}\n```", parse_mode='Markdown')
+
+async def volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """거래량 생성"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    if len(context.args) < 4:
+        await update.message.reply_text("사용법: /volume [심볼] [가격] [수량] [횟수]")
+        return
+    symbol, price, qty, repeat = context.args[0], float(context.args[1]), float(context.args[2]), int(context.args[3])
+    result = trader.volume_trading(symbol, price, qty, repeat)
+    await update.message.reply_text(f"✅ 거래량 생성 완료:\n```\n{str(result)}\n```", parse_mode='Markdown')
+
+async def stop_loss(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """스탑로스 주문"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    if len(context.args) < 4:
+        await update.message.reply_text("사용법: /sl [심볼] [매수가격] [수량] [손절비율]")
+        return
+    symbol, buy_price, qty, sl_percent = context.args[0], float(context.args[1]), float(context.args[2]), float(context.args[3])
+    result = trader.stop_loss_order(symbol, buy_price, qty, sl_percent)
+    await update.message.reply_text(f"✅ 스탑로스 주문 완료:\n```\n{str(result)}\n```", parse_mode='Markdown')
+
+async def take_profit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """익절매 주문"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    if len(context.args) < 4:
+        await update.message.reply_text("사용법: /tp [심볼] [매수가격] [수량] [익절비율]")
+        return
+    symbol, buy_price, qty, tp_percent = context.args[0], float(context.args[1]), float(context.args[2]), float(context.args[3])
+    result = trader.take_profit_order(symbol, buy_price, qty, tp_percent)
+    await update.message.reply_text(f"✅ 익절매 주문 완료:\n```\n{str(result)}\n```", parse_mode='Markdown')
+
+async def risk(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """리스크 설정 조회"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    risk_info = trader.get_risk_info()
+    await update.message.reply_text(
+        f"⚙️ **리스크 설정 정보**\n\n"
+        f"**현재 수익:** `{risk_info['current_profit']} USDT`\n"
+        f"**리스크 레벨:** `{risk_info['risk_level']}`\n"
+        f"**최대 손실 한도:** `{risk_info['max_loss_limit']} USDT`\n"
+        f"**손절매 비율:** `{risk_info['stop_loss_percent']}%`\n"
+        f"**익절매 비율:** `{risk_info['take_profit_percent']}%`\n"
+        f"**최대 포지션 크기:** `{risk_info['max_position_size']} USDT`",
+        parse_mode='Markdown'
+    )
+
+async def setrisk(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """리스크 설정 변경"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    if len(context.args) < 4:
+        await update.message.reply_text("사용법: /setrisk [최대손실] [손절비율] [익절비율] [최대포지션]")
+        return
+    max_loss, sl_percent, tp_percent, max_position = float(context.args[0]), float(context.args[1]), float(context.args[2]), float(context.args[3])
+    trader.set_risk_settings(max_loss, sl_percent, tp_percent, max_position)
+    await update.message.reply_text(f"✅ 리스크 설정이 업데이트되었습니다!")
+
+async def cancel_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """주문 취소"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    if len(context.args) < 2:
+        await update.message.reply_text("사용법: /cancel [주문ID] [심볼]")
+        return
+    order_id, symbol = context.args[0], context.args[1]
+    result = trader.cancel_order(order_id, symbol)
+    await update.message.reply_text(f"✅ 주문 취소 완료:\n```\n{str(result)}\n```", parse_mode='Markdown')
+
+async def order_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """주문 상태 조회"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    if len(context.args) < 2:
+        await update.message.reply_text("사용법: /status [주문ID] [심볼]")
+        return
+    order_id, symbol = context.args[0], context.args[1]
+    result = trader.get_order_status(order_id, symbol)
+    await update.message.reply_text(f"📊 주문 상태:\n```\n{str(result)}\n```", parse_mode='Markdown')
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -399,6 +642,15 @@ def main():
     app.add_handler(CommandHandler('setapi', setapi))
     app.add_handler(CommandHandler('buy', buy))
     app.add_handler(CommandHandler('sell', sell))
+    app.add_handler(CommandHandler('mbuy', mbuy))
+    app.add_handler(CommandHandler('msell', msell))
+    app.add_handler(CommandHandler('volume', volume))
+    app.add_handler(CommandHandler('sl', stop_loss))
+    app.add_handler(CommandHandler('tp', take_profit))
+    app.add_handler(CommandHandler('risk', risk))
+    app.add_handler(CommandHandler('setrisk', setrisk))
+    app.add_handler(CommandHandler('cancel', cancel_order))
+    app.add_handler(CommandHandler('status', order_status))
     app.add_handler(CommandHandler('stop', stop))
     app.add_handler(CallbackQueryHandler(button_callback))
     app.run_polling()
