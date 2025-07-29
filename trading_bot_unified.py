@@ -427,3 +427,68 @@ class UnifiedSpotTrader:
             "max_position_size": self.risk_settings['max_position_size'],
             "risk_level": "HIGH" if abs(self.total_profit) > self.risk_settings['max_loss'] * 0.8 else "NORMAL"
         } 
+
+    def get_all_symbols(self):
+        """모든 거래쌍 심볼 조회"""
+        try:
+            if self.exchange == 'xt':
+                url = f"{self.base_url}/api/v4/public/symbol"
+                response = requests.get(url)
+                if response.status_code == 200:
+                    data = response.json()
+                    symbols = []
+                    for item in data.get('result', []):
+                        if item.get('state') == 'ENABLED':
+                            symbols.append(item.get('symbol'))
+                    return symbols
+                else:
+                    return {"error": response.text}
+            elif self.exchange == 'backpack':
+                url = f"{self.base_url}/markets"
+                response = requests.get(url)
+                if response.status_code == 200:
+                    data = response.json()
+                    symbols = []
+                    for item in data.get('symbols', []):
+                        if item.get('status') == 'TRADING':
+                            symbols.append(item.get('symbol'))
+                    return symbols
+                else:
+                    return {"error": response.text}
+            elif self.exchange == 'hyperliquid':
+                markets = self.ccxt_client.load_markets()
+                symbols = []
+                for symbol in markets:
+                    if markets[symbol]['spot']:
+                        symbols.append(symbol)
+                return symbols
+            else:
+                return {"error": "지원하지 않는 거래소"}
+        except Exception as e:
+            return {"error": f"심볼 조회 오류: {str(e)}"}
+
+    def get_symbol_info(self, symbol):
+        """특정 심볼 정보 조회"""
+        try:
+            if self.exchange == 'xt':
+                url = f"{self.base_url}/api/v4/public/ticker/24hr"
+                params = {"symbol": symbol}
+                response = requests.get(url, params=params)
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    return {"error": response.text}
+            elif self.exchange == 'backpack':
+                url = f"{self.base_url}/ticker/{symbol}"
+                response = requests.get(url)
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    return {"error": response.text}
+            elif self.exchange == 'hyperliquid':
+                ticker = self.ccxt_client.fetch_ticker(symbol)
+                return ticker
+            else:
+                return {"error": "지원하지 않는 거래소"}
+        except Exception as e:
+            return {"error": f"심볼 정보 조회 오류: {str(e)}"} 

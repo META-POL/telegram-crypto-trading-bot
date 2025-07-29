@@ -46,6 +46,10 @@ def get_main_menu_keyboard():
         [
             InlineKeyboardButton("📈 거래량 생성", callback_data="volume_trading"),
             InlineKeyboardButton("⚙️ 리스크 설정", callback_data="risk_settings")
+        ],
+        [
+            InlineKeyboardButton("🔍 심볼 조회", callback_data="symbols"),
+            InlineKeyboardButton("📊 시장 정보", callback_data="market_info")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -323,6 +327,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - **리스크 설정 조회:** `/risk`
 - **리스크 설정 변경:** `/setrisk [최대손실] [손절비율] [익절비율] [최대포지션]`
 
+**5. 심볼 조회**
+- **전체 심볼 조회:** `/symbols`
+- **심볼 검색:** `/search [검색어]`
+- **심볼 정보:** `/info [심볼]`
+
 **지원 거래소:** XT.com, Backpack, Hyperliquid
         """
         await query.edit_message_text(
@@ -330,6 +339,75 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=get_main_menu_keyboard(),
             parse_mode='Markdown'
         )
+
+        elif query.data == "symbols":
+            trader = user_traders.get(user_id)
+            if not trader:
+                await query.edit_message_text(
+                    "❌ **거래소가 선택되지 않았습니다.**\n\n"
+                    "먼저 거래소를 선택하세요.",
+                    reply_markup=get_main_menu_keyboard(),
+                    parse_mode='Markdown'
+                )
+                return
+            
+            await query.edit_message_text(
+                "🔍 **심볼 조회**\n\n"
+                "전체 심볼 목록을 가져오는 중...",
+                parse_mode='Markdown'
+            )
+            
+            symbols = trader.get_all_symbols()
+            if isinstance(symbols, list) and len(symbols) > 0:
+                # 심볼을 10개씩 그룹화
+                symbol_groups = [symbols[i:i+10] for i in range(0, len(symbols), 10)]
+                
+                if len(symbol_groups) == 1:
+                    symbols_text = "\n".join(symbols[:20])  # 최대 20개만 표시
+                    await query.edit_message_text(
+                        f"🔍 **{trader.exchange.upper()} 거래쌍 목록**\n\n"
+                        f"총 {len(symbols)}개 거래쌍\n\n"
+                        f"```\n{symbols_text}\n```\n\n"
+                        f"전체 목록: `/symbols` 명령어 사용",
+                        reply_markup=get_main_menu_keyboard(),
+                        parse_mode='Markdown'
+                    )
+                else:
+                    await query.edit_message_text(
+                        f"🔍 **{trader.exchange.upper()} 거래쌍 목록**\n\n"
+                        f"총 {len(symbols)}개 거래쌍\n\n"
+                        f"페이지가 많아 `/symbols` 명령어로 전체 목록을 확인하세요.",
+                        reply_markup=get_main_menu_keyboard(),
+                        parse_mode='Markdown'
+                    )
+            else:
+                await query.edit_message_text(
+                    f"❌ **심볼 조회 실패**\n\n"
+                    f"오류: {str(symbols)}",
+                    reply_markup=get_main_menu_keyboard(),
+                    parse_mode='Markdown'
+                )
+
+        elif query.data == "market_info":
+            help_text = """
+📊 **시장 정보 사용법**
+
+**현재 가격 조회:**
+`/price [심볼]`
+
+**심볼 검색:**
+`/search [검색어]`
+
+**예시:**
+`/price ETH_USD`
+`/search BTC`
+`/search ETH`
+            """
+            await query.edit_message_text(
+                help_text,
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode='Markdown'
+            )
 
 async def handle_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """API Key 입력 처리"""
@@ -623,6 +701,120 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("먼저 거래소를 선택하세요.")
 
+async def symbols(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """전체 심볼 목록 조회"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    
+    symbols = trader.get_all_symbols()
+    if isinstance(symbols, list) and len(symbols) > 0:
+        # 심볼을 50개씩 그룹화하여 메시지 분할
+        symbol_groups = [symbols[i:i+50] for i in range(0, len(symbols), 50)]
+        
+        for i, group in enumerate(symbol_groups):
+            symbols_text = "\n".join(group)
+            await update.message.reply_text(
+                f"🔍 **{trader.exchange.upper()} 거래쌍 목록 ({i+1}/{len(symbol_groups)})**\n\n"
+                f"```\n{symbols_text}\n```",
+                parse_mode='Markdown'
+            )
+    else:
+        await update.message.reply_text(f"❌ 심볼 조회 실패: {str(symbols)}")
+
+async def search_symbol(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """심볼 검색"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    if len(context.args) < 1:
+        await update.message.reply_text("사용법: /search [검색어]")
+        return
+    
+    search_term = context.args[0].upper()
+    symbols = trader.get_all_symbols()
+    
+    if isinstance(symbols, list):
+        matched_symbols = [s for s in symbols if search_term in s.upper()]
+        if matched_symbols:
+            symbols_text = "\n".join(matched_symbols[:20])  # 최대 20개만 표시
+            await update.message.reply_text(
+                f"🔍 **'{search_term}' 검색 결과**\n\n"
+                f"총 {len(matched_symbols)}개 발견\n\n"
+                f"```\n{symbols_text}\n```",
+                parse_mode='Markdown'
+            )
+        else:
+            await update.message.reply_text(f"❌ '{search_term}'에 해당하는 심볼을 찾을 수 없습니다.")
+    else:
+        await update.message.reply_text(f"❌ 심볼 조회 실패: {str(symbols)}")
+
+async def price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """현재 가격 조회"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    if len(context.args) < 1:
+        await update.message.reply_text("사용법: /price [심볼]")
+        return
+    
+    symbol = context.args[0]
+    current_price = trader.get_current_price(symbol)
+    
+    if current_price:
+        await update.message.reply_text(
+            f"💰 **{symbol} 현재 가격**\n\n"
+            f"**가격:** `{current_price} USD`",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text(f"❌ {symbol} 가격 조회 실패")
+
+async def symbol_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """심볼 상세 정보 조회"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    if len(context.args) < 1:
+        await update.message.reply_text("사용법: /info [심볼]")
+        return
+    
+    symbol = context.args[0]
+    info = trader.get_symbol_info(symbol)
+    
+    if 'error' not in str(info):
+        await update.message.reply_text(
+            f"📊 **{symbol} 상세 정보**\n\n"
+            f"```\n{str(info)}\n```",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text(f"❌ {symbol} 정보 조회 실패: {str(info)}")
+
 def main():
     token = os.environ.get('TELEGRAM_BOT_TOKEN', 'YOUR_TELEGRAM_BOT_TOKEN')
     app = ApplicationBuilder().token(token).build()
@@ -653,6 +845,10 @@ def main():
     app.add_handler(CommandHandler('cancel', cancel_order))
     app.add_handler(CommandHandler('status', order_status))
     app.add_handler(CommandHandler('stop', stop))
+    app.add_handler(CommandHandler('symbols', symbols))
+    app.add_handler(CommandHandler('search', search_symbol))
+    app.add_handler(CommandHandler('price', price))
+    app.add_handler(CommandHandler('info', symbol_info))
     app.add_handler(CallbackQueryHandler(button_callback))
     app.run_polling()
 
