@@ -340,56 +340,56 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
 
-        elif query.data == "symbols":
-            trader = user_traders.get(user_id)
-            if not trader:
-                await query.edit_message_text(
-                    "❌ **거래소가 선택되지 않았습니다.**\n\n"
-                    "먼저 거래소를 선택하세요.",
-                    reply_markup=get_main_menu_keyboard(),
-                    parse_mode='Markdown'
-                )
-                return
-            
+    elif query.data == "symbols":
+        trader = user_traders.get(user_id)
+        if not trader:
             await query.edit_message_text(
-                "🔍 **심볼 조회**\n\n"
-                "전체 심볼 목록을 가져오는 중...",
+                "❌ **거래소가 선택되지 않았습니다.**\n\n"
+                "먼저 거래소를 선택하세요.",
+                reply_markup=get_main_menu_keyboard(),
                 parse_mode='Markdown'
             )
+            return
+        
+        await query.edit_message_text(
+            "🔍 **심볼 조회**\n\n"
+            "전체 심볼 목록을 가져오는 중...",
+            parse_mode='Markdown'
+        )
+        
+        symbols = trader.get_all_symbols()
+        if isinstance(symbols, list) and len(symbols) > 0:
+            # 심볼을 10개씩 그룹화
+            symbol_groups = [symbols[i:i+10] for i in range(0, len(symbols), 10)]
             
-            symbols = trader.get_all_symbols()
-            if isinstance(symbols, list) and len(symbols) > 0:
-                # 심볼을 10개씩 그룹화
-                symbol_groups = [symbols[i:i+10] for i in range(0, len(symbols), 10)]
-                
-                if len(symbol_groups) == 1:
-                    symbols_text = "\n".join(symbols[:20])  # 최대 20개만 표시
-                    await query.edit_message_text(
-                        f"🔍 **{trader.exchange.upper()} 거래쌍 목록**\n\n"
-                        f"총 {len(symbols)}개 거래쌍\n\n"
-                        f"```\n{symbols_text}\n```\n\n"
-                        f"전체 목록: `/symbols` 명령어 사용",
-                        reply_markup=get_main_menu_keyboard(),
-                        parse_mode='Markdown'
-                    )
-                else:
-                    await query.edit_message_text(
-                        f"🔍 **{trader.exchange.upper()} 거래쌍 목록**\n\n"
-                        f"총 {len(symbols)}개 거래쌍\n\n"
-                        f"페이지가 많아 `/symbols` 명령어로 전체 목록을 확인하세요.",
-                        reply_markup=get_main_menu_keyboard(),
-                        parse_mode='Markdown'
-                    )
-            else:
+            if len(symbol_groups) == 1:
+                symbols_text = "\n".join(symbols[:20])  # 최대 20개만 표시
                 await query.edit_message_text(
-                    f"❌ **심볼 조회 실패**\n\n"
-                    f"오류: {str(symbols)}",
+                    f"🔍 **{trader.exchange.upper()} 거래쌍 목록**\n\n"
+                    f"총 {len(symbols)}개 거래쌍\n\n"
+                    f"```\n{symbols_text}\n```\n\n"
+                    f"전체 목록: `/symbols` 명령어 사용",
                     reply_markup=get_main_menu_keyboard(),
                     parse_mode='Markdown'
                 )
+            else:
+                await query.edit_message_text(
+                    f"🔍 **{trader.exchange.upper()} 거래쌍 목록**\n\n"
+                    f"총 {len(symbols)}개 거래쌍\n\n"
+                    f"페이지가 많아 `/symbols` 명령어로 전체 목록을 확인하세요.",
+                    reply_markup=get_main_menu_keyboard(),
+                    parse_mode='Markdown'
+                )
+        else:
+            await query.edit_message_text(
+                f"❌ **심볼 조회 실패**\n\n"
+                f"오류: {str(symbols)}",
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode='Markdown'
+            )
 
-        elif query.data == "market_info":
-            help_text = """
+    elif query.data == "market_info":
+        help_text = """
 📊 **시장 정보 사용법**
 
 **현재 가격 조회:**
@@ -402,12 +402,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 `/price ETH_USD`
 `/search BTC`
 `/search ETH`
-            """
-            await query.edit_message_text(
-                help_text,
-                reply_markup=get_main_menu_keyboard(),
-                parse_mode='Markdown'
-            )
+        """
+        await query.edit_message_text(
+            help_text,
+            reply_markup=get_main_menu_keyboard(),
+            parse_mode='Markdown'
+        )
 
 async def handle_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """API Key 입력 처리"""
