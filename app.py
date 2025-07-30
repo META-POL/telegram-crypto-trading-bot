@@ -206,12 +206,6 @@ async def test_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def run_telegram_bot():
     """텔레그램 봇 실행 함수"""
-    import asyncio
-    
-    # 새로운 이벤트 루프 생성
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
     # 환경 변수 확인
     token = os.environ.get('TELEGRAM_BOT_TOKEN')
     if not token or token == 'YOUR_TELEGRAM_BOT_TOKEN':
@@ -239,20 +233,22 @@ def run_telegram_bot():
         telegram_app.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         print(f"❌ 텔레그램 봇 오류: {e}")
-    finally:
-        loop.close()
 
-def main():
-    """메인 함수 - Flask와 텔레그램 봇을 함께 실행"""
-    # 텔레그램 봇을 별도 스레드에서 실행
-    bot_thread = threading.Thread(target=run_telegram_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
-    
-    # Flask 서버 실행 (Railway 헬스체크용)
+def run_flask_server():
+    """Flask 서버 실행 함수"""
     port = int(os.environ.get('PORT', 5000))
     print(f"🌐 Flask 서버 시작 중... 포트: {port}")
     app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+
+def main():
+    """메인 함수 - 텔레그램 봇을 메인 스레드에서 실행"""
+    # Flask 서버를 별도 스레드에서 실행
+    flask_thread = threading.Thread(target=run_flask_server)
+    flask_thread.daemon = True
+    flask_thread.start()
+    
+    # 텔레그램 봇을 메인 스레드에서 실행
+    run_telegram_bot()
 
 if __name__ == '__main__':
     main() 
