@@ -21,13 +21,18 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 
 ### 3. 배포 확인
 
-배포 후 다음 URL로 헬스체크를 확인하세요:
-- `https://your-app-name.railway.app/`
-- `https://your-app-name.railway.app/health`
+배포 후 다음 로그 메시지들을 확인하세요:
+- `🤖 텔레그램 봇 시작 중...`
+- `✅ 텔레그램 봇이 성공적으로 시작되었습니다!`
+- `🔄 폴링 시작...`
 
-### 4. 로그 확인
+### 4. 봇 테스트
 
-Railway 대시보드에서 로그를 확인하여 오류를 진단하세요.
+텔레그램에서 다음 명령어들로 봇을 테스트하세요:
+- `/start` - 봇 시작
+- `/balance` - 잔고 조회
+- `/symbols` - 심볼 조회
+- `/testapi` - API 테스트
 
 ### 5. 문제 해결
 
@@ -37,26 +42,36 @@ Railway 대시보드에서 로그를 확인하여 오류를 진단하세요.
    - TELEGRAM_BOT_TOKEN이 설정되었는지 확인
    - FERNET_KEY가 설정되었는지 확인
 
-2. **포트 문제**
-   - Railway는 자동으로 PORT 환경 변수를 설정
-   - 코드에서 `os.environ.get('PORT', 5000)` 사용
+2. **배포 실패**
+   - Railway 대시보드에서 로그 확인
+   - 빌드 오류 메시지 확인
 
-3. **의존성 문제**
-   - requirements.txt에 모든 필요한 패키지가 포함되어 있는지 확인
+3. **봇 응답 없음**
+   - 텔레그램 봇 토큰이 올바른지 확인
+   - 채널 멤버십 확인
 
-4. **헬스체크 실패**
-   - Flask 앱이 정상적으로 시작되는지 확인
-   - `/` 또는 `/health` 엔드포인트가 응답하는지 확인
+### 6. 현재 지원 기능
 
-### 6. 배포 후 테스트
+- ✅ **잔고 조회**: Backpack 거래소
+- ✅ **심볼 조회**: Backpack 거래소
+- ✅ **API 테스트**: Backpack 거래소
+- ✅ **도움말**: 사용법 안내
 
-1. 텔레그램에서 봇에게 `/start` 명령어 전송
-2. 메뉴가 정상적으로 표시되는지 확인
-3. API 등록 기능 테스트
-4. 심볼 조회 및 잔고 조회 테스트
+### 7. 파일 구조
+
+```
+├── app.py              # 메인 봇 실행 파일
+├── trading_bot_unified.py  # 거래소 API 통합
+├── user_api_store.py   # API 키 저장
+├── requirements.txt    # Python 패키지
+├── Procfile           # Railway 실행 명령어
+├── railway.json       # Railway 배포 설정
+└── runtime.txt        # Python 버전
+```
 
 ## 📝 참고사항
 
 - Railway는 자동으로 HTTPS를 제공합니다
 - 무료 플랜에서는 월 사용량 제한이 있습니다
-- 로그는 Railway 대시보드에서 실시간으로 확인할 수 있습니다 
+- 로그는 Railway 대시보드에서 실시간으로 확인할 수 있습니다
+- 현재 Backpack 거래소만 지원됩니다 
