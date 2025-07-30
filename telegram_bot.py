@@ -50,6 +50,9 @@ def get_main_menu_keyboard():
         [
             InlineKeyboardButton("🔍 심볼 조회", callback_data="symbols"),
             InlineKeyboardButton("📊 시장 정보", callback_data="market_info")
+        ],
+        [
+            InlineKeyboardButton("🔧 API 테스트", callback_data="test_api")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -270,12 +273,49 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
-        result = trader.get_balance()
         await query.edit_message_text(
-            f"💰 **잔고 정보**\n\n```\n{str(result)}\n```",
-            reply_markup=get_main_menu_keyboard(),
+            "💰 **잔고 조회 중...**\n\n잠시만 기다려주세요.",
             parse_mode='Markdown'
         )
+        
+        result = trader.get_balance()
+        
+        if isinstance(result, dict) and 'error' in result:
+            await query.edit_message_text(
+                f"❌ **잔고 조회 실패**\n\n"
+                f"오류: {result['error']}\n\n"
+                f"**확인사항:**\n"
+                f"1. API 키가 올바르게 등록되었는지 확인\n"
+                f"2. API 권한이 잔고 조회를 허용하는지 확인\n"
+                f"3. 네트워크 연결 상태 확인",
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode='Markdown'
+            )
+        elif isinstance(result, dict) and len(result) > 0:
+            balance_text = f"💰 **{trader.exchange.upper()} 잔고 정보**\n\n"
+            for currency, balance in result.items():
+                if isinstance(balance, dict) and 'available' in balance:
+                    available = balance['available']
+                    if available > 0:
+                        balance_text += f"**{currency}**: `{available:.8f}`\n"
+                elif isinstance(balance, (int, float)) and balance > 0:
+                    balance_text += f"**{currency}**: `{balance:.8f}`\n"
+            
+            if balance_text == f"💰 **{trader.exchange.upper()} 잔고 정보**\n\n":
+                balance_text += "보유 자산이 없습니다."
+            
+            await query.edit_message_text(
+                balance_text,
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode='Markdown'
+            )
+        else:
+            await query.edit_message_text(
+                "❌ **잔고 조회 실패**\n\n"
+                f"예상치 못한 응답: {str(result)}",
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode='Markdown'
+            )
     
     elif query.data == "profit":
         trader = user_traders.get(user_id)
@@ -332,6 +372,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - **심볼 검색:** `/search [검색어]`
 - **심볼 정보:** `/info [심볼]`
 
+**6. 디버깅 및 문제 해결**
+- **API 연결 테스트:** `/testapi`
+- **API 응답 디버깅:** `/debug [balance|symbols]`
+- **잔고 조회:** `/balance`
+
 **지원 거래소:** XT.com, Backpack, Hyperliquid
         """
         await query.edit_message_text(
@@ -352,13 +397,25 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         await query.edit_message_text(
-            "🔍 **심볼 조회**\n\n"
-            "전체 심볼 목록을 가져오는 중...",
+            "🔍 **심볼 조회 중...**\n\n"
+            "거래쌍 목록을 가져오는 중입니다.",
             parse_mode='Markdown'
         )
         
         symbols = trader.get_all_symbols()
-        if isinstance(symbols, list) and len(symbols) > 0:
+        
+        if isinstance(symbols, dict) and 'error' in symbols:
+            await query.edit_message_text(
+                f"❌ **심볼 조회 실패**\n\n"
+                f"오류: {symbols['error']}\n\n"
+                f"**확인사항:**\n"
+                f"1. API 키가 올바르게 등록되었는지 확인\n"
+                f"2. 네트워크 연결 상태 확인\n"
+                f"3. 거래소 서버 상태 확인",
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode='Markdown'
+            )
+        elif isinstance(symbols, list) and len(symbols) > 0:
             # 심볼을 10개씩 그룹화
             symbol_groups = [symbols[i:i+10] for i in range(0, len(symbols), 10)]
             
@@ -383,7 +440,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text(
                 f"❌ **심볼 조회 실패**\n\n"
-                f"오류: {str(symbols)}",
+                f"예상치 못한 응답: {str(symbols)}",
                 reply_markup=get_main_menu_keyboard(),
                 parse_mode='Markdown'
             )
@@ -408,6 +465,45 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=get_main_menu_keyboard(),
             parse_mode='Markdown'
         )
+
+    elif query.data == "test_api":
+        trader = user_traders.get(user_id)
+        if not trader:
+            await query.edit_message_text(
+                "❌ **거래소가 선택되지 않았습니다.**\n\n"
+                "먼저 거래소를 선택하세요.",
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode='Markdown'
+            )
+            return
+        
+        await query.edit_message_text(
+            "🔧 **API 연결 테스트 중...**\n\n"
+            "API 키와 연결 상태를 확인하고 있습니다.",
+            parse_mode='Markdown'
+        )
+        
+        result = trader.test_api_connection()
+        
+        if result.get('status') == 'success':
+            await query.edit_message_text(
+                f"✅ **API 연결 성공!**\n\n"
+                f"{result.get('message')}\n\n"
+                f"이제 잔고 조회와 심볼 조회가 정상적으로 작동할 것입니다.",
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode='Markdown'
+            )
+        else:
+            await query.edit_message_text(
+                f"❌ **API 연결 실패**\n\n"
+                f"오류: {result.get('message')}\n\n"
+                f"**해결 방법:**\n"
+                f"1. API 키를 다시 등록해보세요\n"
+                f"2. API 권한 설정을 확인하세요\n"
+                f"3. 네트워크 연결을 확인하세요",
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode='Markdown'
+            )
 
 async def handle_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """API Key 입력 처리"""
@@ -867,16 +963,16 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             # 결과를 보기 좋게 포맷팅
             if isinstance(result, dict):
-                balance_text = "💰 **잔고 정보**\n\n"
+                balance_text = f"💰 **{trader.exchange.upper()} 잔고 정보**\n\n"
                 for key, value in result.items():
                     if isinstance(value, dict) and 'available' in value:
                         available = value.get('available', 0)
                         if float(available) > 0:
-                            balance_text += f"**{key}**: `{available}`\n"
+                            balance_text += f"**{key}**: `{available:.8f}`\n"
                     elif isinstance(value, (int, float)) and value > 0:
-                        balance_text += f"**{key}**: `{value}`\n"
+                        balance_text += f"**{key}**: `{value:.8f}`\n"
                 
-                if balance_text == "💰 **잔고 정보**\n\n":
+                if balance_text == f"💰 **{trader.exchange.upper()} 잔고 정보**\n\n":
                     balance_text += "보유 자산이 없습니다."
                 
                 await update.message.reply_text(balance_text, parse_mode='Markdown')
@@ -884,6 +980,71 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"💰 **잔고 정보**\n\n```\n{str(result)}\n```", parse_mode='Markdown')
     except Exception as e:
         await update.message.reply_text(f"❌ 잔고 조회 중 오류 발생: {str(e)}")
+
+async def test_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """API 연결 테스트"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    
+    result = trader.test_api_connection()
+    
+    if result.get('status') == 'success':
+        await update.message.reply_text(
+            f"✅ **API 연결 성공!**\n\n"
+            f"{result.get('message')}\n\n"
+            f"이제 잔고 조회와 심볼 조회가 정상적으로 작동할 것입니다.",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text(
+            f"❌ **API 연결 실패**\n\n"
+            f"오류: {result.get('message')}\n\n"
+            f"**해결 방법:**\n"
+            f"1. API 키를 다시 등록해보세요\n"
+            f"2. API 권한 설정을 확인하세요\n"
+            f"3. 네트워크 연결을 확인하세요",
+            parse_mode='Markdown'
+        )
+
+async def debug_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """API 응답 디버깅"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    
+    if len(context.args) < 1:
+        await update.message.reply_text("사용법: /debug [balance|symbols]")
+        return
+    
+    endpoint = context.args[0].lower()
+    if endpoint not in ['balance', 'symbols']:
+        await update.message.reply_text("지원하는 엔드포인트: balance, symbols")
+        return
+    
+    result = trader.debug_api_response(endpoint)
+    
+    if 'error' in result:
+        await update.message.reply_text(f"❌ 디버깅 실패: {result['error']}")
+    else:
+        debug_text = f"🔧 **{endpoint.upper()} API 디버깅 결과**\n\n"
+        debug_text += f"**상태 코드:** `{result.get('status_code', 'N/A')}`\n"
+        debug_text += f"**응답 길이:** `{len(result.get('raw_response', ''))}`\n\n"
+        debug_text += f"**응답 내용 (처음 500자):**\n```\n{result.get('raw_response', '')[:500]}\n```"
+        
+        await update.message.reply_text(debug_text, parse_mode='Markdown')
 
 async def list_symbols(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """심볼 목록 조회 (간단 버전)"""
@@ -988,6 +1149,8 @@ def main():
     app.add_handler(CommandHandler('price', price))
     app.add_handler(CommandHandler('info', symbol_info))
     app.add_handler(CommandHandler('balance', balance))
+    app.add_handler(CommandHandler('testapi', test_api))
+    app.add_handler(CommandHandler('debug', debug_api))
     app.add_handler(CommandHandler('list', list_symbols))
     app.add_handler(CommandHandler('listorders', list_orders))
     app.add_handler(CallbackQueryHandler(button_callback))

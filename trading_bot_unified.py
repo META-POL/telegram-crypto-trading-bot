@@ -4,6 +4,7 @@ import hashlib
 import requests
 import threading
 import base64
+import logging
 from datetime import datetime
 try:
     from nacl.signing import SigningKey
@@ -15,6 +16,10 @@ try:
     import ccxt
 except ImportError:
     ccxt = None
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class UnifiedSpotTrader:
     def __init__(self, exchange, **kwargs):
@@ -98,26 +103,117 @@ class UnifiedSpotTrader:
         }
 
     def get_balance(self):
-        if self.exchange == 'xt':
-            url = f"{self.base_url}/api/v4/balance/list"
-            headers = self._get_headers_xt()
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                return response.json()
+        """잔고 조회 (개선된 버전)"""
+        try:
+            if self.exchange == 'xt':
+                # XT API 엔드포인트 수정
+                url = f"{self.base_url}/api/v4/balance/list"
+                headers = self._get_headers_xt()
+                response = requests.get(url, headers=headers)
+                logger.info(f"XT 잔고 조회 응답: {response.status_code} - {response.text[:200]}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # XT 응답 구조에 맞게 처리
+                    balances = {}
+                    if 'result' in data and 'balances' in data['result']:
+                        for balance in data['result']['balances']:
+                            currency = balance.get('currency')
+                            available = float(balance.get('available', 0))
+                            if available > 0:
+                                balances[currency] = {
+                                    'available': available,
+                                    'total': float(balance.get('total', 0)),
+                                    'frozen': float(balance.get('frozen', 0))
+                                }
+                    elif 'balances' in data:
+                        # 다른 응답 구조 처리
+                        for balance in data['balances']:
+                            currency = balance.get('currency')
+                            available = float(balance.get('available', 0))
+                            if available > 0:
+                                balances[currency] = {
+                                    'available': available,
+                                    'total': float(balance.get('total', 0)),
+                                    'frozen': float(balance.get('frozen', 0))
+                                }
+                    return balances
+                else:
+                    return {"error": f"API 오류 ({response.status_code}): {response.text}"}
+                    
+            elif self.exchange == 'backpack':
+                # Backpack API 엔드포인트 수정
+                url = f"{self.base_url}/capital/balances"
+                headers = self._get_headers_backpack("balanceQuery")
+                response = requests.get(url, headers=headers)
+                logger.info(f"Backpack 잔고 조회 응답: {response.status_code} - {response.text[:200]}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # Backpack 응답 구조에 맞게 처리
+                    balances = {}
+                    if 'balances' in data:
+                        for balance in data['balances']:
+                            currency = balance.get('currency')
+                            available = float(balance.get('available', 0))
+                            if available > 0:
+                                balances[currency] = {
+                                    'available': available,
+                                    'total': float(balance.get('total', 0)),
+                                    'frozen': float(balance.get('frozen', 0))
+                                }
+                    elif 'result' in data and 'balances' in data['result']:
+                        # 다른 응답 구조 처리
+                        for balance in data['result']['balances']:
+                            currency = balance.get('currency')
+                            available = float(balance.get('available', 0))
+                            if available > 0:
+                                balances[currency] = {
+                                    'available': available,
+                                    'total': float(balance.get('total', 0)),
+                                    'frozen': float(balance.get('frozen', 0))
+                                }
+                    return balances
+                else:
+                    return {"error": f"API 오류 ({response.status_code}): {response.text}"}
+                    
+            elif self.exchange == 'hyperliquid':
+                try:
+                    balance = self.ccxt_client.fetch_balance()
+                    # CCXT 응답 구조에 맞게 처리
+                    balances = {}
+                    if isinstance(balance, dict):
+                        for currency, data in balance.items():
+                            if isinstance(data, dict) and 'free' in data:
+                                available = float(data.get('free', 0))
+                                if available > 0:
+                                    balances[currency] = {
+                                        'available': available,
+                                        'total': float(data.get('total', 0)),
+                                        'frozen': float(data.get('used', 0))
+                                    }
+                    elif isinstance(balance, list):
+                        # 리스트인 경우 처리
+                        for item in balance:
+                            if isinstance(item, dict) and 'currency' in item:
+                                currency = item.get('currency')
+                                available = float(item.get('free', 0))
+                                if available > 0:
+                                    balances[currency] = {
+                                        'available': available,
+                                        'total': float(item.get('total', 0)),
+                                        'frozen': float(item.get('used', 0))
+                                    }
+                    return balances
+                except Exception as e:
+                    logger.error(f"Hyperliquid 잔고 조회 오류: {str(e)}")
+                    return {"error": f"Hyperliquid 잔고 조회 오류: {str(e)}"}
             else:
-                return {"error": response.text}
-        elif self.exchange == 'backpack':
-            url = f"{self.base_url}/capital/balances"
-            headers = self._get_headers_backpack("balanceQuery")
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return {"error": response.text}
-        elif self.exchange == 'hyperliquid':
-            return self.ccxt_client.fetch_balance()
-        else:
-            return {"error": "지원하지 않는 거래소"}
+                return {"error": "지원하지 않는 거래소"}
+                
+        except Exception as e:
+            logger.error(f"잔고 조회 중 예외 발생: {str(e)}")
+            return {"error": f"잔고 조회 실패: {str(e)}"}
 
     def get_current_price(self, symbol):
         """현재 가격 조회"""
@@ -429,43 +525,112 @@ class UnifiedSpotTrader:
         } 
 
     def get_all_symbols(self):
-        """모든 거래쌍 심볼 조회"""
+        """모든 거래쌍 심볼 조회 (개선된 버전)"""
         try:
             if self.exchange == 'xt':
-                url = f"{self.base_url}/api/v4/public/symbol"
+                # XT API 엔드포인트 수정 - 올바른 엔드포인트 사용
+                url = f"{self.base_url}/api/v4/public/symbol/list"
                 response = requests.get(url)
+                logger.info(f"XT 심볼 조회 응답: {response.status_code} - {response.text[:200]}")
+                
                 if response.status_code == 200:
                     data = response.json()
                     symbols = []
-                    for item in data.get('result', []):
-                        if item.get('state') == 'ENABLED':
-                            symbols.append(item.get('symbol'))
+                    if 'result' in data:
+                        for item in data['result']:
+                            if isinstance(item, dict) and item.get('state') == 'ENABLED':
+                                symbol = item.get('symbol')
+                                if symbol:
+                                    symbols.append(symbol)
+                    elif isinstance(data, list):
+                        # 리스트 형태의 응답 처리
+                        for item in data:
+                            if isinstance(item, dict) and item.get('state') == 'ENABLED':
+                                symbol = item.get('symbol')
+                                if symbol:
+                                    symbols.append(symbol)
                     return symbols
                 else:
-                    return {"error": response.text}
+                    # 다른 엔드포인트 시도
+                    url2 = f"{self.base_url}/api/v4/public/symbols"
+                    response2 = requests.get(url2)
+                    logger.info(f"XT 심볼 조회 (대체) 응답: {response2.status_code} - {response2.text[:200]}")
+                    
+                    if response2.status_code == 200:
+                        data2 = response2.json()
+                        symbols = []
+                        if 'result' in data2:
+                            for item in data2['result']:
+                                if isinstance(item, dict) and item.get('state') == 'ENABLED':
+                                    symbol = item.get('symbol')
+                                    if symbol:
+                                        symbols.append(symbol)
+                        elif isinstance(data2, list):
+                            for item in data2:
+                                if isinstance(item, dict) and item.get('state') == 'ENABLED':
+                                    symbol = item.get('symbol')
+                                    if symbol:
+                                        symbols.append(symbol)
+                        return symbols
+                    else:
+                        return {"error": f"XT API 오류: 첫 번째 ({response.status_code}), 두 번째 ({response2.status_code})"}
+                    
             elif self.exchange == 'backpack':
                 url = f"{self.base_url}/markets"
                 response = requests.get(url)
+                logger.info(f"Backpack 심볼 조회 응답: {response.status_code} - {response.text[:200]}")
+                
                 if response.status_code == 200:
                     data = response.json()
                     symbols = []
-                    for item in data.get('symbols', []):
-                        if item.get('status') == 'TRADING':
-                            symbols.append(item.get('symbol'))
+                    if isinstance(data, list):
+                        # Backpack은 리스트 형태로 응답
+                        for item in data:
+                            if isinstance(item, dict):
+                                symbol = item.get('symbol')
+                                market_type = item.get('marketType', '')
+                                # SPOT 거래만 필터링
+                                if symbol and market_type == 'SPOT':
+                                    symbols.append(symbol)
+                    elif isinstance(data, dict) and 'symbols' in data:
+                        # 딕셔너리 형태의 응답도 처리
+                        for item in data['symbols']:
+                            if isinstance(item, dict) and item.get('status') == 'TRADING':
+                                symbol = item.get('symbol')
+                                if symbol:
+                                    symbols.append(symbol)
                     return symbols
                 else:
-                    return {"error": response.text}
+                    return {"error": f"API 오류 ({response.status_code}): {response.text}"}
+                    
             elif self.exchange == 'hyperliquid':
-                markets = self.ccxt_client.load_markets()
-                symbols = []
-                for symbol in markets:
-                    if markets[symbol]['spot']:
-                        symbols.append(symbol)
-                return symbols
+                try:
+                    # Hyperliquid는 CCXT 대신 직접 API 호출
+                    url = "https://api.hyperliquid.xyz/info"
+                    response = requests.post(url, json={"type": "meta"})
+                    logger.info(f"Hyperliquid 심볼 조회 응답: {response.status_code} - {response.text[:200]}")
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        symbols = []
+                        if 'universe' in data:
+                            for item in data['universe']:
+                                if isinstance(item, dict):
+                                    symbol = item.get('name')
+                                    if symbol:
+                                        symbols.append(symbol)
+                        return symbols
+                    else:
+                        return {"error": f"Hyperliquid API 오류 ({response.status_code}): {response.text}"}
+                except Exception as e:
+                    logger.error(f"Hyperliquid 심볼 조회 오류: {str(e)}")
+                    return {"error": f"Hyperliquid 심볼 조회 오류: {str(e)}"}
             else:
                 return {"error": "지원하지 않는 거래소"}
+                
         except Exception as e:
-            return {"error": f"심볼 조회 오류: {str(e)}"}
+            logger.error(f"심볼 조회 중 예외 발생: {str(e)}")
+            return {"error": f"심볼 조회 실패: {str(e)}"}
 
     def get_symbol_info(self, symbol):
         """특정 심볼 정보 조회"""
@@ -492,3 +657,97 @@ class UnifiedSpotTrader:
                 return {"error": "지원하지 않는 거래소"}
         except Exception as e:
             return {"error": f"심볼 정보 조회 오류: {str(e)}"} 
+
+    def test_api_connection(self):
+        """API 연결 테스트"""
+        try:
+            if self.exchange == 'xt':
+                # XT API 테스트 - 계정 정보 조회
+                url = f"{self.base_url}/api/v4/account"
+                headers = self._get_headers_xt()
+                response = requests.get(url, headers=headers)
+                logger.info(f"XT API 테스트 응답: {response.status_code} - {response.text[:200]}")
+                
+                if response.status_code == 200:
+                    return {"status": "success", "message": "XT API 연결 성공"}
+                else:
+                    return {"status": "error", "message": f"XT API 오류: {response.text}"}
+                    
+            elif self.exchange == 'backpack':
+                # Backpack API 테스트 - 계정 정보 조회
+                url = f"{self.base_url}/account"
+                headers = self._get_headers_backpack("accountQuery")
+                response = requests.get(url, headers=headers)
+                logger.info(f"Backpack API 테스트 응답: {response.status_code} - {response.text[:200]}")
+                
+                if response.status_code == 200:
+                    return {"status": "success", "message": "Backpack API 연결 성공"}
+                else:
+                    return {"status": "error", "message": f"Backpack API 오류: {response.text}"}
+                    
+            elif self.exchange == 'hyperliquid':
+                try:
+                    # Hyperliquid API 테스트 - 잔고 조회
+                    balance = self.ccxt_client.fetch_balance()
+                    return {"status": "success", "message": "Hyperliquid API 연결 성공"}
+                except Exception as e:
+                    return {"status": "error", "message": f"Hyperliquid API 오류: {str(e)}"}
+            else:
+                return {"status": "error", "message": "지원하지 않는 거래소"}
+                
+        except Exception as e:
+            logger.error(f"API 연결 테스트 중 예외 발생: {str(e)}")
+            return {"status": "error", "message": f"API 연결 테스트 실패: {str(e)}"} 
+
+    def debug_api_response(self, endpoint):
+        """API 응답 디버깅용 함수"""
+        try:
+            if self.exchange == 'xt':
+                if endpoint == 'balance':
+                    url = f"{self.base_url}/api/v4/balance/list"
+                    headers = self._get_headers_xt()
+                    response = requests.get(url, headers=headers)
+                elif endpoint == 'symbols':
+                    url = f"{self.base_url}/api/v4/public/symbol"
+                    response = requests.get(url)
+                else:
+                    return {"error": "지원하지 않는 엔드포인트"}
+                    
+            elif self.exchange == 'backpack':
+                if endpoint == 'balance':
+                    url = f"{self.base_url}/capital/balances"
+                    headers = self._get_headers_backpack("balanceQuery")
+                    response = requests.get(url, headers=headers)
+                elif endpoint == 'symbols':
+                    url = f"{self.base_url}/markets"
+                    response = requests.get(url)
+                else:
+                    return {"error": "지원하지 않는 엔드포인트"}
+                    
+            elif self.exchange == 'hyperliquid':
+                if endpoint == 'balance':
+                    # Hyperliquid 잔고 조회는 인증 필요
+                    return {"error": "Hyperliquid 잔고 조회는 API 키가 필요합니다"}
+                elif endpoint == 'symbols':
+                    url = "https://api.hyperliquid.xyz/info"
+                    response = requests.post(url, json={"type": "meta"})
+                    return {
+                        "status_code": response.status_code,
+                        "raw_response": response.text,
+                        "json_response": response.json() if response.status_code == 200 else None
+                    }
+                else:
+                    return {"error": "지원하지 않는 엔드포인트"}
+            else:
+                return {"error": "지원하지 않는 거래소"}
+            
+            return {
+                "status_code": response.status_code,
+                "headers": dict(response.headers),
+                "raw_response": response.text,
+                "json_response": response.json() if response.status_code == 200 else None
+            }
+            
+        except Exception as e:
+            logger.error(f"API 디버깅 중 오류: {str(e)}")
+            return {"error": f"디버깅 오류: {str(e)}"} 
