@@ -848,6 +848,104 @@ async def symbol_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(f"❌ {symbol} 정보 조회 실패: {str(info)}")
 
+async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """잔고 조회"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    
+    try:
+        result = trader.get_balance()
+        if isinstance(result, dict) and 'error' in result:
+            await update.message.reply_text(f"❌ 잔고 조회 실패: {result['error']}")
+        else:
+            # 결과를 보기 좋게 포맷팅
+            if isinstance(result, dict):
+                balance_text = "💰 **잔고 정보**\n\n"
+                for key, value in result.items():
+                    if isinstance(value, dict) and 'available' in value:
+                        available = value.get('available', 0)
+                        if float(available) > 0:
+                            balance_text += f"**{key}**: `{available}`\n"
+                    elif isinstance(value, (int, float)) and value > 0:
+                        balance_text += f"**{key}**: `{value}`\n"
+                
+                if balance_text == "💰 **잔고 정보**\n\n":
+                    balance_text += "보유 자산이 없습니다."
+                
+                await update.message.reply_text(balance_text, parse_mode='Markdown')
+            else:
+                await update.message.reply_text(f"💰 **잔고 정보**\n\n```\n{str(result)}\n```", parse_mode='Markdown')
+    except Exception as e:
+        await update.message.reply_text(f"❌ 잔고 조회 중 오류 발생: {str(e)}")
+
+async def list_symbols(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """심볼 목록 조회 (간단 버전)"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    
+    try:
+        symbols = trader.get_all_symbols()
+        if isinstance(symbols, list) and len(symbols) > 0:
+            # 주요 심볼들만 표시 (처음 20개)
+            main_symbols = symbols[:20]
+            symbols_text = "\n".join(main_symbols)
+            
+            await update.message.reply_text(
+                f"📋 **{trader.exchange.upper()} 주요 거래쌍**\n\n"
+                f"총 {len(symbols)}개 거래쌍 중 상위 20개\n\n"
+                f"```\n{symbols_text}\n```\n\n"
+                f"전체 목록: `/symbols` 명령어 사용",
+                parse_mode='Markdown'
+            )
+        else:
+            await update.message.reply_text(f"❌ 심볼 조회 실패: {str(symbols)}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ 심볼 조회 중 오류 발생: {str(e)}")
+
+async def list_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """주문 목록 조회"""
+    user_id = update.effective_user.id
+    bot = context.bot
+    if not await is_channel_member(bot, user_id, CHANNEL_ID):
+        await update.message.reply_text("이 봇은 채널 멤버만 사용할 수 있습니다. 채널에 가입 후 다시 시도하세요.")
+        return
+    trader = user_traders.get(user_id)
+    if not trader:
+        await update.message.reply_text("먼저 거래소를 선택하세요.")
+        return
+    
+    try:
+        # 활성 주문 목록 조회 (trader.active_orders 사용)
+        if hasattr(trader, 'active_orders') and trader.active_orders:
+            orders_text = "📋 **활성 주문 목록**\n\n"
+            for order_id, order_info in trader.active_orders.items():
+                orders_text += f"**주문 ID**: `{order_id}`\n"
+                orders_text += f"**심볼**: `{order_info.get('symbol', 'N/A')}`\n"
+                orders_text += f"**타입**: `{order_info.get('side', 'N/A')}`\n"
+                orders_text += f"**가격**: `{order_info.get('price', 'N/A')}`\n"
+                orders_text += f"**수량**: `{order_info.get('quantity', 'N/A')}`\n"
+                orders_text += "---\n"
+            
+            await update.message.reply_text(orders_text, parse_mode='Markdown')
+        else:
+            await update.message.reply_text("📋 **활성 주문이 없습니다.**")
+    except Exception as e:
+        await update.message.reply_text(f"❌ 주문 목록 조회 중 오류 발생: {str(e)}")
+
 def main():
     token = os.environ.get('TELEGRAM_BOT_TOKEN', 'YOUR_TELEGRAM_BOT_TOKEN')
     app = ApplicationBuilder().token(token).build()
@@ -889,6 +987,9 @@ def main():
     app.add_handler(CommandHandler('search', search_symbol))
     app.add_handler(CommandHandler('price', price))
     app.add_handler(CommandHandler('info', symbol_info))
+    app.add_handler(CommandHandler('balance', balance))
+    app.add_handler(CommandHandler('list', list_symbols))
+    app.add_handler(CommandHandler('listorders', list_orders))
     app.add_handler(CallbackQueryHandler(button_callback))
     app.run_polling()
 
