@@ -1133,7 +1133,7 @@ def main():
     print("🤖 텔레그램 봇 시작 중...")
     telegram_app = ApplicationBuilder().token(token).build()
     
-    # 대화 핸들러 (API 등록용)
+    # 대화 핸들러 (API 등록용) - 경고 해결을 위해 per_message=False 사용
     conv_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(button_callback, pattern="^setup_api_")],
         states={
@@ -1147,7 +1147,7 @@ def main():
             ],
         },
         fallbacks=[CallbackQueryHandler(cancel, pattern="^cancel$")],
-        per_message=True,
+        per_message=False,  # 경고 해결
         allow_reentry=True,
     )
     
@@ -1182,15 +1182,11 @@ def main():
     import asyncio
     
     def run_telegram_bot():
-        # 새로운 이벤트 루프 생성
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         try:
-            telegram_app.run_polling()
+            # 메인 스레드에서 직접 실행
+            telegram_app.run_polling(allowed_updates=Update.ALL_TYPES)
         except Exception as e:
             print(f"텔레그램 봇 오류: {e}")
-        finally:
-            loop.close()
     
     # 텔레그램 봇을 별도 스레드에서 실행
     bot_thread = threading.Thread(target=run_telegram_bot)
@@ -1199,7 +1195,8 @@ def main():
     
     # Flask 앱 실행 (Railway 헬스체크용)
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    print(f"🌐 Flask 서버 시작 중... 포트: {port}")
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
 if __name__ == '__main__':
     main() 
