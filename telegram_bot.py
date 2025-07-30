@@ -609,11 +609,14 @@ async def handle_api_secret(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """대화 취소"""
+    query = update.callback_query
+    await query.answer()
+    
     user_id = update.effective_user.id
     if user_id in user_api_setup:
         del user_api_setup[user_id]
     
-    await update.message.reply_text(
+    await query.edit_message_text(
         "❌ API 등록이 취소되었습니다.",
         reply_markup=get_main_menu_keyboard()
     )
@@ -1120,7 +1123,14 @@ async def list_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ 주문 목록 조회 중 오류 발생: {str(e)}")
 
 def main():
-    token = os.environ.get('TELEGRAM_BOT_TOKEN', 'YOUR_TELEGRAM_BOT_TOKEN')
+    # 환경 변수 확인
+    token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    if not token or token == 'YOUR_TELEGRAM_BOT_TOKEN':
+        print("❌ TELEGRAM_BOT_TOKEN이 설정되지 않았습니다.")
+        print("Railway 대시보드에서 환경 변수를 설정하세요.")
+        return
+    
+    print("🤖 텔레그램 봇 시작 중...")
     telegram_app = ApplicationBuilder().token(token).build()
     
     # 대화 핸들러 (API 등록용)
@@ -1129,16 +1139,16 @@ def main():
         states={
             WAITING_API_KEY: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_key),
-                CommandHandler('cancel', cancel)
+                CallbackQueryHandler(cancel, pattern="^cancel$")
             ],
             WAITING_API_SECRET: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_secret),
-                CommandHandler('cancel', cancel)
+                CallbackQueryHandler(cancel, pattern="^cancel$")
             ],
         },
-        fallbacks=[CommandHandler('cancel', cancel)],
-        per_message=True,  # 경고 메시지 해결
-        allow_reentry=True,  # 재진입 허용
+        fallbacks=[CallbackQueryHandler(cancel, pattern="^cancel$")],
+        per_message=True,
+        allow_reentry=True,
     )
     
     telegram_app.add_handler(conv_handler)
@@ -1169,9 +1179,18 @@ def main():
     
     # Railway 배포를 위해 Flask와 텔레그램 봇을 함께 실행
     import threading
+    import asyncio
     
     def run_telegram_bot():
-        telegram_app.run_polling()
+        # 새로운 이벤트 루프 생성
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            telegram_app.run_polling()
+        except Exception as e:
+            print(f"텔레그램 봇 오류: {e}")
+        finally:
+            loop.close()
     
     # 텔레그램 봇을 별도 스레드에서 실행
     bot_thread = threading.Thread(target=run_telegram_bot)
