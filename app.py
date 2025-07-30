@@ -6,10 +6,23 @@ Railway 배포용 텔레그램 봇
 
 import os
 import logging
+import threading
+from flask import Flask, jsonify
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 from trading_bot_unified import UnifiedSpotTrader
 from user_api_store import init_db
+
+# Flask 앱 생성 (Railway 헬스체크용)
+app = Flask(__name__)
+
+@app.route('/')
+def health_check():
+    return jsonify({"status": "healthy", "message": "Telegram Bot is running"})
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "ok", "service": "telegram-crypto-trading-bot"})
 
 # 로깅 설정
 logging.basicConfig(
@@ -191,8 +204,8 @@ async def test_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """API 테스트 명령어"""
     await start(update, context)
 
-def main():
-    """메인 함수"""
+def run_telegram_bot():
+    """텔레그램 봇 실행 함수"""
     # 환경 변수 확인
     token = os.environ.get('TELEGRAM_BOT_TOKEN')
     if not token or token == 'YOUR_TELEGRAM_BOT_TOKEN':
@@ -203,20 +216,32 @@ def main():
     print("🤖 텔레그램 봇 시작 중...")
     
     # 애플리케이션 빌드
-    app = ApplicationBuilder().token(token).build()
+    telegram_app = ApplicationBuilder().token(token).build()
     
     # 핸들러 등록
-    app.add_handler(CommandHandler('start', start))
-    app.add_handler(CommandHandler('balance', balance))
-    app.add_handler(CommandHandler('symbols', symbols))
-    app.add_handler(CommandHandler('testapi', test_api))
-    app.add_handler(CallbackQueryHandler(button_callback))
+    telegram_app.add_handler(CommandHandler('start', start))
+    telegram_app.add_handler(CommandHandler('balance', balance))
+    telegram_app.add_handler(CommandHandler('symbols', symbols))
+    telegram_app.add_handler(CommandHandler('testapi', test_api))
+    telegram_app.add_handler(CallbackQueryHandler(button_callback))
     
     print("✅ 텔레그램 봇이 성공적으로 시작되었습니다!")
     print("🔄 폴링 시작...")
     
     # 폴링 시작
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    telegram_app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+def main():
+    """메인 함수 - Flask와 텔레그램 봇을 함께 실행"""
+    # 텔레그램 봇을 별도 스레드에서 실행
+    bot_thread = threading.Thread(target=run_telegram_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+    
+    # Flask 서버 실행 (Railway 헬스체크용)
+    port = int(os.environ.get('PORT', 5000))
+    print(f"🌐 Flask 서버 시작 중... 포트: {port}")
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
 if __name__ == '__main__':
     main() 
