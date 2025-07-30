@@ -4,6 +4,18 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 from trading_bot_unified import UnifiedSpotTrader
 from user_api_store import init_db, save_api, load_api
 import os
+from flask import Flask, request, jsonify
+
+# Flask 앱 생성 (Railway 헬스체크용)
+app = Flask(__name__)
+
+@app.route('/')
+def health_check():
+    return jsonify({"status": "healthy", "message": "Telegram Bot is running"})
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "ok", "service": "telegram-crypto-trading-bot"})
 
 # 채널 ID (실제 운영 채널 ID로 교체)
 CHANNEL_ID = -1002751102244
@@ -1109,7 +1121,7 @@ async def list_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     token = os.environ.get('TELEGRAM_BOT_TOKEN', 'YOUR_TELEGRAM_BOT_TOKEN')
-    app = ApplicationBuilder().token(token).build()
+    telegram_app = ApplicationBuilder().token(token).build()
     
     # 대화 핸들러 (API 등록용)
     conv_handler = ConversationHandler(
@@ -1129,32 +1141,46 @@ def main():
         allow_reentry=True,  # 재진입 허용
     )
     
-    app.add_handler(conv_handler)
-    app.add_handler(CommandHandler('start', start))
-    app.add_handler(CommandHandler('setapi', setapi))
-    app.add_handler(CommandHandler('buy', buy))
-    app.add_handler(CommandHandler('sell', sell))
-    app.add_handler(CommandHandler('mbuy', mbuy))
-    app.add_handler(CommandHandler('msell', msell))
-    app.add_handler(CommandHandler('volume', volume))
-    app.add_handler(CommandHandler('sl', stop_loss))
-    app.add_handler(CommandHandler('tp', take_profit))
-    app.add_handler(CommandHandler('risk', risk))
-    app.add_handler(CommandHandler('setrisk', setrisk))
-    app.add_handler(CommandHandler('cancel', cancel_order))
-    app.add_handler(CommandHandler('status', order_status))
-    app.add_handler(CommandHandler('stop', stop))
-    app.add_handler(CommandHandler('symbols', symbols))
-    app.add_handler(CommandHandler('search', search_symbol))
-    app.add_handler(CommandHandler('price', price))
-    app.add_handler(CommandHandler('info', symbol_info))
-    app.add_handler(CommandHandler('balance', balance))
-    app.add_handler(CommandHandler('testapi', test_api))
-    app.add_handler(CommandHandler('debug', debug_api))
-    app.add_handler(CommandHandler('list', list_symbols))
-    app.add_handler(CommandHandler('listorders', list_orders))
-    app.add_handler(CallbackQueryHandler(button_callback))
-    app.run_polling()
+    telegram_app.add_handler(conv_handler)
+    telegram_app.add_handler(CommandHandler('start', start))
+    telegram_app.add_handler(CommandHandler('setapi', setapi))
+    telegram_app.add_handler(CommandHandler('buy', buy))
+    telegram_app.add_handler(CommandHandler('sell', sell))
+    telegram_app.add_handler(CommandHandler('mbuy', mbuy))
+    telegram_app.add_handler(CommandHandler('msell', msell))
+    telegram_app.add_handler(CommandHandler('volume', volume))
+    telegram_app.add_handler(CommandHandler('sl', stop_loss))
+    telegram_app.add_handler(CommandHandler('tp', take_profit))
+    telegram_app.add_handler(CommandHandler('risk', risk))
+    telegram_app.add_handler(CommandHandler('setrisk', setrisk))
+    telegram_app.add_handler(CommandHandler('cancel', cancel_order))
+    telegram_app.add_handler(CommandHandler('status', order_status))
+    telegram_app.add_handler(CommandHandler('stop', stop))
+    telegram_app.add_handler(CommandHandler('symbols', symbols))
+    telegram_app.add_handler(CommandHandler('search', search_symbol))
+    telegram_app.add_handler(CommandHandler('price', price))
+    telegram_app.add_handler(CommandHandler('info', symbol_info))
+    telegram_app.add_handler(CommandHandler('balance', balance))
+    telegram_app.add_handler(CommandHandler('testapi', test_api))
+    telegram_app.add_handler(CommandHandler('debug', debug_api))
+    telegram_app.add_handler(CommandHandler('list', list_symbols))
+    telegram_app.add_handler(CommandHandler('listorders', list_orders))
+    telegram_app.add_handler(CallbackQueryHandler(button_callback))
+    
+    # Railway 배포를 위해 Flask와 텔레그램 봇을 함께 실행
+    import threading
+    
+    def run_telegram_bot():
+        telegram_app.run_polling()
+    
+    # 텔레그램 봇을 별도 스레드에서 실행
+    bot_thread = threading.Thread(target=run_telegram_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+    
+    # Flask 앱 실행 (Railway 헬스체크용)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
     main() 
