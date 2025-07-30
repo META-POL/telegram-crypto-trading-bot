@@ -411,60 +411,93 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """API Key 입력 처리"""
-    user_id = update.effective_user.id
-    api_key = update.message.text.strip()
-    
-    if user_id not in user_api_setup:
-        await update.message.reply_text("❌ API 등록이 시작되지 않았습니다. 메인 메뉴에서 다시 시작하세요.")
+    try:
+        user_id = update.effective_user.id
+        api_key = update.message.text.strip()
+        
+        print(f"DEBUG: API Key 입력 처리 시작 - User ID: {user_id}, Exchange: {user_api_setup.get(user_id, {}).get('exchange', 'Unknown')}")
+        
+        if user_id not in user_api_setup:
+            await update.message.reply_text("❌ API 등록이 시작되지 않았습니다. 메인 메뉴에서 다시 시작하세요.")
+            return ConversationHandler.END
+        
+        setup_info = user_api_setup[user_id]
+        exchange = setup_info["exchange"]
+        
+        # API Key 유효성 검사
+        if not api_key or len(api_key) < 10:
+            await update.message.reply_text("❌ API Key가 너무 짧습니다. 올바른 API Key를 입력하세요.")
+            return WAITING_API_KEY
+        
+        # API Key 저장
+        user_api_setup[user_id]["api_key"] = api_key
+        user_api_setup[user_id]["step"] = "api_secret"
+        
+        print(f"DEBUG: API Key 저장 완료 - Exchange: {exchange}")
+        
+        if exchange == 'backpack':
+            await update.message.reply_text(
+                f"✅ **Backpack 공개키가 저장되었습니다!**\n\n"
+                f"이제 Backpack 비밀키(Private Key)를 입력하세요:\n\n"
+                f"**참고:** Private Key는 ED25519 형식의 base64 인코딩된 문자열입니다."
+            )
+        else:
+            await update.message.reply_text(
+                f"✅ **{exchange.upper()} API Key가 저장되었습니다!**\n\n"
+                f"이제 {exchange.upper()} API Secret을 입력하세요:"
+            )
+        
+        return WAITING_API_SECRET
+        
+    except Exception as e:
+        print(f"ERROR in handle_api_key: {str(e)}")
+        await update.message.reply_text(f"❌ API Key 처리 중 오류가 발생했습니다: {str(e)}")
         return ConversationHandler.END
-    
-    setup_info = user_api_setup[user_id]
-    exchange = setup_info["exchange"]
-    
-    # API Key 저장
-    user_api_setup[user_id]["api_key"] = api_key
-    user_api_setup[user_id]["step"] = "api_secret"
-    
-    if exchange == 'backpack':
-        await update.message.reply_text(
-            f"✅ Backpack 공개키가 저장되었습니다.\n\n"
-            f"이제 Backpack 비밀키(Private Key)를 입력하세요:"
-        )
-    else:
-        await update.message.reply_text(
-            f"✅ {exchange.upper()} API Key가 저장되었습니다.\n\n"
-            f"이제 {exchange.upper()} API Secret을 입력하세요:"
-        )
-    
-    return WAITING_API_SECRET
 
 async def handle_api_secret(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """API Secret 입력 처리"""
-    user_id = update.effective_user.id
-    api_secret = update.message.text.strip()
-    
-    if user_id not in user_api_setup:
-        await update.message.reply_text("❌ API 등록이 시작되지 않았습니다. 메인 메뉴에서 다시 시작하세요.")
+    try:
+        user_id = update.effective_user.id
+        api_secret = update.message.text.strip()
+        
+        print(f"DEBUG: API Secret 입력 처리 시작 - User ID: {user_id}")
+        
+        if user_id not in user_api_setup:
+            await update.message.reply_text("❌ API 등록이 시작되지 않았습니다. 메인 메뉴에서 다시 시작하세요.")
+            return ConversationHandler.END
+        
+        setup_info = user_api_setup[user_id]
+        exchange = setup_info["exchange"]
+        api_key = setup_info["api_key"]
+        
+        # API Secret 유효성 검사
+        if not api_secret or len(api_secret) < 10:
+            await update.message.reply_text("❌ API Secret이 너무 짧습니다. 올바른 API Secret을 입력하세요.")
+            return WAITING_API_SECRET
+        
+        print(f"DEBUG: API 정보 저장 시도 - Exchange: {exchange}")
+        
+        # API 정보 저장
+        save_api(user_id, exchange, api_key, api_secret)
+        
+        # 설정 정보 삭제
+        del user_api_setup[user_id]
+        
+        print(f"DEBUG: API 등록 완료 - Exchange: {exchange}")
+        
+        await update.message.reply_text(
+            f"✅ **{exchange.upper()} API 등록이 완료되었습니다!**\n\n"
+            f"이제 거래소 선택에서 {exchange.upper()}를 사용할 수 있습니다.",
+            reply_markup=get_main_menu_keyboard(),
+            parse_mode='Markdown'
+        )
+        
         return ConversationHandler.END
-    
-    setup_info = user_api_setup[user_id]
-    exchange = setup_info["exchange"]
-    api_key = setup_info["api_key"]
-    
-    # API 정보 저장
-    save_api(user_id, exchange, api_key, api_secret)
-    
-    # 설정 정보 삭제
-    del user_api_setup[user_id]
-    
-    await update.message.reply_text(
-        f"✅ **{exchange.upper()} API 등록이 완료되었습니다!**\n\n"
-        f"이제 거래소 선택에서 {exchange.upper()}를 사용할 수 있습니다.",
-        reply_markup=get_main_menu_keyboard(),
-        parse_mode='Markdown'
-    )
-    
-    return ConversationHandler.END
+        
+    except Exception as e:
+        print(f"ERROR in handle_api_secret: {str(e)}")
+        await update.message.reply_text(f"❌ API Secret 처리 중 오류가 발생했습니다: {str(e)}")
+        return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """대화 취소"""
@@ -823,11 +856,18 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(button_callback, pattern="^setup_api_")],
         states={
-            WAITING_API_KEY: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_key)],
-            WAITING_API_SECRET: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_secret)],
+            WAITING_API_KEY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_key),
+                CommandHandler('cancel', cancel)
+            ],
+            WAITING_API_SECRET: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_secret),
+                CommandHandler('cancel', cancel)
+            ],
         },
         fallbacks=[CommandHandler('cancel', cancel)],
         per_message=True,  # 경고 메시지 해결
+        allow_reentry=True,  # 재진입 허용
     )
     
     app.add_handler(conv_handler)
