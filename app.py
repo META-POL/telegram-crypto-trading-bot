@@ -206,6 +206,12 @@ async def test_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def run_telegram_bot():
     """텔레그램 봇 실행 함수"""
+    import asyncio
+    
+    # 새로운 이벤트 루프 생성
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     # 환경 변수 확인
     token = os.environ.get('TELEGRAM_BOT_TOKEN')
     if not token or token == 'YOUR_TELEGRAM_BOT_TOKEN':
@@ -228,8 +234,13 @@ def run_telegram_bot():
     print("✅ 텔레그램 봇이 성공적으로 시작되었습니다!")
     print("🔄 폴링 시작...")
     
-    # 폴링 시작
-    telegram_app.run_polling(allowed_updates=Update.ALL_TYPES)
+    try:
+        # 폴링 시작
+        telegram_app.run_polling(allowed_updates=Update.ALL_TYPES)
+    except Exception as e:
+        print(f"❌ 텔레그램 봇 오류: {e}")
+    finally:
+        loop.close()
 
 def main():
     """메인 함수 - Flask와 텔레그램 봇을 함께 실행"""
