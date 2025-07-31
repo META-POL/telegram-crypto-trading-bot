@@ -50,11 +50,27 @@ def get_main_menu_keyboard():
     keyboard = [
         [
             InlineKeyboardButton("💰 잔고 조회", callback_data="balance"),
-            InlineKeyboardButton("🔍 심볼 조회", callback_data="symbols")
+            InlineKeyboardButton("🔧 API 테스트", callback_data="test_api")
         ],
         [
-            InlineKeyboardButton("🔧 API 테스트", callback_data="test_api"),
+            InlineKeyboardButton("🏪 거래소 선택", callback_data="select_exchange"),
             InlineKeyboardButton("❓ 도움말", callback_data="help")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_exchange_selection_keyboard():
+    """거래소 선택 키보드 생성"""
+    keyboard = [
+        [
+            InlineKeyboardButton("XT Exchange", callback_data="exchange_xt"),
+            InlineKeyboardButton("Backpack", callback_data="exchange_backpack")
+        ],
+        [
+            InlineKeyboardButton("Hyperliquid", callback_data="exchange_hyperliquid")
+        ],
+        [
+            InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -88,41 +104,50 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "balance":
         await query.edit_message_text(
             "💰 **잔고 조회**\n\n"
-            "현재 Backpack 거래소만 지원됩니다.\n"
-            "API 키를 설정하려면 관리자에게 문의하세요.",
+            "지원 거래소: XT, Backpack, Hyperliquid\n"
+            "API 키를 설정하려면 관리자에게 문의하세요.\n\n"
+            "**사용법:**\n"
+            "거래하고 싶은 토큰 심볼을 직접 입력하세요.\n"
+            "예: BTC, ETH, SOL 등",
             reply_markup=get_main_menu_keyboard(),
             parse_mode='Markdown'
         )
     
-    elif query.data == "symbols":
-        try:
-            # Backpack 심볼 조회 테스트
-            trader = UnifiedSpotTrader(exchange='backpack', api_key='test', api_secret='test')
-            symbols = trader.get_all_symbols()
-            
-            if isinstance(symbols, list) and len(symbols) > 0:
-                symbols_text = "\n".join(symbols[:20])  # 최대 20개만 표시
-                await query.edit_message_text(
-                    f"🔍 **Backpack 거래쌍 목록**\n\n"
-                    f"총 {len(symbols)}개 거래쌍\n\n"
-                    f"```\n{symbols_text}\n```",
-                    reply_markup=get_main_menu_keyboard(),
-                    parse_mode='Markdown'
-                )
-            else:
-                await query.edit_message_text(
-                    f"❌ **심볼 조회 실패**\n\n"
-                    f"오류: {str(symbols)}",
-                    reply_markup=get_main_menu_keyboard(),
-                    parse_mode='Markdown'
-                )
-        except Exception as e:
-            await query.edit_message_text(
-                f"❌ **심볼 조회 오류**\n\n"
-                f"오류: {str(e)}",
-                reply_markup=get_main_menu_keyboard(),
-                parse_mode='Markdown'
-            )
+    elif query.data == "select_exchange":
+        await query.edit_message_text(
+            "🏪 **거래소 선택**\n\n"
+            "사용할 거래소를 선택하세요:",
+            reply_markup=get_exchange_selection_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data.startswith("exchange_"):
+        exchange = query.data.replace("exchange_", "")
+        exchange_names = {
+            "xt": "XT Exchange",
+            "backpack": "Backpack",
+            "hyperliquid": "Hyperliquid"
+        }
+        exchange_name = exchange_names.get(exchange, exchange.upper())
+        
+        await query.edit_message_text(
+            f"🏪 **{exchange_name} 선택됨**\n\n"
+            f"현재 선택된 거래소: **{exchange_name}**\n\n"
+            f"**API 키 설정 필요:**\n"
+            f"- API Key\n"
+            f"- API Secret\n"
+            f"- Private Key (Backpack의 경우)\n\n"
+            f"관리자에게 문의하여 API 키를 설정하세요.",
+            reply_markup=get_main_menu_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == "main_menu":
+        await query.edit_message_text(
+            "🤖 **암호화폐 트레이딩 봇**\n\n원하는 기능을 선택하세요:",
+            reply_markup=get_main_menu_keyboard(),
+            parse_mode='Markdown'
+        )
     
     elif query.data == "test_api":
         await query.edit_message_text(
@@ -164,20 +189,34 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 **지원 기능:**
 - 💰 잔고 조회
-- 🔍 심볼 조회  
 - 🔧 API 테스트
+- 🏪 거래소 선택
 
 **지원 거래소:**
+- XT Exchange
 - Backpack Exchange
+- Hyperliquid
 
 **사용법:**
-1. 메뉴에서 원하는 기능 선택
+1. 거래소 선택
 2. API 키 설정 (관리자 문의)
-3. 거래소 선택 후 기능 사용
+3. 거래하고 싶은 토큰 심볼을 직접 입력
+
+**토큰 심볼 예시:**
+- BTC (비트코인)
+- ETH (이더리움)
+- SOL (솔라나)
+- USDC (USD 코인)
+
+**API 키 필요사항:**
+- XT: API Key, API Secret
+- Backpack: API Key, Private Key
+- Hyperliquid: API Key, API Secret
 
 **주의사항:**
 - 채널 멤버만 사용 가능
 - API 키는 안전하게 암호화 저장
+- 각 거래소에서 지원하는 토큰만 거래 가능
         """
         await query.edit_message_text(
             help_text,
@@ -194,10 +233,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """잔고 조회 명령어"""
-    await start(update, context)
-
-async def symbols(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """심볼 조회 명령어"""
     await start(update, context)
 
 async def test_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -221,7 +256,6 @@ def run_telegram_bot():
     # 핸들러 등록
     telegram_app.add_handler(CommandHandler('start', start))
     telegram_app.add_handler(CommandHandler('balance', balance))
-    telegram_app.add_handler(CommandHandler('symbols', symbols))
     telegram_app.add_handler(CommandHandler('testapi', test_api))
     telegram_app.add_handler(CallbackQueryHandler(button_callback))
     
