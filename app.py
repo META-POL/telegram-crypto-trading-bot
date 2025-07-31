@@ -13,6 +13,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 from trading_bot_unified import UnifiedSpotTrader
 from futures_trader import UnifiedFuturesTrader
 from test_mode import create_mock_trader
+from api_key_manager import api_manager
 from user_api_store import init_db
 
 # Flask 앱 생성 (Railway 헬스체크용)
@@ -59,6 +60,7 @@ def get_main_menu_keyboard():
             InlineKeyboardButton("🧪 테스트 모드", callback_data="test_mode")
         ],
         [
+            InlineKeyboardButton("🔑 API 키 관리", callback_data="manage_api"),
             InlineKeyboardButton("❓ 도움말", callback_data="help")
         ]
     ]
@@ -93,6 +95,20 @@ def get_test_mode_keyboard():
             InlineKeyboardButton("Flipster", callback_data="test_flipster")
         ],
         [
+            InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_api_management_keyboard():
+    """API 키 관리 키보드 생성"""
+    keyboard = [
+        [
+            InlineKeyboardButton("➕ API 키 추가", callback_data="add_api"),
+            InlineKeyboardButton("📋 API 키 목록", callback_data="list_api")
+        ],
+        [
+            InlineKeyboardButton("🗑️ API 키 삭제", callback_data="delete_api"),
             InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")
         ]
     ]
@@ -292,6 +308,67 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
     
+    elif query.data == "manage_api":
+        await query.edit_message_text(
+            "🔑 **API 키 관리**\n\n"
+            "API 키를 추가, 조회, 삭제할 수 있습니다.\n"
+            "모든 API 키는 암호화되어 안전하게 저장됩니다.",
+            reply_markup=get_api_management_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == "add_api":
+        await query.edit_message_text(
+            "➕ **API 키 추가**\n\n"
+            "API 키를 추가하려면 다음 형식으로 메시지를 보내세요:\n\n"
+            "`/addapi [거래소] [거래유형] [API_KEY] [API_SECRET] [PRIVATE_KEY(선택)]`\n\n"
+            "**예시:**\n"
+            "`/addapi xt spot your_api_key your_api_secret`\n"
+            "`/addapi backpack spot your_api_key your_private_key`\n\n"
+            "**지원 거래소:** xt, backpack, hyperliquid, flipster\n"
+            "**거래 유형:** spot, futures",
+            reply_markup=get_api_management_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == "list_api":
+        user_id = update.effective_user.id
+        result = api_manager.list_user_apis(user_id)
+        
+        if result['status'] == 'success':
+            apis = result['apis']
+            api_list_text = "📋 **설정된 API 키 목록**\n\n"
+            
+            for api in apis:
+                exchange_name = api['exchange'].capitalize()
+                trading_type = api['trading_type']
+                created_at = api['created_at'][:10]  # 날짜만 표시
+                api_list_text += f"🏪 **{exchange_name}** ({trading_type})\n"
+                api_list_text += f"📅 설정일: {created_at}\n\n"
+            
+            api_list_text += "💡 API 키는 암호화되어 저장됩니다."
+        else:
+            api_list_text = f"❌ **API 키 목록 조회 실패**\n\n{result['message']}"
+        
+        await query.edit_message_text(
+            api_list_text,
+            reply_markup=get_api_management_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == "delete_api":
+        await query.edit_message_text(
+            "🗑️ **API 키 삭제**\n\n"
+            "API 키를 삭제하려면 다음 형식으로 메시지를 보내세요:\n\n"
+            "`/deleteapi [거래소] [거래유형]`\n\n"
+            "**예시:**\n"
+            "`/deleteapi xt spot`\n"
+            "`/deleteapi backpack futures`\n\n"
+            "⚠️ 삭제된 API 키는 복구할 수 없습니다.",
+            reply_markup=get_api_management_keyboard(),
+            parse_mode='Markdown'
+        )
+    
     elif query.data == "main_menu":
         await query.edit_message_text(
             "🤖 **암호화폐 트레이딩 봇**\n\n원하는 기능을 선택하세요:",
@@ -345,6 +422,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - 📈 현물 거래
 - 📊 선물 거래
 - 🧪 테스트 모드
+- 🔑 API 키 관리
 
 **지원 거래소:**
 - XT Exchange
@@ -366,6 +444,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - API 키 없이 봇 기능 테스트 가능
 - 실제 거래는 이루어지지 않음
 - 모든 거래소에서 테스트 가능
+
+**API 키 관리:**
+- `/addapi` - API 키 추가
+- `/deleteapi` - API 키 삭제
+- 🔑 메뉴에서 API 키 관리
+- 모든 API 키는 암호화 저장
 
 **토큰 심볼 예시:**
 - BTC (비트코인)
@@ -412,6 +496,138 @@ async def test_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """API 테스트 명령어"""
     await start(update, context)
 
+async def add_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """API 키 추가 명령어"""
+    user_id = update.effective_user.id
+    message_text = update.message.text
+    
+    try:
+        # /addapi [거래소] [거래유형] [API_KEY] [API_SECRET] [PRIVATE_KEY(선택)]
+        parts = message_text.split()
+        
+        if len(parts) < 5:
+            await update.message.reply_text(
+                "❌ **잘못된 형식**\n\n"
+                "올바른 형식: `/addapi [거래소] [거래유형] [API_KEY] [API_SECRET] [PRIVATE_KEY(선택)]`\n\n"
+                "**예시:**\n"
+                "`/addapi xt spot your_api_key your_api_secret`\n"
+                "`/addapi backpack spot your_api_key your_private_key`",
+                parse_mode='Markdown'
+            )
+            return
+        
+        exchange = parts[1].lower()
+        trading_type = parts[2].lower()
+        api_key = parts[3]
+        api_secret = parts[4] if len(parts) > 4 else None
+        private_key = parts[5] if len(parts) > 5 else None
+        
+        # 거래소 유효성 검사
+        valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
+        if exchange not in valid_exchanges:
+            await update.message.reply_text(
+                f"❌ **지원하지 않는 거래소**\n\n"
+                f"지원 거래소: {', '.join(valid_exchanges)}"
+            )
+            return
+        
+        # 거래 유형 유효성 검사
+        valid_types = ['spot', 'futures']
+        if trading_type not in valid_types:
+            await update.message.reply_text(
+                f"❌ **지원하지 않는 거래 유형**\n\n"
+                f"지원 유형: {', '.join(valid_types)}"
+            )
+            return
+        
+        # API 키 저장
+        result = api_manager.save_api_keys(
+            user_id, exchange, trading_type, api_key, api_secret, private_key
+        )
+        
+        if result['status'] == 'success':
+            await update.message.reply_text(
+                f"✅ **API 키 저장 성공!**\n\n"
+                f"{result['message']}\n\n"
+                f"거래소: {exchange.capitalize()}\n"
+                f"거래 유형: {trading_type}\n\n"
+                f"💡 이제 실제 거래 기능을 사용할 수 있습니다."
+            )
+        else:
+            await update.message.reply_text(
+                f"❌ **API 키 저장 실패**\n\n"
+                f"오류: {result['message']}"
+            )
+            
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ **API 키 추가 오류**\n\n"
+            f"오류: {str(e)}"
+        )
+
+async def delete_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """API 키 삭제 명령어"""
+    user_id = update.effective_user.id
+    message_text = update.message.text
+    
+    try:
+        # /deleteapi [거래소] [거래유형]
+        parts = message_text.split()
+        
+        if len(parts) != 3:
+            await update.message.reply_text(
+                "❌ **잘못된 형식**\n\n"
+                "올바른 형식: `/deleteapi [거래소] [거래유형]`\n\n"
+                "**예시:**\n"
+                "`/deleteapi xt spot`\n"
+                "`/deleteapi backpack futures`",
+                parse_mode='Markdown'
+            )
+            return
+        
+        exchange = parts[1].lower()
+        trading_type = parts[2].lower()
+        
+        # 거래소 유효성 검사
+        valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
+        if exchange not in valid_exchanges:
+            await update.message.reply_text(
+                f"❌ **지원하지 않는 거래소**\n\n"
+                f"지원 거래소: {', '.join(valid_exchanges)}"
+            )
+            return
+        
+        # 거래 유형 유효성 검사
+        valid_types = ['spot', 'futures']
+        if trading_type not in valid_types:
+            await update.message.reply_text(
+                f"❌ **지원하지 않는 거래 유형**\n\n"
+                f"지원 유형: {', '.join(valid_types)}"
+            )
+            return
+        
+        # API 키 삭제
+        result = api_manager.delete_api_keys(user_id, exchange, trading_type)
+        
+        if result['status'] == 'success':
+            await update.message.reply_text(
+                f"✅ **API 키 삭제 성공!**\n\n"
+                f"{result['message']}\n\n"
+                f"거래소: {exchange.capitalize()}\n"
+                f"거래 유형: {trading_type}"
+            )
+        else:
+            await update.message.reply_text(
+                f"❌ **API 키 삭제 실패**\n\n"
+                f"오류: {result['message']}"
+            )
+            
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ **API 키 삭제 오류**\n\n"
+            f"오류: {str(e)}"
+        )
+
 def run_telegram_bot():
     """텔레그램 봇 실행 함수"""
     # 환경 변수 확인
@@ -430,6 +646,8 @@ def run_telegram_bot():
     telegram_app.add_handler(CommandHandler('start', start))
     telegram_app.add_handler(CommandHandler('balance', balance))
     telegram_app.add_handler(CommandHandler('testapi', test_api))
+    telegram_app.add_handler(CommandHandler('addapi', add_api))
+    telegram_app.add_handler(CommandHandler('deleteapi', delete_api))
     telegram_app.add_handler(CallbackQueryHandler(button_callback))
     
     print("✅ 텔레그램 봇이 성공적으로 시작되었습니다!")
