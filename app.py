@@ -52,13 +52,10 @@ def get_main_menu_keyboard():
     keyboard = [
         [
             InlineKeyboardButton("💰 잔고 조회", callback_data="balance"),
-            InlineKeyboardButton("🔧 API 테스트", callback_data="test_api")
+            InlineKeyboardButton("🏪 거래소 선택", callback_data="select_exchange")
         ],
         [
-            InlineKeyboardButton("🏪 거래소 선택", callback_data="select_exchange"),
-            InlineKeyboardButton("🔑 API 키 관리", callback_data="manage_api")
-        ],
-        [
+            InlineKeyboardButton("🔑 API 키 관리", callback_data="manage_api"),
             InlineKeyboardButton("❓ 도움말", callback_data="help")
         ]
     ]
@@ -140,17 +137,114 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if query.data == "balance":
+        user_id = update.effective_user.id
+        
         await query.edit_message_text(
-            "💰 **잔고 조회**\n\n"
-            "지원 거래소: XT, Backpack, Hyperliquid, Flipster\n"
-            "현물 및 선물 계좌 잔고 조회 가능\n"
-            "API 키를 설정하려면 관리자에게 문의하세요.\n\n"
-            "**사용법:**\n"
-            "거래하고 싶은 토큰 심볼을 직접 입력하세요.\n"
-            "예: BTC, ETH, SOL 등",
+            "💰 **잔고 조회 중...**\n\n"
+            "모든 거래소의 잔고를 확인하고 있습니다.",
             reply_markup=get_main_menu_keyboard(),
             parse_mode='Markdown'
         )
+        
+        try:
+            balance_text = "💰 **전체 잔고 조회 결과**\n\n"
+            total_balance = 0
+            exchange_count = 0
+            
+            # 모든 거래소 확인
+            exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
+            trading_types = ['spot', 'futures']
+            
+            for exchange in exchanges:
+                exchange_name = exchange.capitalize()
+                exchange_balance = 0
+                exchange_has_api = False
+                
+                for trading_type in trading_types:
+                    # API 키 존재 여부 확인
+                    if api_manager.has_api_keys(user_id, exchange, trading_type):
+                        exchange_has_api = True
+                        
+                        # API 키 가져오기
+                        api_result = api_manager.get_api_keys(user_id, exchange, trading_type)
+                        
+                        if api_result['status'] == 'success':
+                            try:
+                                # 거래자 생성
+                                if trading_type == 'spot':
+                                    trader = UnifiedSpotTrader(
+                                        exchange=exchange,
+                                        api_key=api_result['api_key'],
+                                        api_secret=api_result['api_secret'],
+                                        private_key=api_result.get('private_key')
+                                    )
+                                    balance_result = trader.get_balance()
+                                else:  # futures
+                                    trader = UnifiedFuturesTrader(
+                                        exchange=exchange,
+                                        api_key=api_result['api_key'],
+                                        api_secret=api_result['api_secret'],
+                                        private_key=api_result.get('private_key')
+                                    )
+                                    balance_result = trader.get_futures_balance()
+                                
+                                if balance_result.get('status') == 'success':
+                                    balance_data = balance_result.get('balance', {})
+                                    
+                                    # USDT 잔고 추출
+                                    if isinstance(balance_data, dict):
+                                        if 'USDT' in balance_data:
+                                            usdt_balance = float(balance_data['USDT'])
+                                        elif 'total' in balance_data and 'USDT' in balance_data['total']:
+                                            usdt_balance = float(balance_data['total']['USDT'])
+                                        else:
+                                            usdt_balance = 0
+                                    else:
+                                        usdt_balance = 0
+                                    
+                                    exchange_balance += usdt_balance
+                                    
+                                    balance_text += f"🏪 **{exchange_name}** ({trading_type})\n"
+                                    balance_text += f"💰 USDT: ${usdt_balance:,.2f}\n\n"
+                                    
+                            except Exception as e:
+                                balance_text += f"🏪 **{exchange_name}** ({trading_type})\n"
+                                balance_text += f"❌ 오류: {str(e)[:50]}...\n\n"
+                
+                if exchange_has_api:
+                    total_balance += exchange_balance
+                    exchange_count += 1
+                    
+                    balance_text += f"📊 **{exchange_name} 총 잔고**: ${exchange_balance:,.2f}\n"
+                    balance_text += "─" * 30 + "\n\n"
+                else:
+                    balance_text += f"🏪 **{exchange_name}**\n"
+                    balance_text += f"⚠️ API 키가 설정되지 않음\n"
+                    balance_text += "─" * 30 + "\n\n"
+            
+            # 전체 요약
+            balance_text += f"🎯 **전체 요약**\n"
+            balance_text += f"📊 설정된 거래소: {exchange_count}개\n"
+            balance_text += f"💰 총 잔고: ${total_balance:,.2f}\n\n"
+            
+            if exchange_count == 0:
+                balance_text += "💡 API 키를 설정하려면 🔑 API 키 관리를 이용하세요."
+            else:
+                balance_text += "💡 모든 거래소의 잔고가 표시됩니다."
+            
+            await query.edit_message_text(
+                balance_text,
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ **잔고 조회 오류**\n\n"
+                f"오류: {str(e)}",
+                reply_markup=get_main_menu_keyboard(),
+                parse_mode='Markdown'
+            )
     
     elif query.data == "select_exchange":
         await query.edit_message_text(
@@ -317,16 +411,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
     
-    elif query.data == "test_api":
-        await query.edit_message_text(
-            "🔧 **API 테스트**\n\n"
-            "지원 거래소: XT, Backpack, Hyperliquid, Flipster\n"
-            "API 키를 설정한 후 실제 거래소와 연결을 테스트할 수 있습니다.\n\n"
-            "**API 키 설정 방법:**\n"
-            "🔑 API 키 관리 → ➕ API 키 추가",
-            reply_markup=get_main_menu_keyboard(),
-            parse_mode='Markdown'
-        )
+
     
     elif query.data == "help":
         help_text = """
@@ -334,7 +419,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 **지원 기능:**
 - 💰 잔고 조회
-- 🔧 API 테스트
 - 🏪 거래소 선택
 - 📈 현물 거래
 - 📊 선물 거래
@@ -404,9 +488,7 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """잔고 조회 명령어"""
     await start(update, context)
 
-async def test_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """API 테스트 명령어"""
-    await start(update, context)
+
 
 async def add_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """API 키 추가 명령어"""
@@ -682,7 +764,6 @@ def run_telegram_bot():
     # 핸들러 등록
     telegram_app.add_handler(CommandHandler('start', start))
     telegram_app.add_handler(CommandHandler('balance', balance))
-    telegram_app.add_handler(CommandHandler('testapi', test_api))
     telegram_app.add_handler(CommandHandler('addapi', add_api))
     telegram_app.add_handler(CommandHandler('deleteapi', delete_api))
     telegram_app.add_handler(CommandHandler('checkapi', check_api))
