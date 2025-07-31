@@ -108,7 +108,10 @@ def get_api_management_keyboard():
             InlineKeyboardButton("📋 API 키 목록", callback_data="list_api")
         ],
         [
-            InlineKeyboardButton("🗑️ API 키 삭제", callback_data="delete_api"),
+            InlineKeyboardButton("🔍 API 키 확인", callback_data="check_api"),
+            InlineKeyboardButton("🗑️ API 키 삭제", callback_data="delete_api")
+        ],
+        [
             InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")
         ]
     ]
@@ -356,6 +359,21 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
     
+    elif query.data == "check_api":
+        await query.edit_message_text(
+            "🔍 **API 키 확인**\n\n"
+            "API 키를 확인하려면 다음 형식으로 메시지를 보내세요:\n\n"
+            "`/checkapi [거래소] [거래유형]`\n\n"
+            "**예시:**\n"
+            "`/checkapi xt spot`\n"
+            "`/checkapi backpack futures`\n\n"
+            "**모든 API 키 확인:**\n"
+            "`/checkapi all`\n\n"
+            "💡 API 키는 보안상 마스킹 처리되어 표시됩니다.",
+            reply_markup=get_api_management_keyboard(),
+            parse_mode='Markdown'
+        )
+    
     elif query.data == "delete_api":
         await query.edit_message_text(
             "🗑️ **API 키 삭제**\n\n"
@@ -447,6 +465,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 **API 키 관리:**
 - `/addapi` - API 키 추가
+- `/checkapi` - API 키 확인
 - `/deleteapi` - API 키 삭제
 - 🔑 메뉴에서 API 키 관리
 - 모든 API 키는 암호화 저장
@@ -628,6 +647,131 @@ async def delete_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"오류: {str(e)}"
         )
 
+async def check_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """API 키 확인 명령어"""
+    user_id = update.effective_user.id
+    message_text = update.message.text
+    
+    try:
+        # /checkapi [거래소] [거래유형]
+        parts = message_text.split()
+        
+        if len(parts) != 3:
+            await update.message.reply_text(
+                "❌ **잘못된 형식**\n\n"
+                "올바른 형식: `/checkapi [거래소] [거래유형]`\n\n"
+                "**예시:**\n"
+                "`/checkapi xt spot`\n"
+                "`/checkapi backpack futures`\n\n"
+                "**또는 모든 API 키 확인:**\n"
+                "`/checkapi all`",
+                parse_mode='Markdown'
+            )
+            return
+        
+        exchange = parts[1].lower()
+        trading_type = parts[2].lower()
+        
+        # 모든 API 키 확인
+        if exchange == 'all':
+            result = api_manager.list_user_apis(user_id)
+            
+            if result['status'] == 'success':
+                apis = result['apis']
+                api_list_text = "🔍 **설정된 API 키 목록**\n\n"
+                
+                for api in apis:
+                    exchange_name = api['exchange'].capitalize()
+                    trading_type = api['trading_type']
+                    created_at = api['created_at'][:10]
+                    updated_at = api['updated_at'][:10]
+                    api_list_text += f"🏪 **{exchange_name}** ({trading_type})\n"
+                    api_list_text += f"📅 설정일: {created_at}\n"
+                    api_list_text += f"📝 수정일: {updated_at}\n\n"
+                
+                api_list_text += "💡 API 키는 보안상 마스킹 처리되어 표시됩니다."
+                
+                await update.message.reply_text(
+                    api_list_text,
+                    parse_mode='Markdown'
+                )
+            else:
+                await update.message.reply_text(
+                    f"❌ **API 키 목록 조회 실패**\n\n"
+                    f"오류: {result['message']}"
+                )
+            return
+        
+        # 거래소 유효성 검사
+        valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
+        if exchange not in valid_exchanges:
+            await update.message.reply_text(
+                f"❌ **지원하지 않는 거래소**\n\n"
+                f"지원 거래소: {', '.join(valid_exchanges)}"
+            )
+            return
+        
+        # 거래 유형 유효성 검사
+        valid_types = ['spot', 'futures']
+        if trading_type not in valid_types:
+            await update.message.reply_text(
+                f"❌ **지원하지 않는 거래 유형**\n\n"
+                f"지원 유형: {', '.join(valid_types)}"
+            )
+            return
+        
+        # API 키 조회
+        result = api_manager.get_api_keys(user_id, exchange, trading_type)
+        
+        if result['status'] == 'success':
+            api_key = result['api_key']
+            api_secret = result['api_secret']
+            private_key = result['private_key']
+            
+            # API 키 마스킹 처리
+            masked_api_key = _mask_api_key(api_key)
+            masked_api_secret = _mask_api_key(api_secret) if api_secret else None
+            masked_private_key = _mask_api_key(private_key) if private_key else None
+            
+            check_text = f"🔍 **{exchange.capitalize()} {trading_type} API 키 확인**\n\n"
+            check_text += f"🏪 **거래소**: {exchange.capitalize()}\n"
+            check_text += f"📊 **거래 유형**: {trading_type}\n\n"
+            check_text += f"🔑 **API Key**: `{masked_api_key}`\n"
+            
+            if masked_api_secret:
+                check_text += f"🔐 **API Secret**: `{masked_api_secret}`\n"
+            
+            if masked_private_key:
+                check_text += f"🔒 **Private Key**: `{masked_private_key}`\n"
+            
+            check_text += f"\n💡 **보안 정보**:\n"
+            check_text += f"• API 키는 암호화되어 저장됩니다\n"
+            check_text += f"• 실제 키는 마스킹 처리되어 표시됩니다\n"
+            check_text += f"• 키의 앞 4자리와 뒤 4자리만 표시됩니다"
+            
+            await update.message.reply_text(
+                check_text,
+                parse_mode='Markdown'
+            )
+        else:
+            await update.message.reply_text(
+                f"❌ **API 키 확인 실패**\n\n"
+                f"오류: {result['message']}"
+            )
+            
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ **API 키 확인 오류**\n\n"
+            f"오류: {str(e)}"
+        )
+
+def _mask_api_key(api_key):
+    """API 키 마스킹 처리"""
+    if not api_key or len(api_key) < 8:
+        return "****"
+    
+    return f"{api_key[:4]}{'*' * (len(api_key) - 8)}{api_key[-4:]}"
+
 def run_telegram_bot():
     """텔레그램 봇 실행 함수"""
     # 환경 변수 확인
@@ -648,6 +792,7 @@ def run_telegram_bot():
     telegram_app.add_handler(CommandHandler('testapi', test_api))
     telegram_app.add_handler(CommandHandler('addapi', add_api))
     telegram_app.add_handler(CommandHandler('deleteapi', delete_api))
+    telegram_app.add_handler(CommandHandler('checkapi', check_api))
     telegram_app.add_handler(CallbackQueryHandler(button_callback))
     
     print("✅ 텔레그램 봇이 성공적으로 시작되었습니다!")
