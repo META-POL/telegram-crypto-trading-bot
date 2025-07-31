@@ -172,35 +172,64 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             try:
                                 # 거래자 생성
                                 if trading_type == 'spot':
-                                    trader = UnifiedSpotTrader(
-                                        exchange=exchange,
-                                        api_key=api_result['api_key'],
-                                        api_secret=api_result['api_secret'],
-                                        private_key=api_result.get('private_key')
-                                    )
+                                    if exchange == 'backpack':
+                                        # Backpack은 private_key 사용
+                                        trader = UnifiedSpotTrader(
+                                            exchange=exchange,
+                                            api_key=api_result['api_key'],
+                                            private_key=api_result.get('private_key')
+                                        )
+                                    else:
+                                        # 다른 거래소는 api_secret 사용
+                                        trader = UnifiedSpotTrader(
+                                            exchange=exchange,
+                                            api_key=api_result['api_key'],
+                                            api_secret=api_result['api_secret']
+                                        )
                                     balance_result = trader.get_balance()
                                 else:  # futures
-                                    trader = UnifiedFuturesTrader(
-                                        exchange=exchange,
-                                        api_key=api_result['api_key'],
-                                        api_secret=api_result['api_secret'],
-                                        private_key=api_result.get('private_key')
-                                    )
+                                    if exchange == 'backpack':
+                                        # Backpack은 private_key 사용
+                                        trader = UnifiedFuturesTrader(
+                                            exchange=exchange,
+                                            api_key=api_result['api_key'],
+                                            private_key=api_result.get('private_key')
+                                        )
+                                    else:
+                                        # 다른 거래소는 api_secret 사용
+                                        trader = UnifiedFuturesTrader(
+                                            exchange=exchange,
+                                            api_key=api_result['api_key'],
+                                            api_secret=api_result['api_secret']
+                                        )
                                     balance_result = trader.get_futures_balance()
                                 
                                 if balance_result.get('status') == 'success':
                                     balance_data = balance_result.get('balance', {})
                                     
-                                    # USDT 잔고 추출
+                                    # USDT 잔고 추출 (다양한 응답 구조 처리)
+                                    usdt_balance = 0
                                     if isinstance(balance_data, dict):
+                                        # 직접 USDT 키가 있는 경우
                                         if 'USDT' in balance_data:
-                                            usdt_balance = float(balance_data['USDT'])
-                                        elif 'total' in balance_data and 'USDT' in balance_data['total']:
-                                            usdt_balance = float(balance_data['total']['USDT'])
-                                        else:
-                                            usdt_balance = 0
-                                    else:
-                                        usdt_balance = 0
+                                            try:
+                                                usdt_balance = float(balance_data['USDT'])
+                                            except (ValueError, TypeError):
+                                                usdt_balance = 0
+                                        # total 객체 안에 USDT가 있는 경우
+                                        elif 'total' in balance_data and isinstance(balance_data['total'], dict):
+                                            if 'USDT' in balance_data['total']:
+                                                try:
+                                                    usdt_balance = float(balance_data['total']['USDT'])
+                                                except (ValueError, TypeError):
+                                                    usdt_balance = 0
+                                        # free 객체 안에 USDT가 있는 경우
+                                        elif 'free' in balance_data and isinstance(balance_data['free'], dict):
+                                            if 'USDT' in balance_data['free']:
+                                                try:
+                                                    usdt_balance = float(balance_data['free']['USDT'])
+                                                except (ValueError, TypeError):
+                                                    usdt_balance = 0
                                     
                                     exchange_balance += usdt_balance
                                     
@@ -209,7 +238,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     
                             except Exception as e:
                                 balance_text += f"🏪 **{exchange_name}** ({trading_type})\n"
-                                balance_text += f"❌ 오류: {str(e)[:50]}...\n\n"
+                                balance_text += f"❌ 오류: {str(e)[:100]}...\n\n"
+                                logger.error(f"잔고 조회 오류 - {exchange} {trading_type}: {str(e)}")
                 
                 if exchange_has_api:
                     total_balance += exchange_balance
