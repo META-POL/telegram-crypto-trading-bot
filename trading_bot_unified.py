@@ -57,8 +57,18 @@ class UnifiedSpotTrader:
                 'secret': self.api_secret,
                 'enableRateLimit': True,
             })
+        elif self.exchange == 'flipster':
+            if ccxt is None:
+                raise ImportError("ccxt 패키지가 필요합니다. requirements.txt에 ccxt==4.1.77 추가")
+            self.api_key = kwargs.get('api_key')
+            self.api_secret = kwargs.get('api_secret')
+            self.ccxt_client = ccxt.flipster({
+                'apiKey': self.api_key,
+                'secret': self.api_secret,
+                'enableRateLimit': True,
+            })
         else:
-            raise ValueError('지원하지 않는 거래소입니다: xt, backpack, hyperliquid만 지원')
+            raise ValueError('지원하지 않는 거래소입니다: xt, backpack, hyperliquid, flipster만 지원')
 
     def set_risk_settings(self, max_loss=None, stop_loss_percent=None, take_profit_percent=None, max_position_size=None):
         """리스크 설정 업데이트"""

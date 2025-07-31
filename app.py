@@ -11,6 +11,7 @@ from flask import Flask, jsonify
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 from trading_bot_unified import UnifiedSpotTrader
+from futures_trader import UnifiedFuturesTrader
 from user_api_store import init_db
 
 # Flask 앱 생성 (Railway 헬스체크용)
@@ -67,10 +68,24 @@ def get_exchange_selection_keyboard():
             InlineKeyboardButton("Backpack", callback_data="exchange_backpack")
         ],
         [
-            InlineKeyboardButton("Hyperliquid", callback_data="exchange_hyperliquid")
+            InlineKeyboardButton("Hyperliquid", callback_data="exchange_hyperliquid"),
+            InlineKeyboardButton("Flipster", callback_data="exchange_flipster")
         ],
         [
             InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_trading_type_keyboard():
+    """거래 유형 선택 키보드 생성"""
+    keyboard = [
+        [
+            InlineKeyboardButton("📈 현물 거래", callback_data="trading_spot"),
+            InlineKeyboardButton("📊 선물 거래", callback_data="trading_futures")
+        ],
+        [
+            InlineKeyboardButton("🔙 거래소 선택", callback_data="select_exchange")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -104,7 +119,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "balance":
         await query.edit_message_text(
             "💰 **잔고 조회**\n\n"
-            "지원 거래소: XT, Backpack, Hyperliquid\n"
+            "지원 거래소: XT, Backpack, Hyperliquid, Flipster\n"
+            "현물 및 선물 계좌 잔고 조회 가능\n"
             "API 키를 설정하려면 관리자에게 문의하세요.\n\n"
             "**사용법:**\n"
             "거래하고 싶은 토큰 심볼을 직접 입력하세요.\n"
@@ -126,13 +142,64 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         exchange_names = {
             "xt": "XT Exchange",
             "backpack": "Backpack",
-            "hyperliquid": "Hyperliquid"
+            "hyperliquid": "Hyperliquid",
+            "flipster": "Flipster"
         }
         exchange_name = exchange_names.get(exchange, exchange.upper())
+        
+        # 사용자 컨텍스트에 선택된 거래소 저장
+        context.user_data['selected_exchange'] = exchange
         
         await query.edit_message_text(
             f"🏪 **{exchange_name} 선택됨**\n\n"
             f"현재 선택된 거래소: **{exchange_name}**\n\n"
+            f"거래 유형을 선택하세요:",
+            reply_markup=get_trading_type_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == "trading_spot":
+        exchange = context.user_data.get('selected_exchange', 'unknown')
+        exchange_names = {
+            "xt": "XT Exchange",
+            "backpack": "Backpack",
+            "hyperliquid": "Hyperliquid",
+            "flipster": "Flipster"
+        }
+        exchange_name = exchange_names.get(exchange, exchange.upper())
+        
+        await query.edit_message_text(
+            f"📈 **현물 거래 - {exchange_name}**\n\n"
+            f"현재 선택된 거래소: **{exchange_name}**\n"
+            f"거래 유형: **현물 거래**\n\n"
+            f"**API 키 설정 필요:**\n"
+            f"- API Key\n"
+            f"- API Secret\n"
+            f"- Private Key (Backpack의 경우)\n\n"
+            f"관리자에게 문의하여 API 키를 설정하세요.",
+            reply_markup=get_main_menu_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == "trading_futures":
+        exchange = context.user_data.get('selected_exchange', 'unknown')
+        exchange_names = {
+            "xt": "XT Exchange",
+            "backpack": "Backpack",
+            "hyperliquid": "Hyperliquid",
+            "flipster": "Flipster"
+        }
+        exchange_name = exchange_names.get(exchange, exchange.upper())
+        
+        await query.edit_message_text(
+            f"📊 **선물 거래 - {exchange_name}**\n\n"
+            f"현재 선택된 거래소: **{exchange_name}**\n"
+            f"거래 유형: **선물 거래**\n\n"
+            f"**지원 기능:**\n"
+            f"- 롱/숏 포지션 오픈\n"
+            f"- 레버리지 설정 (최대 10배)\n"
+            f"- 손절매/익절매 주문\n"
+            f"- 포지션 관리\n\n"
             f"**API 키 설정 필요:**\n"
             f"- API Key\n"
             f"- API Secret\n"
@@ -191,16 +258,24 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - 💰 잔고 조회
 - 🔧 API 테스트
 - 🏪 거래소 선택
+- 📈 현물 거래
+- 📊 선물 거래
 
 **지원 거래소:**
 - XT Exchange
 - Backpack Exchange
 - Hyperliquid
+- Flipster
+
+**거래 유형:**
+- **현물 거래**: 실제 암호화폐 구매/판매
+- **선물 거래**: 레버리지 거래, 롱/숏 포지션
 
 **사용법:**
 1. 거래소 선택
-2. API 키 설정 (관리자 문의)
-3. 거래하고 싶은 토큰 심볼을 직접 입력
+2. 거래 유형 선택 (현물/선물)
+3. API 키 설정 (관리자 문의)
+4. 거래하고 싶은 토큰 심볼을 직접 입력
 
 **토큰 심볼 예시:**
 - BTC (비트코인)
@@ -212,11 +287,19 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - XT: API Key, API Secret
 - Backpack: API Key, Private Key
 - Hyperliquid: API Key, API Secret
+- Flipster: API Key, API Secret
+
+**선물 거래 기능:**
+- 레버리지 설정 (최대 10배)
+- 롱/숏 포지션 오픈
+- 손절매/익절매 주문
+- 포지션 관리
 
 **주의사항:**
 - 채널 멤버만 사용 가능
 - API 키는 안전하게 암호화 저장
 - 각 거래소에서 지원하는 토큰만 거래 가능
+- 선물 거래는 고위험 투자입니다
         """
         await query.edit_message_text(
             help_text,
