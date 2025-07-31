@@ -12,7 +12,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 from trading_bot_unified import UnifiedSpotTrader
 from futures_trader import UnifiedFuturesTrader
-from test_mode import create_mock_trader
 from api_key_manager import api_manager
 from user_api_store import init_db
 
@@ -57,10 +56,9 @@ def get_main_menu_keyboard():
         ],
         [
             InlineKeyboardButton("🏪 거래소 선택", callback_data="select_exchange"),
-            InlineKeyboardButton("🧪 테스트 모드", callback_data="test_mode")
+            InlineKeyboardButton("🔑 API 키 관리", callback_data="manage_api")
         ],
         [
-            InlineKeyboardButton("🔑 API 키 관리", callback_data="manage_api"),
             InlineKeyboardButton("❓ 도움말", callback_data="help")
         ]
     ]
@@ -83,22 +81,7 @@ def get_exchange_selection_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def get_test_mode_keyboard():
-    """테스트 모드 선택 키보드 생성"""
-    keyboard = [
-        [
-            InlineKeyboardButton("XT Exchange", callback_data="test_xt"),
-            InlineKeyboardButton("Backpack", callback_data="test_backpack")
-        ],
-        [
-            InlineKeyboardButton("Hyperliquid", callback_data="test_hyperliquid"),
-            InlineKeyboardButton("Flipster", callback_data="test_flipster")
-        ],
-        [
-            InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
+
 
 def get_api_management_keyboard():
     """API 키 관리 키보드 생성"""
@@ -159,39 +142,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "balance":
         await query.edit_message_text(
             "💰 **잔고 조회**\n\n"
-            "테스트 모드로 잔고 조회 중...",
+            "지원 거래소: XT, Backpack, Hyperliquid, Flipster\n"
+            "현물 및 선물 계좌 잔고 조회 가능\n"
+            "API 키를 설정하려면 관리자에게 문의하세요.\n\n"
+            "**사용법:**\n"
+            "거래하고 싶은 토큰 심볼을 직접 입력하세요.\n"
+            "예: BTC, ETH, SOL 등",
             reply_markup=get_main_menu_keyboard(),
             parse_mode='Markdown'
         )
-        
-        try:
-            # 테스트 모드로 잔고 조회
-            mock_trader = create_mock_trader('backpack', 'spot')
-            result = mock_trader.get_balance()
-            
-            if result.get('status') == 'success':
-                await query.edit_message_text(
-                    f"{result.get('message')}\n\n"
-                    f"**지원 거래소:** XT, Backpack, Hyperliquid, Flipster\n"
-                    f"**사용법:** 거래하고 싶은 토큰 심볼을 직접 입력하세요.\n"
-                    f"예: BTC, ETH, SOL 등",
-                    reply_markup=get_main_menu_keyboard(),
-                    parse_mode='Markdown'
-                )
-            else:
-                await query.edit_message_text(
-                    f"❌ **잔고 조회 실패**\n\n"
-                    f"오류: {result.get('message')}",
-                    reply_markup=get_main_menu_keyboard(),
-                    parse_mode='Markdown'
-                )
-        except Exception as e:
-            await query.edit_message_text(
-                f"❌ **잔고 조회 오류**\n\n"
-                f"오류: {str(e)}",
-                reply_markup=get_main_menu_keyboard(),
-                parse_mode='Markdown'
-            )
     
     elif query.data == "select_exchange":
         await query.edit_message_text(
@@ -273,43 +232,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
     
-    elif query.data == "test_mode":
-        await query.edit_message_text(
-            "🧪 **테스트 모드**\n\n"
-            "API 키 없이 봇 기능을 테스트할 수 있습니다.\n"
-            "테스트할 거래소를 선택하세요:",
-            reply_markup=get_test_mode_keyboard(),
-            parse_mode='Markdown'
-        )
-    
-    elif query.data.startswith("test_"):
-        exchange = query.data.replace("test_", "")
-        exchange_names = {
-            "xt": "XT Exchange",
-            "backpack": "Backpack",
-            "hyperliquid": "Hyperliquid",
-            "flipster": "Flipster"
-        }
-        exchange_name = exchange_names.get(exchange, exchange.upper())
-        
-        # 테스트 모드 거래자 생성
-        mock_trader = create_mock_trader(exchange, 'spot')
-        
-        # 잔고 조회 테스트
-        balance_result = mock_trader.get_balance()
-        
-        await query.edit_message_text(
-            f"🧪 **{exchange_name} 테스트 모드**\n\n"
-            f"{balance_result['message']}\n\n"
-            f"**테스트 기능:**\n"
-            f"✅ 잔고 조회\n"
-            f"✅ 거래쌍 조회\n"
-            f"✅ 현재가 조회\n"
-            f"✅ API 연결 테스트\n\n"
-            f"💡 실제 거래는 이루어지지 않습니다.",
-            reply_markup=get_main_menu_keyboard(),
-            parse_mode='Markdown'
-        )
+
     
     elif query.data == "manage_api":
         await query.edit_message_text(
@@ -397,37 +320,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "test_api":
         await query.edit_message_text(
             "🔧 **API 테스트**\n\n"
-            "테스트 모드로 API 연결 테스트 중...",
+            "지원 거래소: XT, Backpack, Hyperliquid, Flipster\n"
+            "API 키를 설정한 후 실제 거래소와 연결을 테스트할 수 있습니다.\n\n"
+            "**API 키 설정 방법:**\n"
+            "🔑 API 키 관리 → ➕ API 키 추가",
             reply_markup=get_main_menu_keyboard(),
             parse_mode='Markdown'
         )
-        
-        try:
-            # 테스트 모드로 API 테스트
-            mock_trader = create_mock_trader('backpack', 'spot')
-            result = mock_trader.test_api_connection()
-            
-            if result.get('status') == 'success':
-                await query.edit_message_text(
-                    f"✅ **API 연결 성공!**\n\n"
-                    f"{result.get('message')}",
-                    reply_markup=get_main_menu_keyboard(),
-                    parse_mode='Markdown'
-                )
-            else:
-                await query.edit_message_text(
-                    f"❌ **API 연결 실패**\n\n"
-                    f"오류: {result.get('message')}",
-                    reply_markup=get_main_menu_keyboard(),
-                    parse_mode='Markdown'
-                )
-        except Exception as e:
-            await query.edit_message_text(
-                f"❌ **API 테스트 오류**\n\n"
-                f"오류: {str(e)}",
-                reply_markup=get_main_menu_keyboard(),
-                parse_mode='Markdown'
-            )
     
     elif query.data == "help":
         help_text = """
@@ -439,7 +338,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - 🏪 거래소 선택
 - 📈 현물 거래
 - 📊 선물 거래
-- 🧪 테스트 모드
 - 🔑 API 키 관리
 
 **지원 거래소:**
@@ -457,11 +355,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 2. 거래 유형 선택 (현물/선물)
 3. API 키 설정 (관리자 문의)
 4. 거래하고 싶은 토큰 심볼을 직접 입력
-
-**테스트 모드:**
-- API 키 없이 봇 기능 테스트 가능
-- 실제 거래는 이루어지지 않음
-- 모든 거래소에서 테스트 가능
 
 **API 키 관리:**
 - `/addapi` - API 키 추가
