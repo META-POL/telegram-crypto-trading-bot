@@ -45,6 +45,74 @@ def health_check():
 def health():
     return jsonify({"status": "healthy"})
 
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """텔레그램 웹훅 처리"""
+    try:
+        from telegram import Update
+        from telegram.ext import ApplicationBuilder
+        
+        # 텔레그램 봇 토큰
+        token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
+        
+        # 봇 애플리케이션 생성
+        telegram_app = ApplicationBuilder().token(token).build()
+        
+        # 업데이트 처리
+        update = Update.de_json(request.get_json(), telegram_app.bot)
+        
+        # 명령어 처리
+        if update.message and update.message.text:
+            text = update.message.text
+            user_id = update.effective_user.id
+            chat_id = update.effective_chat.id
+            print(f"📨 사용자 {user_id}: {text}")
+            
+            if text == '/start':
+                response_text = (
+                    "🤖 **암호화폐 선물 거래 봇**\n\n"
+                    "사용 가능한 명령어:\n"
+                    "/start - 봇 시작\n"
+                    "/test - 봇 테스트\n"
+                    "/ping - 핑 테스트\n"
+                    "/balance [거래소] - 잔고 조회\n"
+                    "/long [거래소] [심볼] [수량] [레버리지] - 롱 포지션\n"
+                    "/short [거래소] [심볼] [수량] [레버리지] - 숏 포지션\n"
+                    "/close [거래소] [심볼] - 포지션 종료\n"
+                    "/positions [거래소] - 포지션 조회\n"
+                    "/symbols [거래소] - 거래쌍 조회\n"
+                    "/leverage [거래소] [심볼] [레버리지] - 레버리지 설정\n\n"
+                    "지원 거래소: xt, backpack, hyperliquid, flipster"
+                )
+                telegram_app.bot.send_message(chat_id=chat_id, text=response_text, parse_mode='Markdown')
+                print(f"✅ 사용자 {user_id}에게 응답 전송")
+                
+            elif text == '/test':
+                telegram_app.bot.send_message(chat_id=chat_id, text="✅ 봇이 정상 작동 중입니다!")
+                print(f"✅ 테스트 응답 전송")
+                
+            elif text == '/ping':
+                telegram_app.bot.send_message(chat_id=chat_id, text="🏓 Pong! 봇이 살아있습니다!")
+                print(f"✅ 핑 응답 전송")
+                
+            else:
+                telegram_app.bot.send_message(chat_id=chat_id, text="❓ 알 수 없는 명령어입니다. /start를 입력해보세요.")
+        
+        return jsonify({"status": "success"})
+        
+    except Exception as e:
+        print(f"❌ 웹훅 오류: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/setup-webhook')
+def setup_webhook_route():
+    """웹훅 설정 엔드포인트"""
+    success = setup_webhook()
+    if success:
+        return jsonify({"status": "success", "message": "웹훅 설정 완료"})
+    else:
+        return jsonify({"status": "error", "message": "웹훅 설정 실패"}), 500
+
 
 
 # 선물거래 클래스
@@ -605,107 +673,51 @@ class UnifiedFuturesTrader:
 # 사용자별 거래자 저장
 user_traders = {}
 
-def run_telegram_bot():
-    """텔레그램 봇 실행 함수"""
-    print("🤖 텔레그램 봇 시작...")
-    
-    # 텔레그램 봇 토큰
-    token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
-    print(f"🔍 토큰 확인: {token}")
-    
+def setup_webhook():
+    """웹훅 설정"""
     try:
-        from telegram import Update
-        from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+        from telegram.ext import ApplicationBuilder
         
-        # asyncio 이벤트 루프 설정
-        import asyncio
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        # 텔레그램 봇 토큰
+        token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
         
+        # 봇 애플리케이션 생성
         telegram_app = ApplicationBuilder().token(token).build()
         
-        async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """봇 시작"""
-            try:
-                user_id = update.effective_user.id
-                print(f"👤 사용자 {user_id}가 /start 명령어를 보냄")
-                
-                response_text = (
-                    "🤖 **암호화폐 선물 거래 봇**\n\n"
-                    "사용 가능한 명령어:\n"
-                    "/start - 봇 시작\n"
-                    "/test - 봇 테스트\n"
-                    "/ping - 핑 테스트\n"
-                    "/balance [거래소] - 잔고 조회\n"
-                    "/long [거래소] [심볼] [수량] [레버리지] - 롱 포지션\n"
-                    "/short [거래소] [심볼] [수량] [레버리지] - 숏 포지션\n"
-                    "/close [거래소] [심볼] - 포지션 종료\n"
-                    "/positions [거래소] - 포지션 조회\n"
-                    "/symbols [거래소] - 거래쌍 조회\n"
-                    "/leverage [거래소] [심볼] [레버리지] - 레버리지 설정\n\n"
-                    "지원 거래소: xt, backpack, hyperliquid, flipster"
-                )
-                
-                await update.message.reply_text(response_text, parse_mode='Markdown')
-                print(f"✅ 사용자 {user_id}에게 응답 전송 완료")
-                
-            except Exception as e:
-                print(f"❌ start 함수 오류: {e}")
-                await update.message.reply_text("❌ 봇 응답 중 오류가 발생했습니다.")
+        # Railway URL 가져오기
+        railway_url = os.environ.get('RAILWAY_STATIC_URL')
+        if not railway_url:
+            # 환경변수가 없으면 현재 요청에서 추출
+            railway_url = "https://telegram-crypto-trading-bot-production.up.railway.app"
         
-        async def test(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """테스트 명령어"""
-            try:
-                user_id = update.effective_user.id
-                print(f"🧪 사용자 {user_id}가 /test 명령어를 보냄")
-                await update.message.reply_text("✅ 봇이 정상 작동 중입니다!")
-                print(f"✅ 테스트 응답 전송 완료")
-            except Exception as e:
-                print(f"❌ test 함수 오류: {e}")
-                await update.message.reply_text("❌ 테스트 중 오류가 발생했습니다.")
+        webhook_url = f"{railway_url}/webhook"
         
-        async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """핑 테스트"""
-            try:
-                user_id = update.effective_user.id
-                print(f"🏓 사용자 {user_id}가 /ping 명령어를 보냄")
-                await update.message.reply_text("🏓 Pong! 봇이 살아있습니다!")
-                print(f"✅ 핑 응답 전송 완료")
-            except Exception as e:
-                print(f"❌ ping 함수 오류: {e}")
-                await update.message.reply_text("❌ 핑 테스트 중 오류가 발생했습니다.")
+        print(f"🔗 웹훅 URL 설정: {webhook_url}")
         
-        # 핸들러 등록
-        telegram_app.add_handler(CommandHandler('start', start))
-        telegram_app.add_handler(CommandHandler('test', test))
-        telegram_app.add_handler(CommandHandler('ping', ping))
+        # 웹훅 설정
+        result = telegram_app.bot.set_webhook(url=webhook_url)
         
-        print("✅ 텔레그램 봇 핸들러 등록 완료")
-        print("🔄 폴링 시작...")
-        
-        # 폴링 시작
-        telegram_app.run_polling(drop_pending_updates=True, timeout=30)
-        
+        if result:
+            print(f"✅ 웹훅 설정 성공: {webhook_url}")
+            return True
+        else:
+            print("❌ 웹훅 설정 실패")
+            return False
+            
     except Exception as e:
-        print(f"❌ 텔레그램 봇 오류: {e}")
-        import traceback
-        print(f"❌ 스택 트레이스: {traceback.format_exc()}")
+        print(f"❌ 웹훅 설정 오류: {e}")
+        return False
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 서버 시작: 포트 {port}")
     
-    # Flask 서버를 메인 스레드에서 실행
+    # Flask 서버 시작
     print("🌐 Flask 서버 시작...")
     
-    # 텔레그램 봇을 별도 스레드에서 실행
-    telegram_thread = threading.Thread(target=run_telegram_bot)
-    telegram_thread.daemon = True
-    telegram_thread.start()
-    print("✅ 텔레그램 봇 스레드 시작됨")
+    # 웹훅 설정 시도
+    print("🔗 웹훅 설정 시도...")
+    setup_webhook()
     
-    # Flask 서버 시작 (메인 스레드)
+    # Flask 서버 시작
     app.run(host='0.0.0.0', port=port, debug=False) 
