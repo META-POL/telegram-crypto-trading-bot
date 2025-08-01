@@ -6,6 +6,7 @@ Railway 배포용 텔레그램 봇 + Flask 서버
 import os
 import threading
 import logging
+import asyncio
 from datetime import datetime
 from flask import Flask, jsonify
 
@@ -67,7 +68,7 @@ def run_telegram_bot():
         print("🤖 텔레그램 봇 시작 중...")
         print(f"🔑 토큰: {token[:10]}...{token[-10:]}")
         
-        # 텔레그램 봇 라이브러리 import (오류 발생 시 Flask 서버는 계속 작동)
+        # 텔레그램 봇 라이브러리 import
         try:
             print("📦 텔레그램 봇 라이브러리 import 중...")
             from telegram import Update
@@ -83,22 +84,48 @@ def run_telegram_bot():
         telegram_app = ApplicationBuilder().token(token).build()
         print("✅ 텔레그램 애플리케이션 빌드 성공")
         
-        # 기본 핸들러만 등록 (나머지는 나중에 추가)
+        # 기본 핸들러 등록
         async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            await update.message.reply_text("�� 암호화폐 트레이딩 봇이 시작되었습니다!")
+            try:
+                print(f"📱 /start 명령어 수신: 사용자 {update.effective_user.id}")
+                await update.message.reply_text("🤖 암호화폐 트레이딩 봇이 시작되었습니다!")
+                print(f"✅ /start 명령어 응답 완료")
+            except Exception as e:
+                print(f"❌ /start 명령어 처리 오류: {e}")
         
+        async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            try:
+                print(f"📱 /help 명령어 수신: 사용자 {update.effective_user.id}")
+                await update.message.reply_text("❓ 도움말: /start - 봇 시작")
+                print(f"✅ /help 명령어 응답 완료")
+            except Exception as e:
+                print(f"❌ /help 명령어 처리 오류: {e}")
+        
+        # 핸들러 등록
         telegram_app.add_handler(CommandHandler('start', start))
+        telegram_app.add_handler(CommandHandler('help', help))
         print("✅ 핸들러 등록 완료")
         
         print("✅ 텔레그램 봇이 성공적으로 시작되었습니다!")
         print("🔄 폴링 시작...")
         
-        # 폴링 시작
-        telegram_app.run_polling(allowed_updates=Update.ALL_TYPES)
+        # 폴링 시작 (더 안전한 설정)
+        telegram_app.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+            timeout=30,
+            read_timeout=30,
+            write_timeout=30,
+            connect_timeout=30,
+            pool_timeout=30
+        )
         
     except Exception as e:
         print(f"❌ 텔레그램 봇 오류: {e}")
         print(f"❌ 오류 상세: {str(e)}")
+        print(f"❌ 오류 타입: {type(e)}")
+        import traceback
+        print(f"❌ 스택 트레이스: {traceback.format_exc()}")
         print("💡 Flask 서버는 계속 작동합니다.")
 
 if __name__ == '__main__':
