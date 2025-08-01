@@ -160,6 +160,8 @@ class UnifiedSpotTrader:
                 
                 if response.status_code == 200:
                     data = response.json()
+                    logger.info(f"Backpack API 응답: {data}")
+                    
                     # Backpack 응답 구조에 맞게 처리
                     balances = {}
                     if 'balances' in data:
@@ -183,6 +185,19 @@ class UnifiedSpotTrader:
                                     'total': float(balance.get('total', 0)),
                                     'frozen': float(balance.get('frozen', 0))
                                 }
+                    
+                    # Backpack의 경우 특별한 응답 구조 처리
+                    if not balances and isinstance(data, dict):
+                        # 직접 잔고 정보가 있는 경우
+                        for currency, amount in data.items():
+                            if isinstance(amount, (int, float)) and amount > 0:
+                                balances[currency] = {
+                                    'available': float(amount),
+                                    'total': float(amount),
+                                    'frozen': 0
+                                }
+                    
+                    logger.info(f"Backpack 처리된 잔고: {balances}")
                     return balances
                 else:
                     return {"error": f"API 오류 ({response.status_code}): {response.text}"}

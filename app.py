@@ -240,6 +240,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 if balance_result.get('status') == 'success':
                                     balance_data = balance_result.get('balance', {})
                                     
+                                    # 디버깅을 위한 로그 추가
+                                    logger.info(f"잔고 데이터 - {exchange} {trading_type}: {balance_data}")
+                                    
                                     # USDT 잔고 추출 (다양한 응답 구조 처리)
                                     usdt_balance = 0
                                     if isinstance(balance_data, dict):
@@ -247,6 +250,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                         if 'USDT' in balance_data:
                                             try:
                                                 usdt_balance = float(balance_data['USDT'])
+                                                logger.info(f"USDT 직접 키에서 추출: {usdt_balance}")
                                             except (ValueError, TypeError):
                                                 usdt_balance = 0
                                         # total 객체 안에 USDT가 있는 경우
@@ -254,6 +258,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                             if 'USDT' in balance_data['total']:
                                                 try:
                                                     usdt_balance = float(balance_data['total']['USDT'])
+                                                    logger.info(f"USDT total 객체에서 추출: {usdt_balance}")
                                                 except (ValueError, TypeError):
                                                     usdt_balance = 0
                                         # free 객체 안에 USDT가 있는 경우
@@ -261,6 +266,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                             if 'USDT' in balance_data['free']:
                                                 try:
                                                     usdt_balance = float(balance_data['free']['USDT'])
+                                                    logger.info(f"USDT free 객체에서 추출: {usdt_balance}")
+                                                except (ValueError, TypeError):
+                                                    usdt_balance = 0
+                                        # available 객체 안에 USDT가 있는 경우 (Backpack)
+                                        elif 'available' in balance_data and isinstance(balance_data['available'], dict):
+                                            if 'USDT' in balance_data['available']:
+                                                try:
+                                                    usdt_balance = float(balance_data['available']['USDT'])
+                                                    logger.info(f"USDT available 객체에서 추출: {usdt_balance}")
                                                 except (ValueError, TypeError):
                                                     usdt_balance = 0
                                     
@@ -273,6 +287,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 balance_text += f"🏪 **{exchange_name}** ({trading_type})\n"
                                 balance_text += f"❌ 오류: {str(e)[:100]}...\n\n"
                                 logger.error(f"잔고 조회 오류 - {exchange} {trading_type}: {str(e)}")
+                                logger.error(f"전체 오류 상세: {str(e)}")
                 
                 if exchange_has_api:
                     total_balance += exchange_balance
