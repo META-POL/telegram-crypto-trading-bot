@@ -56,6 +56,8 @@ def run_telegram_bot():
     try:
         # 환경 변수 확인
         token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        print(f"🔍 환경 변수 확인: TELEGRAM_BOT_TOKEN = {token}")
+        
         if not token or token == 'YOUR_TELEGRAM_BOT_TOKEN':
             print("❌ TELEGRAM_BOT_TOKEN이 설정되지 않았습니다.")
             print("Railway 대시보드에서 환경 변수를 설정하세요.")
@@ -67,21 +69,26 @@ def run_telegram_bot():
         
         # 텔레그램 봇 라이브러리 import (오류 발생 시 Flask 서버는 계속 작동)
         try:
+            print("📦 텔레그램 봇 라이브러리 import 중...")
             from telegram import Update
             from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+            print("✅ 텔레그램 봇 라이브러리 import 성공")
         except ImportError as e:
             print(f"❌ 텔레그램 봇 라이브러리 import 실패: {e}")
             print("💡 Flask 서버는 계속 작동합니다.")
             return
         
         # 애플리케이션 빌드
+        print("🔧 텔레그램 애플리케이션 빌드 중...")
         telegram_app = ApplicationBuilder().token(token).build()
+        print("✅ 텔레그램 애플리케이션 빌드 성공")
         
         # 기본 핸들러만 등록 (나머지는 나중에 추가)
         async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("�� 암호화폐 트레이딩 봇이 시작되었습니다!")
         
         telegram_app.add_handler(CommandHandler('start', start))
+        print("✅ 핸들러 등록 완료")
         
         print("✅ 텔레그램 봇이 성공적으로 시작되었습니다!")
         print("🔄 폴링 시작...")
