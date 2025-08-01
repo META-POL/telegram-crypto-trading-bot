@@ -103,11 +103,187 @@ def webhook():
                         await telegram_app.bot.send_message(chat_id=chat_id, text="🏓 Pong! 봇이 살아있습니다!")
                         print(f"✅ 핑 응답 전송")
                         
+                    elif text.startswith('/balance'):
+                        parts = text.split()
+                        if len(parts) < 2:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text="❌ 사용법: /balance [거래소]")
+                            return
+                        
+                        exchange = parts[1].lower()
+                        api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
+                        api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
+                        
+                        if not api_key or not api_secret:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ {exchange} API 키가 설정되지 않음")
+                            return
+                        
+                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+                        result = trader.get_futures_balance()
+                        
+                        if result.get('status') == 'success':
+                            balance_data = result.get('balance', {})
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"💰 {exchange} 잔고: {balance_data}")
+                        else:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ 잔고 조회 실패: {result}")
+                        
+                    elif text.startswith('/symbols'):
+                        parts = text.split()
+                        if len(parts) < 2:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text="❌ 사용법: /symbols [거래소]")
+                            return
+                        
+                        exchange = parts[1].lower()
+                        api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
+                        api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
+                        
+                        if not api_key or not api_secret:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ {exchange} API 키가 설정되지 않음")
+                            return
+                        
+                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+                        result = trader.get_futures_symbols()
+                        
+                        if result.get('status') == 'success':
+                            symbols_data = result.get('symbols', [])
+                            symbols_text = f"📈 {exchange} 거래쌍 ({len(symbols_data)}개):\n"
+                            for i, symbol in enumerate(symbols_data[:20], 1):
+                                symbols_text += f"{i}. {symbol}\n"
+                            if len(symbols_data) > 20:
+                                symbols_text += f"... 및 {len(symbols_data) - 20}개 더"
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=symbols_text)
+                        else:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ 거래쌍 조회 실패: {result}")
+                        
+                    elif text.startswith('/long'):
+                        parts = text.split()
+                        if len(parts) < 5:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text="❌ 사용법: /long [거래소] [심볼] [수량] [레버리지]")
+                            return
+                        
+                        exchange = parts[1].lower()
+                        symbol = parts[2].upper()
+                        size = float(parts[3])
+                        leverage = int(parts[4])
+                        
+                        api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
+                        api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
+                        
+                        if not api_key or not api_secret:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ {exchange} API 키가 설정되지 않음")
+                            return
+                        
+                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+                        result = trader.open_long_position(symbol, size, leverage)
+                        
+                        if result.get('status') == 'success':
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"✅ 롱 포지션 오픈 성공: {result}")
+                        else:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ 롱 포지션 오픈 실패: {result}")
+                        
+                    elif text.startswith('/short'):
+                        parts = text.split()
+                        if len(parts) < 5:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text="❌ 사용법: /short [거래소] [심볼] [수량] [레버리지]")
+                            return
+                        
+                        exchange = parts[1].lower()
+                        symbol = parts[2].upper()
+                        size = float(parts[3])
+                        leverage = int(parts[4])
+                        
+                        api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
+                        api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
+                        
+                        if not api_key or not api_secret:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ {exchange} API 키가 설정되지 않음")
+                            return
+                        
+                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+                        result = trader.open_short_position(symbol, size, leverage)
+                        
+                        if result.get('status') == 'success':
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"✅ 숏 포지션 오픈 성공: {result}")
+                        else:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ 숏 포지션 오픈 실패: {result}")
+                        
+                    elif text.startswith('/close'):
+                        parts = text.split()
+                        if len(parts) < 3:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text="❌ 사용법: /close [거래소] [심볼]")
+                            return
+                        
+                        exchange = parts[1].lower()
+                        symbol = parts[2].upper()
+                        
+                        api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
+                        api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
+                        
+                        if not api_key or not api_secret:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ {exchange} API 키가 설정되지 않음")
+                            return
+                        
+                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+                        result = trader.close_position(symbol)
+                        
+                        if result.get('status') == 'success':
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"✅ 포지션 종료 성공: {result}")
+                        else:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ 포지션 종료 실패: {result}")
+                        
+                    elif text.startswith('/positions'):
+                        parts = text.split()
+                        if len(parts) < 2:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text="❌ 사용법: /positions [거래소]")
+                            return
+                        
+                        exchange = parts[1].lower()
+                        api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
+                        api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
+                        
+                        if not api_key or not api_secret:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ {exchange} API 키가 설정되지 않음")
+                            return
+                        
+                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+                        result = trader.get_positions()
+                        
+                        if result.get('status') == 'success':
+                            positions_data = result.get('positions', {})
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"📊 {exchange} 포지션: {positions_data}")
+                        else:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ 포지션 조회 실패: {result}")
+                        
+                    elif text.startswith('/leverage'):
+                        parts = text.split()
+                        if len(parts) < 4:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text="❌ 사용법: /leverage [거래소] [심볼] [레버리지]")
+                            return
+                        
+                        exchange = parts[1].lower()
+                        symbol = parts[2].upper()
+                        leverage = int(parts[3])
+                        
+                        api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
+                        api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
+                        
+                        if not api_key or not api_secret:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ {exchange} API 키가 설정되지 않음")
+                            return
+                        
+                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+                        result = trader.set_leverage(symbol, leverage)
+                        
+                        if result.get('status') == 'success':
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"✅ 레버리지 설정 성공: {result}")
+                        else:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ 레버리지 설정 실패: {result}")
+                        
                     else:
                         await telegram_app.bot.send_message(chat_id=chat_id, text="❓ 알 수 없는 명령어입니다. /start를 입력해보세요.")
                         
                 except Exception as e:
                     print(f"❌ 응답 전송 오류: {e}")
+                    await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ 오류가 발생했습니다: {str(e)}")
             
             # 비동기 함수 실행
             try:
