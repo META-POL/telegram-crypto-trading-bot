@@ -1084,12 +1084,15 @@ async def spot_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Backpack 심볼 형식 변환
         if exchange == 'backpack':
-            # ETH -> ETHUSD, BTC -> BTCUSD 등으로 변환
+            # ETH -> ETH-USDC, BTC -> BTC-USDC 등으로 변환
             if symbol in ['ETH', 'BTC', 'SOL', 'ADA', 'DOT', 'LINK', 'UNI', 'AVAX', 'MATIC', 'ATOM']:
-                symbol = f"{symbol}USD"
-            # 이미 USD가 붙어있지 않은 경우 USD 추가
-            elif not symbol.endswith('USD'):
-                symbol = f"{symbol}USD"
+                symbol = f"{symbol}-USDC"
+            # 이미 USDC가 붙어있지 않은 경우 USDC 추가
+            elif not symbol.endswith('USDC') and not symbol.endswith('USD'):
+                symbol = f"{symbol}-USDC"
+            # USD -> USDC 변환
+            elif symbol.endswith('USD'):
+                symbol = symbol.replace('USD', 'USDC')
         
         # 거래소 유효성 검사
         valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
@@ -1194,6 +1197,119 @@ async def spot_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode='Markdown'
             )
             return
+
+async def get_symbols(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """거래 가능한 심볼 조회 명령어"""
+    user_id = update.effective_user.id
+    message_text = update.message.text
+    
+    try:
+        # /symbols [거래소]
+        parts = message_text.split()
+        
+        if len(parts) != 2:
+            await update.message.reply_text(
+                "❌ **잘못된 형식**\n\n"
+                "올바른 형식: `/symbols [거래소]`\n\n"
+                "**예시:**\n"
+                "`/symbols backpack`\n"
+                "`/symbols xt`\n\n"
+                "**지원 거래소:** xt, backpack, hyperliquid, flipster",
+                parse_mode='Markdown'
+            )
+            return
+        
+        exchange = parts[1].lower()
+        
+        # 거래소 유효성 검사
+        valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
+        if exchange not in valid_exchanges:
+            await update.message.reply_text(
+                f"❌ **지원하지 않는 거래소**\n\n"
+                f"지원 거래소: {', '.join(valid_exchanges)}"
+            )
+            return
+        
+        # API 키 확인 (선택사항)
+        has_api = api_manager.has_api_keys(user_id, exchange, 'spot')
+        
+        if has_api:
+            # API 키가 있으면 실제 심볼 조회
+            api_result = api_manager.get_api_keys(user_id, exchange, 'spot')
+            if api_result['status'] == 'success':
+                # 거래자 생성
+                if exchange == 'backpack':
+                    trader = UnifiedSpotTrader(
+                        exchange=exchange,
+                        api_key=api_result['api_key'],
+                        private_key=api_result['private_key']
+                    )
+                else:
+                    trader = UnifiedSpotTrader(
+                        exchange=exchange,
+                        api_key=api_result['api_key'],
+                        api_secret=api_result['api_secret']
+                    )
+                
+                # 심볼 조회
+                symbols_result = trader.get_all_symbols()
+                
+                if isinstance(symbols_result, list) and len(symbols_result) > 0:
+                    # 상위 20개만 표시
+                    top_symbols = symbols_result[:20]
+                    symbols_text = f"📊 **{exchange.capitalize()} 거래 가능 심볼** (상위 20개)\n\n"
+                    
+                    for i, symbol in enumerate(top_symbols, 1):
+                        symbols_text += f"{i:2d}. {symbol}\n"
+                    
+                    if len(symbols_result) > 20:
+                        symbols_text += f"\n... 및 {len(symbols_result) - 20}개 더"
+                    
+                    symbols_text += f"\n\n💡 총 {len(symbols_result)}개의 심볼이 거래 가능합니다."
+                else:
+                    symbols_text = f"❌ **심볼 조회 실패**\n\n"
+                    symbols_text += f"오류: {str(symbols_result)}"
+            else:
+                symbols_text = f"❌ **API 키 조회 실패**\n\n"
+                symbols_text += f"오류: {api_result['message']}"
+        else:
+            # API 키가 없으면 기본 심볼 목록 제공
+            if exchange == 'backpack':
+                symbols_text = f"📊 **{exchange.capitalize()} 주요 거래 심볼**\n\n"
+                symbols_text += "💡 API 키를 설정하면 전체 심볼 목록을 확인할 수 있습니다.\n\n"
+                symbols_text += "**주요 심볼:**\n"
+                symbols_text += "• SOL-USDC\n"
+                symbols_text += "• ETH-USDC\n"
+                symbols_text += "• BTC-USDC\n"
+                symbols_text += "• BONK-USDC\n"
+                symbols_text += "• JUP-USDC\n"
+                symbols_text += "• PYTH-USDC\n"
+                symbols_text += "• ORCA-USDC\n"
+                symbols_text += "• RAY-USDC\n\n"
+                symbols_text += "**API 키 설정:**\n"
+                symbols_text += f"`/addapi {exchange} spot [API_KEY] [API_SECRET]`"
+            else:
+                symbols_text = f"📊 **{exchange.capitalize()} 주요 거래 심볼**\n\n"
+                symbols_text += "💡 API 키를 설정하면 전체 심볼 목록을 확인할 수 있습니다.\n\n"
+                symbols_text += "**주요 심볼:**\n"
+                symbols_text += "• BTC/USDT\n"
+                symbols_text += "• ETH/USDT\n"
+                symbols_text += "• SOL/USDT\n"
+                symbols_text += "• ADA/USDT\n"
+                symbols_text += "• DOT/USDT\n\n"
+                symbols_text += "**API 키 설정:**\n"
+                symbols_text += f"`/addapi {exchange} spot [API_KEY] [API_SECRET]`"
+        
+        await update.message.reply_text(
+            symbols_text,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ **심볼 조회 오류**\n\n"
+            f"오류: {str(e)}"
+        )
         
         exchange = parts[1].lower()
         symbol = parts[2].upper()
@@ -1215,12 +1331,15 @@ async def spot_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Backpack 심볼 형식 변환
         if exchange == 'backpack':
-            # ETH -> ETHUSD, BTC -> BTCUSD 등으로 변환
+            # ETH -> ETH-USDC, BTC -> BTC-USDC 등으로 변환
             if symbol in ['ETH', 'BTC', 'SOL', 'ADA', 'DOT', 'LINK', 'UNI', 'AVAX', 'MATIC', 'ATOM']:
-                symbol = f"{symbol}USD"
-            # 이미 USD가 붙어있지 않은 경우 USD 추가
-            elif not symbol.endswith('USD'):
-                symbol = f"{symbol}USD"
+                symbol = f"{symbol}-USDC"
+            # 이미 USDC가 붙어있지 않은 경우 USDC 추가
+            elif not symbol.endswith('USDC') and not symbol.endswith('USD'):
+                symbol = f"{symbol}-USDC"
+            # USD -> USDC 변환
+            elif symbol.endswith('USD'):
+                symbol = symbol.replace('USD', 'USDC')
         
         # 거래소 유효성 검사
         valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
@@ -1331,6 +1450,7 @@ def run_telegram_bot():
     telegram_app.add_handler(CommandHandler('addapi', add_api))
     telegram_app.add_handler(CommandHandler('deleteapi', delete_api))
     telegram_app.add_handler(CommandHandler('checkapi', check_api))
+    telegram_app.add_handler(CommandHandler('symbols', get_symbols))
     telegram_app.add_handler(CommandHandler('spotbuy', spot_buy))
     telegram_app.add_handler(CommandHandler('spotsell', spot_sell))
     telegram_app.add_handler(CallbackQueryHandler(button_callback))
