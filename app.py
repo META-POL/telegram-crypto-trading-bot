@@ -13,7 +13,7 @@ import threading
 import base64
 import logging
 from datetime import datetime
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
 # 라이브러리 import
 try:
@@ -44,6 +44,99 @@ def health_check():
 @app.route('/health')
 def health():
     return jsonify({"status": "healthy"})
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """텔레그램 웹훅 처리"""
+    try:
+        from telegram import Update
+        from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+        
+        # 텔레그램 봇 토큰
+        token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
+        
+        # 봇 애플리케이션 생성
+        telegram_app = ApplicationBuilder().token(token).build()
+        
+        # 업데이트 처리
+        update = Update.de_json(request.get_json(), telegram_app.bot)
+        
+        # 명령어 처리
+        if update.message and update.message.text:
+            text = update.message.text
+            user_id = update.effective_user.id
+            print(f"📨 사용자 {user_id}: {text}")
+            
+            if text == '/start':
+                response_text = (
+                    "🤖 **암호화폐 선물 거래 봇**\n\n"
+                    "사용 가능한 명령어:\n"
+                    "/start - 봇 시작\n"
+                    "/test - 봇 테스트\n"
+                    "/ping - 핑 테스트\n"
+                    "/balance [거래소] - 잔고 조회\n"
+                    "/long [거래소] [심볼] [수량] [레버리지] - 롱 포지션\n"
+                    "/short [거래소] [심볼] [수량] [레버리지] - 숏 포지션\n"
+                    "/close [거래소] [심볼] - 포지션 종료\n"
+                    "/positions [거래소] - 포지션 조회\n"
+                    "/symbols [거래소] - 거래쌍 조회\n"
+                    "/leverage [거래소] [심볼] [레버리지] - 레버리지 설정\n\n"
+                    "지원 거래소: xt, backpack, hyperliquid, flipster"
+                )
+                telegram_app.bot.send_message(chat_id=update.effective_chat.id, text=response_text, parse_mode='Markdown')
+                print(f"✅ 사용자 {user_id}에게 응답 전송")
+                
+            elif text == '/test':
+                telegram_app.bot.send_message(chat_id=update.effective_chat.id, text="✅ 봇이 정상 작동 중입니다!")
+                print(f"✅ 테스트 응답 전송")
+                
+            elif text == '/ping':
+                telegram_app.bot.send_message(chat_id=update.effective_chat.id, text="🏓 Pong! 봇이 살아있습니다!")
+                print(f"✅ 핑 응답 전송")
+                
+            else:
+                telegram_app.bot.send_message(chat_id=update.effective_chat.id, text="❓ 알 수 없는 명령어입니다. /start를 입력해보세요.")
+        
+        return jsonify({"status": "success"})
+        
+    except Exception as e:
+        print(f"❌ 웹훅 오류: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/setup-webhook')
+def setup_webhook():
+    """웹훅 설정"""
+    try:
+        from telegram.ext import ApplicationBuilder
+        
+        # 텔레그램 봇 토큰
+        token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
+        
+        # 봇 애플리케이션 생성
+        telegram_app = ApplicationBuilder().token(token).build()
+        
+        # Railway URL 가져오기
+        railway_url = os.environ.get('RAILWAY_STATIC_URL', 'https://your-app-name.railway.app')
+        webhook_url = f"{railway_url}/webhook"
+        
+        # 웹훅 설정
+        result = telegram_app.bot.set_webhook(url=webhook_url)
+        
+        if result:
+            return jsonify({
+                "status": "success",
+                "message": f"웹훅 설정 성공: {webhook_url}",
+                "webhook_url": webhook_url
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "웹훅 설정 실패"
+            })
+            
+    except Exception as e:
+        print(f"❌ 웹훅 설정 오류: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # 선물거래 클래스
 class UnifiedFuturesTrader:
@@ -926,11 +1019,17 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"🚀 서버 시작: 포트 {port}")
     
-    # 텔레그램 봇 스레드 시작
-    telegram_thread = threading.Thread(target=run_telegram_bot)
-    telegram_thread.daemon = True
-    telegram_thread.start()
-    print("✅ 텔레그램 봇 스레드 시작됨")
-    
-    # Flask 서버 시작
-    app.run(host='0.0.0.0', port=port, debug=False) 
+    # Railway 환경에서는 Flask만 실행, 로컬에서는 텔레그램 봇도 실행
+    if os.environ.get('RAILWAY_ENVIRONMENT'):
+        print("🚂 Railway 환경 감지 - Flask 서버만 실행")
+        app.run(host='0.0.0.0', port=port, debug=False)
+    else:
+        print("💻 로컬 환경 감지 - 텔레그램 봇과 Flask 서버 모두 실행")
+        # 텔레그램 봇 스레드 시작
+        telegram_thread = threading.Thread(target=run_telegram_bot)
+        telegram_thread.daemon = True
+        telegram_thread.start()
+        print("✅ 텔레그램 봇 스레드 시작됨")
+        
+        # Flask 서버 시작
+        app.run(host='0.0.0.0', port=port, debug=False) 
