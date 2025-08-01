@@ -717,11 +717,28 @@ async def setup_webhook_async():
         # 봇 애플리케이션 생성
         telegram_app = ApplicationBuilder().token(token).build()
         
-        # Railway URL 가져오기
+        # Railway URL 가져오기 (여러 환경변수 시도)
+        railway_url = None
+        
+        # 1. RAILWAY_STATIC_URL 시도
         railway_url = os.environ.get('RAILWAY_STATIC_URL')
+        
+        # 2. RAILWAY_PUBLIC_DOMAIN 시도
         if not railway_url:
-            # 환경변수가 없으면 현재 요청에서 추출
+            public_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+            if public_domain:
+                railway_url = f"https://{public_domain}"
+        
+        # 3. PORT 환경변수로 Railway 감지 후 기본 URL 사용
+        if not railway_url and os.environ.get('PORT'):
             railway_url = "https://telegram-crypto-trading-bot-production.up.railway.app"
+        
+        # 4. 최후 수단으로 하드코딩된 URL (Railway에서 실제 도메인으로 변경 필요)
+        if not railway_url:
+            # Railway 대시보드에서 실제 도메인을 확인하고 여기에 입력하세요
+            railway_url = "https://telegram-crypto-trading-bot-production.up.railway.app"
+        
+        print(f"🔍 사용할 Railway URL: {railway_url}")
         
         webhook_url = f"{railway_url}/webhook"
         
