@@ -7,6 +7,7 @@ Railway 배포용 텔레그램 봇
 import os
 import logging
 import threading
+from datetime import datetime
 from flask import Flask, jsonify
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -50,12 +51,6 @@ def status():
         "service": "telegram-crypto-trading-bot",
         "timestamp": datetime.now().isoformat()
     })
-
-# 로깅 설정
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
 
 # 채널 ID
 CHANNEL_ID = -1002751102244
@@ -1214,6 +1209,118 @@ async def spot_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode='Markdown'
             )
             return
+        
+        exchange = parts[1].lower()
+        symbol = parts[2].upper()
+        quantity = float(parts[3])
+        
+        # 가격 파싱 (쉼표 제거)
+        price = None
+        if len(parts) > 4:
+            try:
+                # 쉼표 제거 후 파싱
+                price_str = parts[4].replace(',', '')
+                price = float(price_str)
+            except ValueError:
+                await update.message.reply_text(
+                    "❌ **잘못된 가격 형식**\n\n"
+                    "가격은 숫자로 입력하세요. (예: 3688.14 또는 3,688.14)"
+                )
+                return
+        
+        # Backpack 심볼 형식 변환
+        if exchange == 'backpack':
+            # ETH -> ETH-USDC, BTC -> BTC-USDC 등으로 변환
+            if symbol in ['ETH', 'BTC', 'SOL', 'ADA', 'DOT', 'LINK', 'UNI', 'AVAX', 'MATIC', 'ATOM']:
+                symbol = f"{symbol}-USDC"
+            # 이미 USDC가 붙어있지 않은 경우 USDC 추가
+            elif not symbol.endswith('USDC') and not symbol.endswith('USD'):
+                symbol = f"{symbol}-USDC"
+            # USD -> USDC 변환
+            elif symbol.endswith('USD'):
+                symbol = symbol.replace('USD', 'USDC')
+        
+        # 거래소 유효성 검사
+        valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
+        if exchange not in valid_exchanges:
+            await update.message.reply_text(
+                f"❌ **지원하지 않는 거래소**\n\n"
+                f"지원 거래소: {', '.join(valid_exchanges)}"
+            )
+            return
+        
+        # API 키 확인
+        if not api_manager.has_api_keys(user_id, exchange, 'spot'):
+            await update.message.reply_text(
+                f"❌ **API 키가 설정되지 않음**\n\n"
+                f"{exchange.capitalize()} 현물 거래용 API 키를 먼저 설정하세요:\n"
+                f"`/addapi {exchange} spot [API_KEY] [API_SECRET]`"
+            )
+            return
+        
+        # API 키 가져오기
+        api_result = api_manager.get_api_keys(user_id, exchange, 'spot')
+        if api_result['status'] != 'success':
+            await update.message.reply_text(
+                f"❌ **API 키 조회 실패**\n\n"
+                f"오류: {api_result['message']}"
+            )
+            return
+        
+        # 거래자 생성
+        if exchange == 'backpack':
+            trader = UnifiedSpotTrader(
+                exchange=exchange,
+                api_key=api_result['api_key'],
+                private_key=api_result['private_key']
+            )
+        else:
+            trader = UnifiedSpotTrader(
+                exchange=exchange,
+                api_key=api_result['api_key'],
+                api_secret=api_result['api_secret']
+            )
+        
+        # 매도 주문 실행
+        order_type = 'market' if price is None else 'limit'
+        result = trader.sell(symbol, price or 0, quantity, 1, order_type)
+        
+        if isinstance(result, list) and len(result) > 0:
+            order_result = result[0]
+            if 'error' in str(order_result):
+                await update.message.reply_text(
+                    f"❌ **매도 주문 실패**\n\n"
+                    f"🏪 거래소: {exchange.capitalize()}\n"
+                    f"📈 심볼: {symbol}\n"
+                    f"📊 수량: {quantity}\n"
+                    f"💰 가격: {'시장가' if price is None else f'${price:,.2f}'}\n"
+                    f"❌ 오류: {str(order_result)}"
+                )
+            else:
+                await update.message.reply_text(
+                    f"✅ **매도 주문 성공!**\n\n"
+                    f"🏪 거래소: {exchange.capitalize()}\n"
+                    f"📈 심볼: {symbol}\n"
+                    f"📊 수량: {quantity}\n"
+                    f"💰 가격: {'시장가' if price is None else f'${price:,.2f}'}\n"
+                    f"🆔 주문 ID: {order_result.get('orderId', 'N/A')}"
+                )
+        else:
+            await update.message.reply_text(
+                f"❌ **매도 주문 실패**\n\n"
+                f"오류: {str(result)}"
+            )
+        
+    except ValueError:
+        await update.message.reply_text(
+            "❌ **잘못된 수량 또는 가격**\n\n"
+            "수량과 가격은 숫자로 입력하세요."
+        )
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ **매도 주문 오류**\n\n"
+            f"오류: {str(e)}"
+        )
 
 async def get_symbols(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """거래 가능한 심볼 조회 명령어"""
@@ -1325,118 +1432,6 @@ async def get_symbols(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(
             f"❌ **심볼 조회 오류**\n\n"
-            f"오류: {str(e)}"
-        )
-        
-        exchange = parts[1].lower()
-        symbol = parts[2].upper()
-        quantity = float(parts[3])
-        
-        # 가격 파싱 (쉼표 제거)
-        price = None
-        if len(parts) > 4:
-            try:
-                # 쉼표 제거 후 파싱
-                price_str = parts[4].replace(',', '')
-                price = float(price_str)
-            except ValueError:
-                await update.message.reply_text(
-                    "❌ **잘못된 가격 형식**\n\n"
-                    "가격은 숫자로 입력하세요. (예: 3688.14 또는 3,688.14)"
-                )
-                return
-        
-        # Backpack 심볼 형식 변환
-        if exchange == 'backpack':
-            # ETH -> ETH-USDC, BTC -> BTC-USDC 등으로 변환
-            if symbol in ['ETH', 'BTC', 'SOL', 'ADA', 'DOT', 'LINK', 'UNI', 'AVAX', 'MATIC', 'ATOM']:
-                symbol = f"{symbol}-USDC"
-            # 이미 USDC가 붙어있지 않은 경우 USDC 추가
-            elif not symbol.endswith('USDC') and not symbol.endswith('USD'):
-                symbol = f"{symbol}-USDC"
-            # USD -> USDC 변환
-            elif symbol.endswith('USD'):
-                symbol = symbol.replace('USD', 'USDC')
-        
-        # 거래소 유효성 검사
-        valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
-        if exchange not in valid_exchanges:
-            await update.message.reply_text(
-                f"❌ **지원하지 않는 거래소**\n\n"
-                f"지원 거래소: {', '.join(valid_exchanges)}"
-            )
-            return
-        
-        # API 키 확인
-        if not api_manager.has_api_keys(user_id, exchange, 'spot'):
-            await update.message.reply_text(
-                f"❌ **API 키가 설정되지 않음**\n\n"
-                f"{exchange.capitalize()} 현물 거래용 API 키를 먼저 설정하세요:\n"
-                f"`/addapi {exchange} spot [API_KEY] [API_SECRET]`"
-            )
-            return
-        
-        # API 키 가져오기
-        api_result = api_manager.get_api_keys(user_id, exchange, 'spot')
-        if api_result['status'] != 'success':
-            await update.message.reply_text(
-                f"❌ **API 키 조회 실패**\n\n"
-                f"오류: {api_result['message']}"
-            )
-            return
-        
-        # 거래자 생성
-        if exchange == 'backpack':
-            trader = UnifiedSpotTrader(
-                exchange=exchange,
-                api_key=api_result['api_key'],
-                private_key=api_result['private_key']
-            )
-        else:
-            trader = UnifiedSpotTrader(
-                exchange=exchange,
-                api_key=api_result['api_key'],
-                api_secret=api_result['api_secret']
-            )
-        
-        # 매도 주문 실행
-        order_type = 'market' if price is None else 'limit'
-        result = trader.sell(symbol, price or 0, quantity, 1, order_type)
-        
-        if isinstance(result, list) and len(result) > 0:
-            order_result = result[0]
-            if 'error' in str(order_result):
-                await update.message.reply_text(
-                    f"❌ **매도 주문 실패**\n\n"
-                    f"🏪 거래소: {exchange.capitalize()}\n"
-                    f"📈 심볼: {symbol}\n"
-                    f"📊 수량: {quantity}\n"
-                    f"💰 가격: {'시장가' if price is None else f'${price:,.2f}'}\n"
-                    f"❌ 오류: {str(order_result)}"
-                )
-            else:
-                await update.message.reply_text(
-                    f"✅ **매도 주문 성공!**\n\n"
-                    f"🏪 거래소: {exchange.capitalize()}\n"
-                    f"📈 심볼: {symbol}\n"
-                    f"📊 수량: {quantity}\n"
-                    f"💰 가격: {'시장가' if price is None else f'${price:,.2f}'}\n"
-                    f"🆔 주문 ID: {order_result.get('orderId', 'N/A')}"
-                )
-        else:
-            await update.message.reply_text(
-                f"❌ **매도 주문 실패**\n\n"
-                f"오류: {str(result)}"
-            )
-        
-    except ValueError:
-        await update.message.reply_text(
-            "❌ **잘못된 수량 또는 가격**\n\n"
-            "수량과 가격은 숫자로 입력하세요."
-        )
-    except Exception as e:
-        await update.message.reply_text(
-            f"❌ **매도 주문 오류**\n\n"
             f"오류: {str(e)}"
         )
 
