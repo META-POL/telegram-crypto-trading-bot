@@ -616,6 +616,14 @@ def run_telegram_bot():
         
         print("🤖 텔레그램 봇 시작...")
         
+        # asyncio 이벤트 루프 설정
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
         from telegram import Update
         from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
         
@@ -623,21 +631,30 @@ def run_telegram_bot():
         
         async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """봇 시작"""
-            user_id = update.effective_user.id
-            await update.message.reply_text(
-                "🤖 **암호화폐 선물 거래 봇**\n\n"
-                "사용 가능한 명령어:\n"
-                "/start - 봇 시작\n"
-                "/balance [거래소] - 잔고 조회\n"
-                "/long [거래소] [심볼] [수량] [레버리지] - 롱 포지션\n"
-                "/short [거래소] [심볼] [수량] [레버리지] - 숏 포지션\n"
-                "/close [거래소] [심볼] - 포지션 종료\n"
-                "/positions [거래소] - 포지션 조회\n"
-                "/symbols [거래소] - 거래쌍 조회\n"
-                "/leverage [거래소] [심볼] [레버리지] - 레버리지 설정\n\n"
-                "지원 거래소: xt, backpack, hyperliquid, flipster",
-                parse_mode='Markdown'
-            )
+            try:
+                user_id = update.effective_user.id
+                print(f"👤 사용자 {user_id}가 /start 명령어를 보냄")
+                
+                response_text = (
+                    "🤖 **암호화폐 선물 거래 봇**\n\n"
+                    "사용 가능한 명령어:\n"
+                    "/start - 봇 시작\n"
+                    "/balance [거래소] - 잔고 조회\n"
+                    "/long [거래소] [심볼] [수량] [레버리지] - 롱 포지션\n"
+                    "/short [거래소] [심볼] [수량] [레버리지] - 숏 포지션\n"
+                    "/close [거래소] [심볼] - 포지션 종료\n"
+                    "/positions [거래소] - 포지션 조회\n"
+                    "/symbols [거래소] - 거래쌍 조회\n"
+                    "/leverage [거래소] [심볼] [레버리지] - 레버리지 설정\n\n"
+                    "지원 거래소: xt, backpack, hyperliquid, flipster"
+                )
+                
+                await update.message.reply_text(response_text, parse_mode='Markdown')
+                print(f"✅ 사용자 {user_id}에게 응답 전송 완료")
+                
+            except Exception as e:
+                print(f"❌ start 함수 오류: {e}")
+                await update.message.reply_text("❌ 봇 응답 중 오류가 발생했습니다.")
         
         async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """잔고 조회"""
@@ -855,8 +872,32 @@ def run_telegram_bot():
             except Exception as e:
                 await update.message.reply_text(f"❌ 오류: {str(e)}")
         
+        async def test(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """테스트 명령어"""
+            try:
+                user_id = update.effective_user.id
+                print(f"🧪 사용자 {user_id}가 /test 명령어를 보냄")
+                await update.message.reply_text("✅ 봇이 정상 작동 중입니다!")
+                print(f"✅ 테스트 응답 전송 완료")
+            except Exception as e:
+                print(f"❌ test 함수 오류: {e}")
+                await update.message.reply_text("❌ 테스트 중 오류가 발생했습니다.")
+        
+        async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """핑 테스트"""
+            try:
+                user_id = update.effective_user.id
+                print(f"🏓 사용자 {user_id}가 /ping 명령어를 보냄")
+                await update.message.reply_text("🏓 Pong! 봇이 살아있습니다!")
+                print(f"✅ 핑 응답 전송 완료")
+            except Exception as e:
+                print(f"❌ ping 함수 오류: {e}")
+                await update.message.reply_text("❌ 핑 테스트 중 오류가 발생했습니다.")
+        
         # 핸들러 등록
         telegram_app.add_handler(CommandHandler('start', start))
+        telegram_app.add_handler(CommandHandler('test', test))
+        telegram_app.add_handler(CommandHandler('ping', ping))
         telegram_app.add_handler(CommandHandler('balance', balance))
         telegram_app.add_handler(CommandHandler('long', long_position))
         telegram_app.add_handler(CommandHandler('short', short_position))
@@ -868,7 +909,13 @@ def run_telegram_bot():
         print("✅ 텔레그램 봇 핸들러 등록 완료")
         print("🔄 폴링 시작...")
         
-        telegram_app.run_polling(drop_pending_updates=True)
+        try:
+            telegram_app.run_polling(drop_pending_updates=True, timeout=30)
+            print("✅ 텔레그램 봇 폴링 시작됨")
+        except Exception as polling_error:
+            print(f"❌ 폴링 오류: {polling_error}")
+            import traceback
+            print(f"❌ 폴링 스택 트레이스: {traceback.format_exc()}")
         
     except Exception as e:
         print(f"❌ 텔레그램 봇 오류: {e}")
