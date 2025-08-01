@@ -606,11 +606,12 @@ user_traders = {}
 def run_telegram_bot():
     """텔레그램 봇 실행"""
     try:
-        token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        # 텔레그램 봇 토큰 직접 설정
+        token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
         print(f"🔍 토큰 확인: {token}")
         
         if not token:
-            print("❌ TELEGRAM_BOT_TOKEN이 설정되지 않음")
+            print("❌ 텔레그램 봇 토큰이 설정되지 않음")
             return
         
         print("🤖 텔레그램 봇 시작...")
