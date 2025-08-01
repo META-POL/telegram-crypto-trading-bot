@@ -15,6 +15,13 @@ from futures_trader import UnifiedFuturesTrader
 from api_key_manager import api_manager
 from user_api_store import init_db
 
+# 로깅 설정
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
 # Flask 앱 생성 (Railway 헬스체크용)
 app = Flask(__name__)
 
