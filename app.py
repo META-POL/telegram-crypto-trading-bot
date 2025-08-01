@@ -13,6 +13,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 from trading_bot_unified import UnifiedSpotTrader
 from futures_trader import UnifiedFuturesTrader
 from api_key_manager import api_manager
+from exchange_info import exchange_info
 from user_api_store import init_db
 
 # 로깅 설정
@@ -63,6 +64,9 @@ def get_main_menu_keyboard():
         ],
         [
             InlineKeyboardButton("🔑 API 키 관리", callback_data="manage_api"),
+            InlineKeyboardButton("ℹ️ 거래소 정보", callback_data="exchange_info")
+        ],
+        [
             InlineKeyboardButton("❓ 도움말", callback_data="help")
         ]
     ]
@@ -85,7 +89,29 @@ def get_exchange_selection_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-
+def get_exchange_info_keyboard():
+    """거래소 정보 키보드 생성"""
+    keyboard = [
+        [
+            InlineKeyboardButton("XT Exchange", callback_data="info_xt"),
+            InlineKeyboardButton("Backpack", callback_data="info_backpack")
+        ],
+        [
+            InlineKeyboardButton("Hyperliquid", callback_data="info_hyperliquid"),
+            InlineKeyboardButton("Flipster", callback_data="info_flipster")
+        ],
+        [
+            InlineKeyboardButton("Binance", callback_data="info_binance"),
+            InlineKeyboardButton("OKX", callback_data="info_okx")
+        ],
+        [
+            InlineKeyboardButton("Bybit", callback_data="info_bybit")
+        ],
+        [
+            InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
 def get_api_management_keyboard():
     """API 키 관리 키보드 생성"""
@@ -448,7 +474,22 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
     
-
+    elif query.data == "exchange_info":
+        await query.edit_message_text(
+            "ℹ️ **거래소 정보**\n\n"
+            "아래에서 거래소를 선택하세요:",
+            reply_markup=get_exchange_info_keyboard(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data.startswith("info_"):
+        exchange = query.data.replace("info_", "")
+        info_text = exchange_info.format_exchange_info(exchange)
+        await query.edit_message_text(
+            info_text,
+            reply_markup=get_exchange_info_keyboard(),
+            parse_mode='Markdown'
+        )
     
     elif query.data == "help":
         help_text = """
