@@ -1471,14 +1471,27 @@ def run_flask_server():
     app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
 def main():
-    """메인 함수 - 텔레그램 봇을 메인 스레드에서 실행"""
-    # Flask 서버를 별도 스레드에서 실행
-    flask_thread = threading.Thread(target=run_flask_server)
-    flask_thread.daemon = True
-    flask_thread.start()
-    
-    # 텔레그램 봇을 메인 스레드에서 실행
-    run_telegram_bot()
+    """메인 함수 - Railway에서는 Flask 서버를 메인에서 실행"""
+    # Railway 환경에서는 Flask 서버를 메인에서 실행
+    if os.environ.get('RAILWAY_ENVIRONMENT'):
+        print("🚂 Railway 환경에서 Flask 서버 시작...")
+        # 텔레그램 봇을 별도 스레드에서 실행
+        telegram_thread = threading.Thread(target=run_telegram_bot)
+        telegram_thread.daemon = True
+        telegram_thread.start()
+        
+        # Flask 서버를 메인 스레드에서 실행
+        run_flask_server()
+    else:
+        # 로컬 환경에서는 텔레그램 봇을 메인에서 실행
+        print("🏠 로컬 환경에서 텔레그램 봇 시작...")
+        # Flask 서버를 별도 스레드에서 실행
+        flask_thread = threading.Thread(target=run_flask_server)
+        flask_thread.daemon = True
+        flask_thread.start()
+        
+        # 텔레그램 봇을 메인 스레드에서 실행
+        run_telegram_bot()
 
 if __name__ == '__main__':
     main() 
