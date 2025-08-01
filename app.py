@@ -51,6 +51,7 @@ def webhook():
     try:
         from telegram import Update
         from telegram.ext import ApplicationBuilder
+        import asyncio
         
         # 텔레그램 봇 토큰
         token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
@@ -68,35 +69,49 @@ def webhook():
             chat_id = update.effective_chat.id
             print(f"📨 사용자 {user_id}: {text}")
             
-            if text == '/start':
-                response_text = (
-                    "🤖 **암호화폐 선물 거래 봇**\n\n"
-                    "사용 가능한 명령어:\n"
-                    "/start - 봇 시작\n"
-                    "/test - 봇 테스트\n"
-                    "/ping - 핑 테스트\n"
-                    "/balance [거래소] - 잔고 조회\n"
-                    "/long [거래소] [심볼] [수량] [레버리지] - 롱 포지션\n"
-                    "/short [거래소] [심볼] [수량] [레버리지] - 숏 포지션\n"
-                    "/close [거래소] [심볼] - 포지션 종료\n"
-                    "/positions [거래소] - 포지션 조회\n"
-                    "/symbols [거래소] - 거래쌍 조회\n"
-                    "/leverage [거래소] [심볼] [레버리지] - 레버리지 설정\n\n"
-                    "지원 거래소: xt, backpack, hyperliquid, flipster"
-                )
-                telegram_app.bot.send_message(chat_id=chat_id, text=response_text, parse_mode='Markdown')
-                print(f"✅ 사용자 {user_id}에게 응답 전송")
-                
-            elif text == '/test':
-                telegram_app.bot.send_message(chat_id=chat_id, text="✅ 봇이 정상 작동 중입니다!")
-                print(f"✅ 테스트 응답 전송")
-                
-            elif text == '/ping':
-                telegram_app.bot.send_message(chat_id=chat_id, text="🏓 Pong! 봇이 살아있습니다!")
-                print(f"✅ 핑 응답 전송")
-                
-            else:
-                telegram_app.bot.send_message(chat_id=chat_id, text="❓ 알 수 없는 명령어입니다. /start를 입력해보세요.")
+            async def send_response():
+                try:
+                    if text == '/start':
+                        response_text = (
+                            "🤖 **암호화폐 선물 거래 봇**\n\n"
+                            "사용 가능한 명령어:\n"
+                            "/start - 봇 시작\n"
+                            "/test - 봇 테스트\n"
+                            "/ping - 핑 테스트\n"
+                            "/balance [거래소] - 잔고 조회\n"
+                            "/long [거래소] [심볼] [수량] [레버리지] - 롱 포지션\n"
+                            "/short [거래소] [심볼] [수량] [레버리지] - 숏 포지션\n"
+                            "/close [거래소] [심볼] - 포지션 종료\n"
+                            "/positions [거래소] - 포지션 조회\n"
+                            "/symbols [거래소] - 거래쌍 조회\n"
+                            "/leverage [거래소] [심볼] [레버리지] - 레버리지 설정\n\n"
+                            "지원 거래소: xt, backpack, hyperliquid, flipster"
+                        )
+                        await telegram_app.bot.send_message(chat_id=chat_id, text=response_text, parse_mode='Markdown')
+                        print(f"✅ 사용자 {user_id}에게 응답 전송")
+                        
+                    elif text == '/test':
+                        await telegram_app.bot.send_message(chat_id=chat_id, text="✅ 봇이 정상 작동 중입니다!")
+                        print(f"✅ 테스트 응답 전송")
+                        
+                    elif text == '/ping':
+                        await telegram_app.bot.send_message(chat_id=chat_id, text="🏓 Pong! 봇이 살아있습니다!")
+                        print(f"✅ 핑 응답 전송")
+                        
+                    else:
+                        await telegram_app.bot.send_message(chat_id=chat_id, text="❓ 알 수 없는 명령어입니다. /start를 입력해보세요.")
+                        
+                except Exception as e:
+                    print(f"❌ 응답 전송 오류: {e}")
+            
+            # 비동기 함수 실행
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(send_response())
+                loop.close()
+            except Exception as e:
+                print(f"❌ 비동기 실행 오류: {e}")
         
         return jsonify({"status": "success"})
         
@@ -673,8 +688,8 @@ class UnifiedFuturesTrader:
 # 사용자별 거래자 저장
 user_traders = {}
 
-def setup_webhook():
-    """웹훅 설정"""
+async def setup_webhook_async():
+    """웹훅 설정 (비동기)"""
     try:
         from telegram.ext import ApplicationBuilder
         
@@ -694,8 +709,8 @@ def setup_webhook():
         
         print(f"🔗 웹훅 URL 설정: {webhook_url}")
         
-        # 웹훅 설정
-        result = telegram_app.bot.set_webhook(url=webhook_url)
+        # 웹훅 설정 (비동기)
+        result = await telegram_app.bot.set_webhook(url=webhook_url)
         
         if result:
             print(f"✅ 웹훅 설정 성공: {webhook_url}")
@@ -706,6 +721,26 @@ def setup_webhook():
             
     except Exception as e:
         print(f"❌ 웹훅 설정 오류: {e}")
+        return False
+
+def setup_webhook():
+    """웹훅 설정 (동기 래퍼)"""
+    import asyncio
+    try:
+        # 새로운 이벤트 루프 생성
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # 비동기 함수 실행
+        result = loop.run_until_complete(setup_webhook_async())
+        
+        # 루프 정리
+        loop.close()
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ 웹훅 설정 래퍼 오류: {e}")
         return False
 
 if __name__ == '__main__':
