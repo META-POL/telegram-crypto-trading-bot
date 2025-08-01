@@ -516,9 +516,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - 💰 **잔고 조회**: `/balance` 또는 메뉴 버튼
 - 🔑 **API 키 관리**: 추가, 확인, 삭제
 - ℹ️ **거래소 정보**: API 지원 여부 확인
+- 📈 **현물 거래**: 매수/매도 기능
 
 ### 🚧 **개발 중인 기능**
-- 📈 **현물 거래**: 매수/매도 기능 (준비 중)
 - 📊 **선물 거래**: 레버리지 거래 (준비 중)
 - 🔍 **심볼 조회**: 거래 가능 코인 목록 (준비 중)
 
@@ -545,12 +545,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /deleteapi [거래소] [거래유형]
 ```
 
+### 📈 **현물 거래**
+```
+/spotbuy [거래소] [심볼] [수량] [가격(선택)] - 현물 매수
+/spotsell [거래소] [심볼] [수량] [가격(선택)] - 현물 매도
+```
+
 ### 📝 **명령어 예시**
 ```
 /addapi backpack spot your_api_key your_private_key
 /addapi xt futures your_api_key your_api_secret
 /checkapi backpack spot
 /balance
+/spotbuy backpack BTC 0.001
+/spotsell xt ETH 0.1 2100
 ```
 
 ## 🔧 **API 키 설정 방법**
@@ -574,7 +582,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ### **현재 상태**
 - ✅ 잔고 조회 기능 완전 작동
 - ✅ API 키 관리 기능 완전 작동
-- 🚧 거래 기능은 개발 중 (준비 중)
+- ✅ 현물 거래 기능 완전 작동
+- 🚧 선물 거래 기능은 개발 중 (준비 중)
 
 ### **보안**
 - 모든 API 키는 암호화되어 저장
@@ -582,8 +591,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - API 키는 서버에만 저장, 개발자도 접근 불가
 
 ### **사용 제한**
-- 현재는 잔고 조회만 가능
-- 거래 기능은 추후 업데이트 예정
+- ✅ 잔고 조회 및 현물 거래 가능
+- 🚧 선물 거래는 추후 업데이트 예정
 - 각 거래소별 API 지원 여부 확인 필요
 
 ## 🚀 **향후 업데이트 예정**
@@ -591,22 +600,23 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ### **1단계 (현재)**
 - ✅ 잔고 조회
 - ✅ API 키 관리
+- ✅ 현물 거래 (매수/매도)
 
 ### **2단계 (준비 중)**
-- 📈 현물 거래 (매수/매도)
 - 🔍 심볼 조회
+- 📊 선물 거래 (레버리지)
 
 ### **3단계 (계획)**
-- 📊 선물 거래 (레버리지)
 - 🎯 자동 거래 봇
+- 📈 고급 차트 분석
 
 ## 📞 **지원 및 문의**
 - 채널 멤버십 필요
 - API 키 설정 문의는 관리자에게
 - 버그 리포트는 개발자에게
 
-**💡 현재는 잔고 조회와 API 키 관리만 가능합니다.**
-**거래 기능은 개발 완료 후 업데이트됩니다.**
+**💡 현재는 잔고 조회, API 키 관리, 현물 거래가 가능합니다.**
+**선물 거래는 개발 완료 후 업데이트됩니다.**
         """
         await query.edit_message_text(
             help_text,
@@ -1032,6 +1042,224 @@ async def check_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"오류: {str(e)}"
         )
 
+async def spot_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """현물 매수 명령어"""
+    user_id = update.effective_user.id
+    message_text = update.message.text
+    
+    try:
+        # /spotbuy [거래소] [심볼] [수량] [가격(선택)]
+        parts = message_text.split()
+        
+        if len(parts) < 4:
+            await update.message.reply_text(
+                "❌ **잘못된 형식**\n\n"
+                "올바른 형식:\n"
+                "`/spotbuy [거래소] [심볼] [수량] [가격(선택)]`\n\n"
+                "**예시:**\n"
+                "`/spotbuy backpack BTC 0.001` (시장가 매수)\n"
+                "`/spotbuy xt ETH 0.1 2000` (지정가 매수)\n\n"
+                "**지원 거래소:** xt, backpack, hyperliquid, flipster",
+                parse_mode='Markdown'
+            )
+            return
+        
+        exchange = parts[1].lower()
+        symbol = parts[2].upper()
+        quantity = float(parts[3])
+        price = float(parts[4]) if len(parts) > 4 else None
+        
+        # 거래소 유효성 검사
+        valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
+        if exchange not in valid_exchanges:
+            await update.message.reply_text(
+                f"❌ **지원하지 않는 거래소**\n\n"
+                f"지원 거래소: {', '.join(valid_exchanges)}"
+            )
+            return
+        
+        # API 키 확인
+        if not api_manager.has_api_keys(user_id, exchange, 'spot'):
+            await update.message.reply_text(
+                f"❌ **API 키가 설정되지 않음**\n\n"
+                f"{exchange.capitalize()} 현물 거래용 API 키를 먼저 설정하세요:\n"
+                f"`/addapi {exchange} spot [API_KEY] [API_SECRET]`"
+            )
+            return
+        
+        # API 키 가져오기
+        api_result = api_manager.get_api_keys(user_id, exchange, 'spot')
+        if api_result['status'] != 'success':
+            await update.message.reply_text(
+                f"❌ **API 키 조회 실패**\n\n"
+                f"오류: {api_result['message']}"
+            )
+            return
+        
+        # 거래자 생성
+        if exchange == 'backpack':
+            trader = UnifiedSpotTrader(
+                exchange=exchange,
+                api_key=api_result['api_key'],
+                private_key=api_result['private_key']
+            )
+        else:
+            trader = UnifiedSpotTrader(
+                exchange=exchange,
+                api_key=api_result['api_key'],
+                api_secret=api_result['api_secret']
+            )
+        
+        # 매수 주문 실행
+        order_type = 'market' if price is None else 'limit'
+        result = trader.buy(symbol, price or 0, quantity, 1, order_type)
+        
+        if isinstance(result, list) and len(result) > 0:
+            order_result = result[0]
+            if 'error' in str(order_result):
+                await update.message.reply_text(
+                    f"❌ **매수 주문 실패**\n\n"
+                    f"🏪 거래소: {exchange.capitalize()}\n"
+                    f"📈 심볼: {symbol}\n"
+                    f"📊 수량: {quantity}\n"
+                    f"💰 가격: {'시장가' if price is None else f'${price:,.2f}'}\n"
+                    f"❌ 오류: {str(order_result)}"
+                )
+            else:
+                await update.message.reply_text(
+                    f"✅ **매수 주문 성공!**\n\n"
+                    f"🏪 거래소: {exchange.capitalize()}\n"
+                    f"📈 심볼: {symbol}\n"
+                    f"📊 수량: {quantity}\n"
+                    f"💰 가격: {'시장가' if price is None else f'${price:,.2f}'}\n"
+                    f"🆔 주문 ID: {order_result.get('orderId', 'N/A')}"
+                )
+        else:
+            await update.message.reply_text(
+                f"❌ **매수 주문 실패**\n\n"
+                f"오류: {str(result)}"
+            )
+        
+    except ValueError:
+        await update.message.reply_text(
+            "❌ **잘못된 수량 또는 가격**\n\n"
+            "수량과 가격은 숫자로 입력하세요."
+        )
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ **매수 주문 오류**\n\n"
+            f"오류: {str(e)}"
+        )
+
+async def spot_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """현물 매도 명령어"""
+    user_id = update.effective_user.id
+    message_text = update.message.text
+    
+    try:
+        # /spotsell [거래소] [심볼] [수량] [가격(선택)]
+        parts = message_text.split()
+        
+        if len(parts) < 4:
+            await update.message.reply_text(
+                "❌ **잘못된 형식**\n\n"
+                "올바른 형식:\n"
+                "`/spotsell [거래소] [심볼] [수량] [가격(선택)]`\n\n"
+                "**예시:**\n"
+                "`/spotsell backpack BTC 0.001` (시장가 매도)\n"
+                "`/spotsell xt ETH 0.1 2100` (지정가 매도)\n\n"
+                "**지원 거래소:** xt, backpack, hyperliquid, flipster",
+                parse_mode='Markdown'
+            )
+            return
+        
+        exchange = parts[1].lower()
+        symbol = parts[2].upper()
+        quantity = float(parts[3])
+        price = float(parts[4]) if len(parts) > 4 else None
+        
+        # 거래소 유효성 검사
+        valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
+        if exchange not in valid_exchanges:
+            await update.message.reply_text(
+                f"❌ **지원하지 않는 거래소**\n\n"
+                f"지원 거래소: {', '.join(valid_exchanges)}"
+            )
+            return
+        
+        # API 키 확인
+        if not api_manager.has_api_keys(user_id, exchange, 'spot'):
+            await update.message.reply_text(
+                f"❌ **API 키가 설정되지 않음**\n\n"
+                f"{exchange.capitalize()} 현물 거래용 API 키를 먼저 설정하세요:\n"
+                f"`/addapi {exchange} spot [API_KEY] [API_SECRET]`"
+            )
+            return
+        
+        # API 키 가져오기
+        api_result = api_manager.get_api_keys(user_id, exchange, 'spot')
+        if api_result['status'] != 'success':
+            await update.message.reply_text(
+                f"❌ **API 키 조회 실패**\n\n"
+                f"오류: {api_result['message']}"
+            )
+            return
+        
+        # 거래자 생성
+        if exchange == 'backpack':
+            trader = UnifiedSpotTrader(
+                exchange=exchange,
+                api_key=api_result['api_key'],
+                private_key=api_result['private_key']
+            )
+        else:
+            trader = UnifiedSpotTrader(
+                exchange=exchange,
+                api_key=api_result['api_key'],
+                api_secret=api_result['api_secret']
+            )
+        
+        # 매도 주문 실행
+        order_type = 'market' if price is None else 'limit'
+        result = trader.sell(symbol, price or 0, quantity, 1, order_type)
+        
+        if isinstance(result, list) and len(result) > 0:
+            order_result = result[0]
+            if 'error' in str(order_result):
+                await update.message.reply_text(
+                    f"❌ **매도 주문 실패**\n\n"
+                    f"🏪 거래소: {exchange.capitalize()}\n"
+                    f"📈 심볼: {symbol}\n"
+                    f"📊 수량: {quantity}\n"
+                    f"💰 가격: {'시장가' if price is None else f'${price:,.2f}'}\n"
+                    f"❌ 오류: {str(order_result)}"
+                )
+            else:
+                await update.message.reply_text(
+                    f"✅ **매도 주문 성공!**\n\n"
+                    f"🏪 거래소: {exchange.capitalize()}\n"
+                    f"📈 심볼: {symbol}\n"
+                    f"📊 수량: {quantity}\n"
+                    f"💰 가격: {'시장가' if price is None else f'${price:,.2f}'}\n"
+                    f"🆔 주문 ID: {order_result.get('orderId', 'N/A')}"
+                )
+        else:
+            await update.message.reply_text(
+                f"❌ **매도 주문 실패**\n\n"
+                f"오류: {str(result)}"
+            )
+        
+    except ValueError:
+        await update.message.reply_text(
+            "❌ **잘못된 수량 또는 가격**\n\n"
+            "수량과 가격은 숫자로 입력하세요."
+        )
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ **매도 주문 오류**\n\n"
+            f"오류: {str(e)}"
+        )
+
 def _mask_api_key(api_key):
     """API 키 마스킹 처리"""
     if not api_key or len(api_key) < 8:
@@ -1059,6 +1287,8 @@ def run_telegram_bot():
     telegram_app.add_handler(CommandHandler('addapi', add_api))
     telegram_app.add_handler(CommandHandler('deleteapi', delete_api))
     telegram_app.add_handler(CommandHandler('checkapi', check_api))
+    telegram_app.add_handler(CommandHandler('spotbuy', spot_buy))
+    telegram_app.add_handler(CommandHandler('spotsell', spot_sell))
     telegram_app.add_handler(CallbackQueryHandler(button_callback))
     
     print("✅ 텔레그램 봇이 성공적으로 시작되었습니다!")
