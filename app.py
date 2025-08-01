@@ -508,61 +508,105 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif query.data == "help":
         help_text = """
-❓ **도움말**
+❓ **암호화폐 트레이딩 봇 도움말**
 
-**지원 기능:**
-- 💰 잔고 조회
-- 🏪 거래소 선택
-- 📈 현물 거래
-- 📊 선물 거래
-- 🔑 API 키 관리
+## 🎯 **현재 사용 가능한 기능**
 
-**지원 거래소:**
-- XT Exchange
-- Backpack Exchange
-- Hyperliquid
-- Flipster
+### ✅ **완전 구현된 기능**
+- 💰 **잔고 조회**: `/balance` 또는 메뉴 버튼
+- 🔑 **API 키 관리**: 추가, 확인, 삭제
+- ℹ️ **거래소 정보**: API 지원 여부 확인
 
-**거래 유형:**
-- **현물 거래**: 실제 암호화폐 구매/판매
-- **선물 거래**: 레버리지 거래, 롱/숏 포지션
+### 🚧 **개발 중인 기능**
+- 📈 **현물 거래**: 매수/매도 기능 (준비 중)
+- 📊 **선물 거래**: 레버리지 거래 (준비 중)
+- 🔍 **심볼 조회**: 거래 가능 코인 목록 (준비 중)
 
-**사용법:**
-1. 거래소 선택
-2. 거래 유형 선택 (현물/선물)
-3. API 키 설정 (관리자 문의)
-4. 거래하고 싶은 토큰 심볼을 직접 입력
+## 🏪 **지원 거래소**
 
-**API 키 관리:**
-- `/addapi` - API 키 추가
-- `/checkapi` - API 키 확인
-- `/deleteapi` - API 키 삭제
-- 🔑 메뉴에서 API 키 관리
-- 모든 API 키는 암호화 저장
+| 거래소 | 현물 거래 | 선물 거래 | API 키 필요 |
+|--------|-----------|-----------|-------------|
+| XT Exchange | ✅ | ✅ | API Key + Secret |
+| Backpack | ✅ | ✅ | API Key + Private Key |
+| Hyperliquid | ❌ | ✅ | API Key + Secret |
+| Flipster | ✅ | ✅ | API Key + Secret |
 
-**토큰 심볼 예시:**
-- BTC (비트코인)
-- ETH (이더리움)
-- SOL (솔라나)
-- USDC (USD 코인)
+## 📋 **사용 가능한 명령어**
 
-**API 키 필요사항:**
-- XT: API Key, API Secret
-- Backpack: API Key, Private Key
-- Hyperliquid: API Key, API Secret
-- Flipster: API Key, API Secret
+### 💰 **잔고 관련**
+```
+/balance - 모든 거래소 잔고 조회
+```
 
-**선물 거래 기능:**
-- 레버리지 설정 (최대 10배)
-- 롱/숏 포지션 오픈
-- 손절매/익절매 주문
-- 포지션 관리
+### 🔑 **API 키 관리**
+```
+/addapi [거래소] [거래유형] [API_KEY] [API_SECRET/PRIVATE_KEY]
+/checkapi [거래소] [거래유형] 또는 /checkapi all
+/deleteapi [거래소] [거래유형]
+```
 
-**주의사항:**
-- 채널 멤버만 사용 가능
-- API 키는 안전하게 암호화 저장
-- 각 거래소에서 지원하는 토큰만 거래 가능
-- 선물 거래는 고위험 투자입니다
+### 📝 **명령어 예시**
+```
+/addapi backpack spot your_api_key your_private_key
+/addapi xt futures your_api_key your_api_secret
+/checkapi backpack spot
+/balance
+```
+
+## 🔧 **API 키 설정 방법**
+
+### **Backpack 설정**
+1. Backpack 웹사이트에서 API 키 생성
+2. `/addapi backpack spot [API_KEY] [PRIVATE_KEY]`
+3. `/addapi backpack futures [API_KEY] [PRIVATE_KEY]`
+
+### **XT Exchange 설정**
+1. XT 웹사이트에서 API 키 생성
+2. `/addapi xt spot [API_KEY] [API_SECRET]`
+3. `/addapi xt futures [API_KEY] [API_SECRET]`
+
+### **다른 거래소 설정**
+1. 각 거래소 웹사이트에서 API 키 생성
+2. `/addapi [거래소] [거래유형] [API_KEY] [API_SECRET]`
+
+## ⚠️ **중요 안내사항**
+
+### **현재 상태**
+- ✅ 잔고 조회 기능 완전 작동
+- ✅ API 키 관리 기능 완전 작동
+- 🚧 거래 기능은 개발 중 (준비 중)
+
+### **보안**
+- 모든 API 키는 암호화되어 저장
+- 채널 멤버만 봇 사용 가능
+- API 키는 서버에만 저장, 개발자도 접근 불가
+
+### **사용 제한**
+- 현재는 잔고 조회만 가능
+- 거래 기능은 추후 업데이트 예정
+- 각 거래소별 API 지원 여부 확인 필요
+
+## 🚀 **향후 업데이트 예정**
+
+### **1단계 (현재)**
+- ✅ 잔고 조회
+- ✅ API 키 관리
+
+### **2단계 (준비 중)**
+- 📈 현물 거래 (매수/매도)
+- 🔍 심볼 조회
+
+### **3단계 (계획)**
+- 📊 선물 거래 (레버리지)
+- 🎯 자동 거래 봇
+
+## 📞 **지원 및 문의**
+- 채널 멤버십 필요
+- API 키 설정 문의는 관리자에게
+- 버그 리포트는 개발자에게
+
+**💡 현재는 잔고 조회와 API 키 관리만 가능합니다.**
+**거래 기능은 개발 완료 후 업데이트됩니다.**
         """
         await query.edit_message_text(
             help_text,
