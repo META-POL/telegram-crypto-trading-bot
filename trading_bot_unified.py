@@ -147,9 +147,15 @@ class UnifiedSpotTrader:
                                     'total': float(balance.get('total', 0)),
                                     'frozen': float(balance.get('frozen', 0))
                                 }
-                    return balances
+                    return {
+                        'status': 'success',
+                        'balance': balances
+                    }
                 else:
-                    return {"error": f"API 오류 ({response.status_code}): {response.text}"}
+                    return {
+                        'status': 'error',
+                        'message': f"API 오류 ({response.status_code}): {response.text}"
+                    }
                     
             elif self.exchange == 'backpack':
                 # Backpack API 엔드포인트 수정
@@ -198,9 +204,15 @@ class UnifiedSpotTrader:
                                 }
                     
                     logger.info(f"Backpack 처리된 잔고: {balances}")
-                    return balances
+                    return {
+                        'status': 'success',
+                        'balance': balances
+                    }
                 else:
-                    return {"error": f"API 오류 ({response.status_code}): {response.text}"}
+                    return {
+                        'status': 'error',
+                        'message': f"API 오류 ({response.status_code}): {response.text}"
+                    }
                     
             elif self.exchange == 'hyperliquid':
                 try:
@@ -229,16 +241,28 @@ class UnifiedSpotTrader:
                                         'total': float(item.get('total', 0)),
                                         'frozen': float(item.get('used', 0))
                                     }
-                    return balances
+                    return {
+                        'status': 'success',
+                        'balance': balances
+                    }
                 except Exception as e:
                     logger.error(f"Hyperliquid 잔고 조회 오류: {str(e)}")
-                    return {"error": f"Hyperliquid 잔고 조회 오류: {str(e)}"}
+                    return {
+                        'status': 'error',
+                        'message': f"Hyperliquid 잔고 조회 오류: {str(e)}"
+                    }
             else:
-                return {"error": "지원하지 않는 거래소"}
+                return {
+                    'status': 'error',
+                    'message': "지원하지 않는 거래소"
+                }
                 
         except Exception as e:
             logger.error(f"잔고 조회 중 예외 발생: {str(e)}")
-            return {"error": f"잔고 조회 실패: {str(e)}"}
+            return {
+                'status': 'error',
+                'message': f"잔고 조회 실패: {str(e)}"
+            }
 
     def get_current_price(self, symbol):
         """현재 가격 조회"""
