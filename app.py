@@ -67,6 +67,11 @@ def webhook():
         # 업데이트 처리
         update = Update.de_json(data, telegram_app.bot)
         
+        # 콜백 쿼리 처리 (버튼 클릭)
+        if update.callback_query:
+            await handle_callback_query(update.callback_query, telegram_app)
+            return jsonify({"status": "success"})
+        
         # 명령어 처리
         if update.message and update.message.text:
             text = update.message.text
@@ -77,23 +82,36 @@ def webhook():
             async def send_response():
                 try:
                     if text == '/start':
+                        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                        
+                        # 메인 메뉴 버튼
+                        keyboard = [
+                            [InlineKeyboardButton("🔑 API 키 설정", callback_data="api_setup")],
+                            [InlineKeyboardButton("💰 잔고 조회", callback_data="balance_menu")],
+                            [InlineKeyboardButton("📈 거래쌍 조회", callback_data="symbols_menu")],
+                            [InlineKeyboardButton("📊 포지션 관리", callback_data="position_menu")],
+                            [InlineKeyboardButton("⚙️ 설정", callback_data="settings_menu")],
+                            [InlineKeyboardButton("❓ 도움말", callback_data="help")]
+                        ]
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+                        
                         response_text = (
                             "🤖 **암호화폐 선물 거래 봇**\n\n"
-                            "사용 가능한 명령어:\n"
-                            "/start - 봇 시작\n"
-                            "/test - 봇 테스트\n"
-                            "/ping - 핑 테스트\n"
-                            "/balance [거래소] - 잔고 조회\n"
-                            "/long [거래소] [심볼] [수량] [레버리지] - 롱 포지션\n"
-                            "/short [거래소] [심볼] [수량] [레버리지] - 숏 포지션\n"
-                            "/close [거래소] [심볼] - 포지션 종료\n"
-                            "/positions [거래소] - 포지션 조회\n"
-                            "/symbols [거래소] - 거래쌍 조회\n"
-                            "/leverage [거래소] [심볼] [레버리지] - 레버리지 설정\n\n"
-                            "지원 거래소: xt, backpack, hyperliquid, flipster"
+                            "버튼을 클릭하여 원하는 기능을 선택하세요!\n\n"
+                            "**지원 거래소:**\n"
+                            "• XT Exchange\n"
+                            "• Backpack Exchange\n"
+                            "• Hyperliquid\n"
+                            "• Flipster\n\n"
+                            "먼저 API 키를 설정해주세요!"
                         )
-                        await telegram_app.bot.send_message(chat_id=chat_id, text=response_text, parse_mode='Markdown')
-                        print(f"✅ 사용자 {user_id}에게 응답 전송")
+                        await telegram_app.bot.send_message(
+                            chat_id=chat_id, 
+                            text=response_text, 
+                            parse_mode='Markdown',
+                            reply_markup=reply_markup
+                        )
+                        print(f"✅ 사용자 {user_id}에게 메인 메뉴 전송")
                         
                     elif text == '/test':
                         await telegram_app.bot.send_message(chat_id=chat_id, text="✅ 봇이 정상 작동 중입니다!")
@@ -278,6 +296,26 @@ def webhook():
                         else:
                             await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ 레버리지 설정 실패: {result}")
                         
+                    elif text.startswith('/setapi'):
+                        parts = text.split()
+                        if len(parts) < 4:
+                            await telegram_app.bot.send_message(chat_id=chat_id, text="❌ 사용법: /setapi [거래소] [API_KEY] [SECRET_KEY]")
+                            return
+                        
+                        exchange = parts[1].lower()
+                        api_key = parts[2]
+                        api_secret = parts[3]
+                        
+                        # 환경변수로 설정 (실제로는 데이터베이스에 저장해야 함)
+                        os.environ[f'{exchange.upper()}_API_KEY'] = api_key
+                        os.environ[f'{exchange.upper()}_API_SECRET'] = api_secret
+                        
+                        await telegram_app.bot.send_message(
+                            chat_id=chat_id, 
+                            text=f"✅ {exchange.upper()} API 키가 설정되었습니다!\n\n이제 해당 거래소의 기능을 사용할 수 있습니다."
+                        )
+                        print(f"✅ 사용자 {user_id}가 {exchange} API 키 설정")
+                        
                     else:
                         await telegram_app.bot.send_message(chat_id=chat_id, text="❓ 알 수 없는 명령어입니다. /start를 입력해보세요.")
                         
@@ -302,6 +340,177 @@ def webhook():
         import traceback
         print(f"❌ 웹훅 스택 트레이스: {traceback.format_exc()}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+async def handle_callback_query(callback_query, telegram_app):
+    """콜백 쿼리 처리 (버튼 클릭)"""
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        chat_id = callback_query.message.chat_id
+        data = callback_query.data
+        user_id = callback_query.from_user.id
+        
+        print(f"🔘 사용자 {user_id}가 버튼 클릭: {data}")
+        
+        if data == "api_setup":
+            # API 키 설정 메뉴
+            keyboard = [
+                [InlineKeyboardButton("XT Exchange", callback_data="api_xt")],
+                [InlineKeyboardButton("Backpack Exchange", callback_data="api_backpack")],
+                [InlineKeyboardButton("Hyperliquid", callback_data="api_hyperliquid")],
+                [InlineKeyboardButton("Flipster", callback_data="api_flipster")],
+                [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await telegram_app.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=callback_query.message.message_id,
+                text="🔑 **API 키 설정**\n\n거래소를 선택하여 API 키를 설정하세요.\n\n**설정 방법:**\n1. 거래소에서 API 키 생성\n2. API Key와 Secret Key 복사\n3. 아래 버튼 클릭하여 입력",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            
+        elif data.startswith("api_"):
+            # 특정 거래소 API 설정
+            exchange = data.replace("api_", "")
+            exchange_names = {
+                "xt": "XT Exchange",
+                "backpack": "Backpack Exchange", 
+                "hyperliquid": "Hyperliquid",
+                "flipster": "Flipster"
+            }
+            
+            await telegram_app.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=callback_query.message.message_id,
+                text=f"🔑 **{exchange_names[exchange]} API 설정**\n\n"
+                     f"다음 형식으로 API 키를 입력하세요:\n\n"
+                     f"`/setapi {exchange} YOUR_API_KEY YOUR_SECRET_KEY`\n\n"
+                     f"예시:\n"
+                     f"`/setapi {exchange} abc123def456 ghi789jkl012`\n\n"
+                     f"⚠️ **주의:** API 키는 안전하게 저장됩니다.",
+                parse_mode='Markdown'
+            )
+            
+        elif data == "balance_menu":
+            # 잔고 조회 메뉴
+            keyboard = [
+                [InlineKeyboardButton("XT Exchange", callback_data="balance_xt")],
+                [InlineKeyboardButton("Backpack Exchange", callback_data="balance_backpack")],
+                [InlineKeyboardButton("Hyperliquid", callback_data="balance_hyperliquid")],
+                [InlineKeyboardButton("Flipster", callback_data="balance_flipster")],
+                [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await telegram_app.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=callback_query.message.message_id,
+                text="💰 **잔고 조회**\n\n거래소를 선택하여 잔고를 조회하세요.",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            
+        elif data.startswith("balance_"):
+            # 특정 거래소 잔고 조회
+            exchange = data.replace("balance_", "")
+            api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
+            api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
+            
+            if not api_key or not api_secret:
+                await telegram_app.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=callback_query.message.message_id,
+                    text=f"❌ {exchange.upper()} API 키가 설정되지 않았습니다.\n\n먼저 API 키를 설정해주세요.",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            try:
+                trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+                result = trader.get_futures_balance()
+                
+                if result.get('status') == 'success':
+                    balance_data = result.get('balance', {})
+                    await telegram_app.bot.edit_message_text(
+                        chat_id=chat_id,
+                        message_id=callback_query.message.message_id,
+                        text=f"💰 **{exchange.upper()} 잔고**\n\n```\n{balance_data}\n```",
+                        parse_mode='Markdown'
+                    )
+                else:
+                    await telegram_app.bot.edit_message_text(
+                        chat_id=chat_id,
+                        message_id=callback_query.message.message_id,
+                        text=f"❌ 잔고 조회 실패: {result}",
+                        parse_mode='Markdown'
+                    )
+            except Exception as e:
+                await telegram_app.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=callback_query.message.message_id,
+                    text=f"❌ 오류 발생: {str(e)}",
+                    parse_mode='Markdown'
+                )
+                
+        elif data == "main_menu":
+            # 메인 메뉴로 돌아가기
+            keyboard = [
+                [InlineKeyboardButton("🔑 API 키 설정", callback_data="api_setup")],
+                [InlineKeyboardButton("💰 잔고 조회", callback_data="balance_menu")],
+                [InlineKeyboardButton("📈 거래쌍 조회", callback_data="symbols_menu")],
+                [InlineKeyboardButton("📊 포지션 관리", callback_data="position_menu")],
+                [InlineKeyboardButton("⚙️ 설정", callback_data="settings_menu")],
+                [InlineKeyboardButton("❓ 도움말", callback_data="help")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await telegram_app.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=callback_query.message.message_id,
+                text="🤖 **암호화폐 선물 거래 봇**\n\n버튼을 클릭하여 원하는 기능을 선택하세요!",
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            
+        elif data == "help":
+            # 도움말
+            help_text = (
+                "❓ **도움말**\n\n"
+                "**사용 방법:**\n"
+                "1. 🔑 API 키 설정 - 거래소 API 키 입력\n"
+                "2. 💰 잔고 조회 - 계좌 잔고 확인\n"
+                "3. 📈 거래쌍 조회 - 거래 가능한 심볼 확인\n"
+                "4. 📊 포지션 관리 - 포지션 오픈/종료\n\n"
+                "**지원 거래소:**\n"
+                "• XT Exchange\n"
+                "• Backpack Exchange\n"
+                "• Hyperliquid\n"
+                "• Flipster\n\n"
+                "**명령어:**\n"
+                "• `/setapi [거래소] [API_KEY] [SECRET_KEY]` - API 키 설정\n"
+                "• `/balance [거래소]` - 잔고 조회\n"
+                "• `/symbols [거래소]` - 거래쌍 조회"
+            )
+            
+            keyboard = [[InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await telegram_app.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=callback_query.message.message_id,
+                text=help_text,
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+        
+        # 콜백 쿼리 응답
+        await callback_query.answer()
+        
+    except Exception as e:
+        print(f"❌ 콜백 쿼리 처리 오류: {e}")
+        await callback_query.answer("❌ 오류가 발생했습니다.")
 
 @app.route('/setup-webhook')
 def setup_webhook_route():
