@@ -115,9 +115,12 @@ def setup_webhook():
         # 봇 애플리케이션 생성
         telegram_app = ApplicationBuilder().token(token).build()
         
-        # Railway URL 가져오기
-        railway_url = os.environ.get('RAILWAY_STATIC_URL', 'https://your-app-name.railway.app')
-        webhook_url = f"{railway_url}/webhook"
+        # 현재 요청 URL에서 도메인 추출
+        request_url = request.url
+        base_url = request_url.replace('/setup-webhook', '')
+        webhook_url = f"{base_url}/webhook"
+        
+        print(f"🔗 웹훅 URL 설정: {webhook_url}")
         
         # 웹훅 설정
         result = telegram_app.bot.set_webhook(url=webhook_url)
@@ -126,7 +129,8 @@ def setup_webhook():
             return jsonify({
                 "status": "success",
                 "message": f"웹훅 설정 성공: {webhook_url}",
-                "webhook_url": webhook_url
+                "webhook_url": webhook_url,
+                "bot_info": telegram_app.bot.get_me()
             })
         else:
             return jsonify({
@@ -136,6 +140,31 @@ def setup_webhook():
             
     except Exception as e:
         print(f"❌ 웹훅 설정 오류: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/webhook-info')
+def webhook_info():
+    """웹훅 정보 확인"""
+    try:
+        from telegram.ext import ApplicationBuilder
+        
+        # 텔레그램 봇 토큰
+        token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
+        
+        # 봇 애플리케이션 생성
+        telegram_app = ApplicationBuilder().token(token).build()
+        
+        # 웹훅 정보 가져오기
+        webhook_info = telegram_app.bot.get_webhook_info()
+        
+        return jsonify({
+            "status": "success",
+            "webhook_info": webhook_info,
+            "bot_info": telegram_app.bot.get_me()
+        })
+        
+    except Exception as e:
+        print(f"❌ 웹훅 정보 확인 오류: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # 선물거래 클래스
