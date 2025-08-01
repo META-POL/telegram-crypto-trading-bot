@@ -206,11 +206,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 # 거래자 생성
                                 if trading_type == 'spot':
                                     if exchange == 'backpack':
-                                        # Backpack은 private_key 사용 (api_secret 필드에 저장됨)
+                                        # Backpack은 private_key 사용
                                         trader = UnifiedSpotTrader(
                                             exchange=exchange,
                                             api_key=api_result['api_key'],
-                                            private_key=api_result['api_secret']  # Backpack은 api_secret 필드에 private_key 저장
+                                            private_key=api_result['private_key']  # Backpack은 private_key 필드 사용
                                         )
                                     else:
                                         # 다른 거래소는 api_secret 사용
@@ -222,11 +222,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     balance_result = trader.get_balance()
                                 else:  # futures
                                     if exchange == 'backpack':
-                                        # Backpack은 private_key 사용 (api_secret 필드에 저장됨)
+                                        # Backpack은 private_key 사용
                                         trader = UnifiedFuturesTrader(
                                             exchange=exchange,
                                             api_key=api_result['api_key'],
-                                            private_key=api_result['api_secret']  # Backpack은 api_secret 필드에 private_key 저장
+                                            private_key=api_result['private_key']  # Backpack은 private_key 필드 사용
                                         )
                                     else:
                                         # 다른 거래소는 api_secret 사용
@@ -580,10 +580,12 @@ async def add_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(parts) < 5:
             await update.message.reply_text(
                 "❌ **잘못된 형식**\n\n"
-                "올바른 형식: `/addapi [거래소] [거래유형] [API_KEY] [API_SECRET] [PRIVATE_KEY(선택)]`\n\n"
+                "올바른 형식: `/addapi [거래소] [거래유형] [API_KEY] [API_SECRET/PRIVATE_KEY]`\n\n"
                 "**예시:**\n"
                 "`/addapi xt spot your_api_key your_api_secret`\n"
-                "`/addapi backpack spot your_api_key your_private_key`",
+                "`/addapi backpack spot your_api_key your_private_key`\n\n"
+                "💡 **Backpack**: 4번째 파라미터는 Private Key\n"
+                "💡 **다른 거래소**: 4번째 파라미터는 API Secret",
                 parse_mode='Markdown'
             )
             return
@@ -591,8 +593,15 @@ async def add_api(update: Update, context: ContextTypes.DEFAULT_TYPE):
         exchange = parts[1].lower()
         trading_type = parts[2].lower()
         api_key = parts[3]
-        api_secret = parts[4] if len(parts) > 4 else None
-        private_key = parts[5] if len(parts) > 5 else None
+        
+        # Backpack의 경우 4번째 파라미터가 private_key
+        if exchange == 'backpack':
+            private_key = parts[4] if len(parts) > 4 else None
+            api_secret = None
+        else:
+            # 다른 거래소는 4번째 파라미터가 api_secret
+            api_secret = parts[4] if len(parts) > 4 else None
+            private_key = parts[5] if len(parts) > 5 else None
         
         # 거래소 유효성 검사
         valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
