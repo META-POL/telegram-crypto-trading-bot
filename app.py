@@ -45,127 +45,7 @@ def health_check():
 def health():
     return jsonify({"status": "healthy"})
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    """텔레그램 웹훅 처리"""
-    try:
-        from telegram import Update
-        from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-        
-        # 텔레그램 봇 토큰
-        token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
-        
-        # 봇 애플리케이션 생성
-        telegram_app = ApplicationBuilder().token(token).build()
-        
-        # 업데이트 처리
-        update = Update.de_json(request.get_json(), telegram_app.bot)
-        
-        # 명령어 처리
-        if update.message and update.message.text:
-            text = update.message.text
-            user_id = update.effective_user.id
-            print(f"📨 사용자 {user_id}: {text}")
-            
-            if text == '/start':
-                response_text = (
-                    "🤖 **암호화폐 선물 거래 봇**\n\n"
-                    "사용 가능한 명령어:\n"
-                    "/start - 봇 시작\n"
-                    "/test - 봇 테스트\n"
-                    "/ping - 핑 테스트\n"
-                    "/balance [거래소] - 잔고 조회\n"
-                    "/long [거래소] [심볼] [수량] [레버리지] - 롱 포지션\n"
-                    "/short [거래소] [심볼] [수량] [레버리지] - 숏 포지션\n"
-                    "/close [거래소] [심볼] - 포지션 종료\n"
-                    "/positions [거래소] - 포지션 조회\n"
-                    "/symbols [거래소] - 거래쌍 조회\n"
-                    "/leverage [거래소] [심볼] [레버리지] - 레버리지 설정\n\n"
-                    "지원 거래소: xt, backpack, hyperliquid, flipster"
-                )
-                telegram_app.bot.send_message(chat_id=update.effective_chat.id, text=response_text, parse_mode='Markdown')
-                print(f"✅ 사용자 {user_id}에게 응답 전송")
-                
-            elif text == '/test':
-                telegram_app.bot.send_message(chat_id=update.effective_chat.id, text="✅ 봇이 정상 작동 중입니다!")
-                print(f"✅ 테스트 응답 전송")
-                
-            elif text == '/ping':
-                telegram_app.bot.send_message(chat_id=update.effective_chat.id, text="🏓 Pong! 봇이 살아있습니다!")
-                print(f"✅ 핑 응답 전송")
-                
-            else:
-                telegram_app.bot.send_message(chat_id=update.effective_chat.id, text="❓ 알 수 없는 명령어입니다. /start를 입력해보세요.")
-        
-        return jsonify({"status": "success"})
-        
-    except Exception as e:
-        print(f"❌ 웹훅 오류: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/setup-webhook')
-def setup_webhook():
-    """웹훅 설정"""
-    try:
-        from telegram.ext import ApplicationBuilder
-        
-        # 텔레그램 봇 토큰
-        token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
-        
-        # 봇 애플리케이션 생성
-        telegram_app = ApplicationBuilder().token(token).build()
-        
-        # 현재 요청 URL에서 도메인 추출
-        request_url = request.url
-        base_url = request_url.replace('/setup-webhook', '')
-        webhook_url = f"{base_url}/webhook"
-        
-        print(f"🔗 웹훅 URL 설정: {webhook_url}")
-        
-        # 웹훅 설정
-        result = telegram_app.bot.set_webhook(url=webhook_url)
-        
-        if result:
-            return jsonify({
-                "status": "success",
-                "message": f"웹훅 설정 성공: {webhook_url}",
-                "webhook_url": webhook_url,
-                "bot_info": telegram_app.bot.get_me()
-            })
-        else:
-            return jsonify({
-                "status": "error",
-                "message": "웹훅 설정 실패"
-            })
-            
-    except Exception as e:
-        print(f"❌ 웹훅 설정 오류: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/webhook-info')
-def webhook_info():
-    """웹훅 정보 확인"""
-    try:
-        from telegram.ext import ApplicationBuilder
-        
-        # 텔레그램 봇 토큰
-        token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
-        
-        # 봇 애플리케이션 생성
-        telegram_app = ApplicationBuilder().token(token).build()
-        
-        # 웹훅 정보 가져오기
-        webhook_info = telegram_app.bot.get_webhook_info()
-        
-        return jsonify({
-            "status": "success",
-            "webhook_info": webhook_info,
-            "bot_info": telegram_app.bot.get_me()
-        })
-        
-    except Exception as e:
-        print(f"❌ 웹훅 정보 확인 오류: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 # 선물거래 클래스
 class UnifiedFuturesTrader:
@@ -725,18 +605,20 @@ class UnifiedFuturesTrader:
 # 사용자별 거래자 저장
 user_traders = {}
 
-def run_telegram_bot():
-    """텔레그램 봇 실행"""
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    print(f"🚀 서버 시작: 포트 {port}")
+    
+    # 텔레그램 봇을 메인 스레드에서 실행
+    print("🤖 텔레그램 봇 시작...")
+    
+    # 텔레그램 봇 토큰
+    token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
+    print(f"🔍 토큰 확인: {token}")
+    
     try:
-        # 텔레그램 봇 토큰 직접 설정
-        token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
-        print(f"🔍 토큰 확인: {token}")
-        
-        if not token:
-            print("❌ 텔레그램 봇 토큰이 설정되지 않음")
-            return
-        
-        print("🤖 텔레그램 봇 시작...")
+        from telegram import Update
+        from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
         
         # asyncio 이벤트 루프 설정
         import asyncio
@@ -745,9 +627,6 @@ def run_telegram_bot():
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-        
-        from telegram import Update
-        from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
         
         telegram_app = ApplicationBuilder().token(token).build()
         
@@ -761,6 +640,8 @@ def run_telegram_bot():
                     "🤖 **암호화폐 선물 거래 봇**\n\n"
                     "사용 가능한 명령어:\n"
                     "/start - 봇 시작\n"
+                    "/test - 봇 테스트\n"
+                    "/ping - 핑 테스트\n"
                     "/balance [거래소] - 잔고 조회\n"
                     "/long [거래소] [심볼] [수량] [레버리지] - 롱 포지션\n"
                     "/short [거래소] [심볼] [수량] [레버리지] - 숏 포지션\n"
@@ -777,222 +658,6 @@ def run_telegram_bot():
             except Exception as e:
                 print(f"❌ start 함수 오류: {e}")
                 await update.message.reply_text("❌ 봇 응답 중 오류가 발생했습니다.")
-        
-        async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """잔고 조회"""
-            try:
-                parts = update.message.text.split()
-                if len(parts) < 2:
-                    await update.message.reply_text("❌ 사용법: /balance [거래소]")
-                    return
-                
-                exchange = parts[1].lower()
-                user_id = update.effective_user.id
-                
-                # API 키 확인 (간단한 구현)
-                api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
-                api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
-                
-                if not api_key or not api_secret:
-                    await update.message.reply_text(f"❌ {exchange} API 키가 설정되지 않음")
-                    return
-                
-                # 거래자 생성
-                trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-                balance_result = trader.get_futures_balance()
-                
-                if balance_result.get('status') == 'success':
-                    balance_data = balance_result.get('balance', {})
-                    await update.message.reply_text(f"💰 {exchange} 잔고: {balance_data}")
-                else:
-                    await update.message.reply_text(f"❌ 잔고 조회 실패: {balance_result}")
-                    
-            except Exception as e:
-                await update.message.reply_text(f"❌ 오류: {str(e)}")
-        
-        async def long_position(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """롱 포지션 오픈"""
-            try:
-                parts = update.message.text.split()
-                if len(parts) < 5:
-                    await update.message.reply_text("❌ 사용법: /long [거래소] [심볼] [수량] [레버리지]")
-                    return
-                
-                exchange = parts[1].lower()
-                symbol = parts[2].upper()
-                size = float(parts[3])
-                leverage = int(parts[4])
-                
-                api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
-                api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
-                
-                if not api_key or not api_secret:
-                    await update.message.reply_text(f"❌ {exchange} API 키가 설정되지 않음")
-                    return
-                
-                trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-                result = trader.open_long_position(symbol, size, leverage)
-                
-                if result.get('status') == 'success':
-                    await update.message.reply_text(f"✅ 롱 포지션 오픈 성공: {result}")
-                else:
-                    await update.message.reply_text(f"❌ 롱 포지션 오픈 실패: {result}")
-                    
-            except Exception as e:
-                await update.message.reply_text(f"❌ 오류: {str(e)}")
-        
-        async def short_position(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """숏 포지션 오픈"""
-            try:
-                parts = update.message.text.split()
-                if len(parts) < 5:
-                    await update.message.reply_text("❌ 사용법: /short [거래소] [심볼] [수량] [레버리지]")
-                    return
-                
-                exchange = parts[1].lower()
-                symbol = parts[2].upper()
-                size = float(parts[3])
-                leverage = int(parts[4])
-                
-                api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
-                api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
-                
-                if not api_key or not api_secret:
-                    await update.message.reply_text(f"❌ {exchange} API 키가 설정되지 않음")
-                    return
-                
-                trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-                result = trader.open_short_position(symbol, size, leverage)
-                
-                if result.get('status') == 'success':
-                    await update.message.reply_text(f"✅ 숏 포지션 오픈 성공: {result}")
-                else:
-                    await update.message.reply_text(f"❌ 숏 포지션 오픈 실패: {result}")
-                    
-            except Exception as e:
-                await update.message.reply_text(f"❌ 오류: {str(e)}")
-        
-        async def close_position(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """포지션 종료"""
-            try:
-                parts = update.message.text.split()
-                if len(parts) < 3:
-                    await update.message.reply_text("❌ 사용법: /close [거래소] [심볼]")
-                    return
-                
-                exchange = parts[1].lower()
-                symbol = parts[2].upper()
-                
-                api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
-                api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
-                
-                if not api_key or not api_secret:
-                    await update.message.reply_text(f"❌ {exchange} API 키가 설정되지 않음")
-                    return
-                
-                trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-                result = trader.close_position(symbol)
-                
-                if result.get('status') == 'success':
-                    await update.message.reply_text(f"✅ 포지션 종료 성공: {result}")
-                else:
-                    await update.message.reply_text(f"❌ 포지션 종료 실패: {result}")
-                    
-            except Exception as e:
-                await update.message.reply_text(f"❌ 오류: {str(e)}")
-        
-        async def positions(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """포지션 조회"""
-            try:
-                parts = update.message.text.split()
-                if len(parts) < 2:
-                    await update.message.reply_text("❌ 사용법: /positions [거래소]")
-                    return
-                
-                exchange = parts[1].lower()
-                
-                api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
-                api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
-                
-                if not api_key or not api_secret:
-                    await update.message.reply_text(f"❌ {exchange} API 키가 설정되지 않음")
-                    return
-                
-                trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-                result = trader.get_positions()
-                
-                if result.get('status') == 'success':
-                    positions_data = result.get('positions', {})
-                    await update.message.reply_text(f"📊 {exchange} 포지션: {positions_data}")
-                else:
-                    await update.message.reply_text(f"❌ 포지션 조회 실패: {result}")
-                    
-            except Exception as e:
-                await update.message.reply_text(f"❌ 오류: {str(e)}")
-        
-        async def symbols(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """거래쌍 조회"""
-            try:
-                parts = update.message.text.split()
-                if len(parts) < 2:
-                    await update.message.reply_text("❌ 사용법: /symbols [거래소]")
-                    return
-                
-                exchange = parts[1].lower()
-                
-                api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
-                api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
-                
-                if not api_key or not api_secret:
-                    await update.message.reply_text(f"❌ {exchange} API 키가 설정되지 않음")
-                    return
-                
-                trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-                result = trader.get_futures_symbols()
-                
-                if result.get('status') == 'success':
-                    symbols_data = result.get('symbols', [])
-                    symbols_text = f"📈 {exchange} 거래쌍 ({len(symbols_data)}개):\n"
-                    for i, symbol in enumerate(symbols_data[:20], 1):  # 상위 20개만 표시
-                        symbols_text += f"{i}. {symbol}\n"
-                    if len(symbols_data) > 20:
-                        symbols_text += f"... 및 {len(symbols_data) - 20}개 더"
-                    await update.message.reply_text(symbols_text)
-                else:
-                    await update.message.reply_text(f"❌ 거래쌍 조회 실패: {result}")
-                    
-            except Exception as e:
-                await update.message.reply_text(f"❌ 오류: {str(e)}")
-        
-        async def leverage(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """레버리지 설정"""
-            try:
-                parts = update.message.text.split()
-                if len(parts) < 4:
-                    await update.message.reply_text("❌ 사용법: /leverage [거래소] [심볼] [레버리지]")
-                    return
-                
-                exchange = parts[1].lower()
-                symbol = parts[2].upper()
-                leverage = int(parts[3])
-                
-                api_key = os.environ.get(f'{exchange.upper()}_API_KEY')
-                api_secret = os.environ.get(f'{exchange.upper()}_API_SECRET')
-                
-                if not api_key or not api_secret:
-                    await update.message.reply_text(f"❌ {exchange} API 키가 설정되지 않음")
-                    return
-                
-                trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-                result = trader.set_leverage(symbol, leverage)
-                
-                if result.get('status') == 'success':
-                    await update.message.reply_text(f"✅ 레버리지 설정 성공: {result}")
-                else:
-                    await update.message.reply_text(f"❌ 레버리지 설정 실패: {result}")
-                    
-            except Exception as e:
-                await update.message.reply_text(f"❌ 오류: {str(e)}")
         
         async def test(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """테스트 명령어"""
@@ -1020,45 +685,18 @@ def run_telegram_bot():
         telegram_app.add_handler(CommandHandler('start', start))
         telegram_app.add_handler(CommandHandler('test', test))
         telegram_app.add_handler(CommandHandler('ping', ping))
-        telegram_app.add_handler(CommandHandler('balance', balance))
-        telegram_app.add_handler(CommandHandler('long', long_position))
-        telegram_app.add_handler(CommandHandler('short', short_position))
-        telegram_app.add_handler(CommandHandler('close', close_position))
-        telegram_app.add_handler(CommandHandler('positions', positions))
-        telegram_app.add_handler(CommandHandler('symbols', symbols))
-        telegram_app.add_handler(CommandHandler('leverage', leverage))
         
         print("✅ 텔레그램 봇 핸들러 등록 완료")
         print("🔄 폴링 시작...")
         
-        try:
-            telegram_app.run_polling(drop_pending_updates=True, timeout=30)
-            print("✅ 텔레그램 봇 폴링 시작됨")
-        except Exception as polling_error:
-            print(f"❌ 폴링 오류: {polling_error}")
-            import traceback
-            print(f"❌ 폴링 스택 트레이스: {traceback.format_exc()}")
+        # 폴링 시작
+        telegram_app.run_polling(drop_pending_updates=True, timeout=30)
         
     except Exception as e:
         print(f"❌ 텔레그램 봇 오류: {e}")
         import traceback
         print(f"❌ 스택 트레이스: {traceback.format_exc()}")
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    print(f"🚀 서버 시작: 포트 {port}")
-    
-    # Railway 환경에서는 Flask만 실행, 로컬에서는 텔레그램 봇도 실행
-    if os.environ.get('RAILWAY_ENVIRONMENT'):
-        print("🚂 Railway 환경 감지 - Flask 서버만 실행")
-        app.run(host='0.0.0.0', port=port, debug=False)
-    else:
-        print("💻 로컬 환경 감지 - 텔레그램 봇과 Flask 서버 모두 실행")
-        # 텔레그램 봇 스레드 시작
-        telegram_thread = threading.Thread(target=run_telegram_bot)
-        telegram_thread.daemon = True
-        telegram_thread.start()
-        print("✅ 텔레그램 봇 스레드 시작됨")
         
-        # Flask 서버 시작
+        # 오류가 발생해도 Flask 서버는 실행
+        print("🔄 Flask 서버 시작...")
         app.run(host='0.0.0.0', port=port, debug=False) 
