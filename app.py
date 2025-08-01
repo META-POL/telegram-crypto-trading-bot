@@ -605,11 +605,8 @@ class UnifiedFuturesTrader:
 # 사용자별 거래자 저장
 user_traders = {}
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    print(f"🚀 서버 시작: 포트 {port}")
-    
-    # 텔레그램 봇을 메인 스레드에서 실행
+def run_telegram_bot():
+    """텔레그램 봇 실행 함수"""
     print("🤖 텔레그램 봇 시작...")
     
     # 텔레그램 봇 토큰
@@ -696,7 +693,19 @@ if __name__ == '__main__':
         print(f"❌ 텔레그램 봇 오류: {e}")
         import traceback
         print(f"❌ 스택 트레이스: {traceback.format_exc()}")
-        
-        # 오류가 발생해도 Flask 서버는 실행
-        print("🔄 Flask 서버 시작...")
-        app.run(host='0.0.0.0', port=port, debug=False) 
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    print(f"🚀 서버 시작: 포트 {port}")
+    
+    # Flask 서버를 메인 스레드에서 실행
+    print("🌐 Flask 서버 시작...")
+    
+    # 텔레그램 봇을 별도 스레드에서 실행
+    telegram_thread = threading.Thread(target=run_telegram_bot)
+    telegram_thread.daemon = True
+    telegram_thread.start()
+    print("✅ 텔레그램 봇 스레드 시작됨")
+    
+    # Flask 서버 시작 (메인 스레드)
+    app.run(host='0.0.0.0', port=port, debug=False) 
