@@ -61,7 +61,7 @@ def run_telegram_bot():
         if not token or token == 'YOUR_TELEGRAM_BOT_TOKEN':
             print("❌ TELEGRAM_BOT_TOKEN이 설정되지 않았습니다.")
             print("Railway 대시보드에서 환경 변수를 설정하세요.")
-            print("토큰: 7926137534:AAGEj-L9kpeS84jOSnzBemhoFOip9yu5t_0")
+            print("토큰: 8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I")
             return
         
         print("🤖 텔레그램 봇 시작 중...")
