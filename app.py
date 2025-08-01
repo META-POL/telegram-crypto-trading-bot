@@ -206,11 +206,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 # 거래자 생성
                                 if trading_type == 'spot':
                                     if exchange == 'backpack':
-                                        # Backpack은 private_key 사용
+                                        # Backpack은 private_key 사용 (api_secret 필드에 저장됨)
                                         trader = UnifiedSpotTrader(
                                             exchange=exchange,
                                             api_key=api_result['api_key'],
-                                            private_key=api_result.get('private_key')
+                                            private_key=api_result['api_secret']  # Backpack은 api_secret 필드에 private_key 저장
                                         )
                                     else:
                                         # 다른 거래소는 api_secret 사용
@@ -222,11 +222,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     balance_result = trader.get_balance()
                                 else:  # futures
                                     if exchange == 'backpack':
-                                        # Backpack은 private_key 사용
+                                        # Backpack은 private_key 사용 (api_secret 필드에 저장됨)
                                         trader = UnifiedFuturesTrader(
                                             exchange=exchange,
                                             api_key=api_result['api_key'],
-                                            private_key=api_result.get('private_key')
+                                            private_key=api_result['api_secret']  # Backpack은 api_secret 필드에 private_key 저장
                                         )
                                     else:
                                         # 다른 거래소는 api_secret 사용
