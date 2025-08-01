@@ -1473,7 +1473,7 @@ def run_flask_server():
 def main():
     """메인 함수 - Railway에서는 Flask 서버를 메인에서 실행"""
     # Railway 환경에서는 Flask 서버를 메인에서 실행
-    if os.environ.get('RAILWAY_ENVIRONMENT'):
+    if os.environ.get('PORT'):
         print("🚂 Railway 환경에서 Flask 서버 시작...")
         # 텔레그램 봇을 별도 스레드에서 실행
         telegram_thread = threading.Thread(target=run_telegram_bot)
