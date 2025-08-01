@@ -48,6 +48,7 @@ def health():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """텔레그램 웹훅 처리"""
+    print("📨 웹훅 요청 수신")
     try:
         from telegram import Update
         from telegram.ext import ApplicationBuilder
@@ -59,8 +60,12 @@ def webhook():
         # 봇 애플리케이션 생성
         telegram_app = ApplicationBuilder().token(token).build()
         
+        # 요청 데이터 확인
+        data = request.get_json()
+        print(f"📨 받은 데이터: {data}")
+        
         # 업데이트 처리
-        update = Update.de_json(request.get_json(), telegram_app.bot)
+        update = Update.de_json(data, telegram_app.bot)
         
         # 명령어 처리
         if update.message and update.message.text:
@@ -113,20 +118,33 @@ def webhook():
             except Exception as e:
                 print(f"❌ 비동기 실행 오류: {e}")
         
+        print("✅ 웹훅 처리 완료")
         return jsonify({"status": "success"})
         
     except Exception as e:
         print(f"❌ 웹훅 오류: {e}")
+        import traceback
+        print(f"❌ 웹훅 스택 트레이스: {traceback.format_exc()}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/setup-webhook')
 def setup_webhook_route():
     """웹훅 설정 엔드포인트"""
+    print("🔗 웹훅 설정 엔드포인트 호출")
     success = setup_webhook()
     if success:
         return jsonify({"status": "success", "message": "웹훅 설정 완료"})
     else:
         return jsonify({"status": "error", "message": "웹훅 설정 실패"}), 500
+
+@app.route('/test-webhook')
+def test_webhook():
+    """웹훅 테스트 엔드포인트"""
+    return jsonify({
+        "status": "success", 
+        "message": "웹훅 엔드포인트가 정상 작동 중입니다",
+        "timestamp": datetime.now().isoformat()
+    })
 
 
 
