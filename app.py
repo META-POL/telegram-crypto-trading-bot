@@ -1067,7 +1067,29 @@ async def spot_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         exchange = parts[1].lower()
         symbol = parts[2].upper()
         quantity = float(parts[3])
-        price = float(parts[4]) if len(parts) > 4 else None
+        
+        # 가격 파싱 (쉼표 제거)
+        price = None
+        if len(parts) > 4:
+            try:
+                # 쉼표 제거 후 파싱
+                price_str = parts[4].replace(',', '')
+                price = float(price_str)
+            except ValueError:
+                await update.message.reply_text(
+                    "❌ **잘못된 가격 형식**\n\n"
+                    "가격은 숫자로 입력하세요. (예: 3688.14 또는 3,688.14)"
+                )
+                return
+        
+        # Backpack 심볼 형식 변환
+        if exchange == 'backpack':
+            # ETH -> ETHUSD, BTC -> BTCUSD 등으로 변환
+            if symbol in ['ETH', 'BTC', 'SOL', 'ADA', 'DOT', 'LINK', 'UNI', 'AVAX', 'MATIC', 'ATOM']:
+                symbol = f"{symbol}USD"
+            # 이미 USD가 붙어있지 않은 경우 USD 추가
+            elif not symbol.endswith('USD'):
+                symbol = f"{symbol}USD"
         
         # 거래소 유효성 검사
         valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
@@ -1176,7 +1198,29 @@ async def spot_sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
         exchange = parts[1].lower()
         symbol = parts[2].upper()
         quantity = float(parts[3])
-        price = float(parts[4]) if len(parts) > 4 else None
+        
+        # 가격 파싱 (쉼표 제거)
+        price = None
+        if len(parts) > 4:
+            try:
+                # 쉼표 제거 후 파싱
+                price_str = parts[4].replace(',', '')
+                price = float(price_str)
+            except ValueError:
+                await update.message.reply_text(
+                    "❌ **잘못된 가격 형식**\n\n"
+                    "가격은 숫자로 입력하세요. (예: 3688.14 또는 3,688.14)"
+                )
+                return
+        
+        # Backpack 심볼 형식 변환
+        if exchange == 'backpack':
+            # ETH -> ETHUSD, BTC -> BTCUSD 등으로 변환
+            if symbol in ['ETH', 'BTC', 'SOL', 'ADA', 'DOT', 'LINK', 'UNI', 'AVAX', 'MATIC', 'ATOM']:
+                symbol = f"{symbol}USD"
+            # 이미 USD가 붙어있지 않은 경우 USD 추가
+            elif not symbol.endswith('USD'):
+                symbol = f"{symbol}USD"
         
         # 거래소 유효성 검사
         valid_exchanges = ['xt', 'backpack', 'hyperliquid', 'flipster']
