@@ -1444,18 +1444,18 @@ def _mask_api_key(api_key):
 
 def run_telegram_bot():
     """텔레그램 봇 실행 함수"""
-    # 환경 변수 확인
-    token = os.environ.get('TELEGRAM_BOT_TOKEN')
-    if not token or token == 'YOUR_TELEGRAM_BOT_TOKEN':
-        print("❌ TELEGRAM_BOT_TOKEN이 설정되지 않았습니다.")
-        print("Railway 대시보드에서 환경 변수를 설정하세요.")
-        print("토큰: 7926137534:AAGEj-L9kpeS84jOSnzBemhoFOip9yu5t_0")
-        return
-    
-    print("🤖 텔레그램 봇 시작 중...")
-    print(f"🔑 토큰: {token[:10]}...{token[-10:]}")
-    
     try:
+        # 환경 변수 확인
+        token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        if not token or token == 'YOUR_TELEGRAM_BOT_TOKEN':
+            print("❌ TELEGRAM_BOT_TOKEN이 설정되지 않았습니다.")
+            print("Railway 대시보드에서 환경 변수를 설정하세요.")
+            print("토큰: 7926137534:AAGEj-L9kpeS84jOSnzBemhoFOip9yu5t_0")
+            return
+        
+        print("🤖 텔레그램 봇 시작 중...")
+        print(f"🔑 토큰: {token[:10]}...{token[-10:]}")
+        
         # 애플리케이션 빌드
         telegram_app = ApplicationBuilder().token(token).build()
         
@@ -1475,43 +1475,66 @@ def run_telegram_bot():
         
         # 폴링 시작
         telegram_app.run_polling(allowed_updates=Update.ALL_TYPES)
+        
     except Exception as e:
         print(f"❌ 텔레그램 봇 오류: {e}")
         print(f"❌ 오류 상세: {str(e)}")
+        print(f"❌ 오류 타입: {type(e)}")
+        import traceback
+        print(f"❌ 스택 트레이스: {traceback.format_exc()}")
 
 def run_flask_server():
     """Flask 서버 실행 함수"""
-    port = int(os.environ.get('PORT', 5000))
-    print(f"🌐 Flask 서버 시작 중... 포트: {port}")
-    print(f"🌐 서버 URL: http://0.0.0.0:{port}")
-    print(f"🌐 헬스체크 URL: http://0.0.0.0:{port}/")
-    print(f"🌐 상태 URL: http://0.0.0.0:{port}/status")
-    
     try:
-        app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+        port = int(os.environ.get('PORT', 5000))
+        print(f"🌐 Flask 서버 시작 중... 포트: {port}")
+        print(f"🌐 서버 URL: http://0.0.0.0:{port}")
+        print(f"🌐 헬스체크 URL: http://0.0.0.0:{port}/")
+        print(f"🌐 상태 URL: http://0.0.0.0:{port}/status")
+        
+        # Flask 서버 시작
+        app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False, threaded=True)
+        print("✅ Flask 서버가 성공적으로 시작되었습니다!")
+        
     except Exception as e:
         print(f"❌ Flask 서버 오류: {e}")
         print(f"❌ 오류 상세: {str(e)}")
+        print(f"❌ 오류 타입: {type(e)}")
+        import traceback
+        print(f"❌ 스택 트레이스: {traceback.format_exc()}")
 
 def main():
     """메인 함수 - Railway에서는 Flask 서버를 메인에서 실행"""
+    print("🚀 애플리케이션 시작...")
+    
     # Railway 환경에서는 Flask 서버를 메인에서 실행
     if os.environ.get('PORT'):
         print("🚂 Railway 환경에서 Flask 서버 시작...")
+        print(f"🌐 PORT 환경 변수: {os.environ.get('PORT')}")
+        
         # 텔레그램 봇을 별도 스레드에서 실행
-        telegram_thread = threading.Thread(target=run_telegram_bot)
-        telegram_thread.daemon = True
-        telegram_thread.start()
+        try:
+            telegram_thread = threading.Thread(target=run_telegram_bot)
+            telegram_thread.daemon = True
+            telegram_thread.start()
+            print("✅ 텔레그램 봇 스레드 시작됨")
+        except Exception as e:
+            print(f"❌ 텔레그램 봇 스레드 시작 실패: {e}")
         
         # Flask 서버를 메인 스레드에서 실행
         run_flask_server()
     else:
         # 로컬 환경에서는 텔레그램 봇을 메인에서 실행
         print("🏠 로컬 환경에서 텔레그램 봇 시작...")
+        
         # Flask 서버를 별도 스레드에서 실행
-        flask_thread = threading.Thread(target=run_flask_server)
-        flask_thread.daemon = True
-        flask_thread.start()
+        try:
+            flask_thread = threading.Thread(target=run_flask_server)
+            flask_thread.daemon = True
+            flask_thread.start()
+            print("✅ Flask 서버 스레드 시작됨")
+        except Exception as e:
+            print(f"❌ Flask 서버 스레드 시작 실패: {e}")
         
         # 텔레그램 봇을 메인 스레드에서 실행
         run_telegram_bot()
