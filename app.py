@@ -1684,20 +1684,36 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
                 return
         
         if result.get('status') == 'success':
+            # 스팟 거래와 선물 거래에 따른 메시지 구분
+            if market_type == 'spot':
+                success_message = f"✅ **{direction.upper()} 거래 성공**\n\n"
+                success_message += f"거래소: {exchange.upper()}\n"
+                success_message += f"심볼: {symbol}\n"
+                success_message += f"수량: {size}\n"
+                success_message += f"주문 ID: {result.get('order_id', 'N/A')}"
+            else:
+                success_message = f"✅ **{direction.upper()} 포지션 오픈 성공**\n\n"
+                success_message += f"거래소: {exchange.upper()}\n"
+                success_message += f"심볼: {symbol}\n"
+                success_message += f"수량: {size}\n"
+                success_message += f"레버리지: {leverage}배\n"
+                success_message += f"주문 ID: {result.get('order_id', 'N/A')}"
+            
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
-                text=f"✅ **{direction.upper()} 포지션 오픈 성공**\n\n"
-                     f"거래소: {exchange.upper()}\n"
-                     f"심볼: {symbol}\n"
-                     f"수량: {size}\n"
-                     f"레버리지: {leverage}배\n"
-                     f"주문 ID: {result.get('order_id', 'N/A')}",
+                text=success_message,
                 parse_mode='Markdown'
             )
         else:
+            # 스팟 거래와 선물 거래에 따른 실패 메시지 구분
+            if market_type == 'spot':
+                error_message = f"❌ **거래 실패**\n\n오류: {result.get('message', '알 수 없는 오류')}"
+            else:
+                error_message = f"❌ **포지션 오픈 실패**\n\n오류: {result.get('message', '알 수 없는 오류')}"
+            
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
-                text=f"❌ **포지션 오픈 실패**\n\n오류: {result.get('message', '알 수 없는 오류')}",
+                text=error_message,
                 parse_mode='Markdown'
             )
     except Exception as e:
