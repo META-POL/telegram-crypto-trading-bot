@@ -2580,11 +2580,6 @@ class UnifiedFuturesTrader:
                         'status': 'error',
                         'message': f'XT 스팟 잔고 조회 실패: {response.status_code}'
                     }
-                else:
-                    return {
-                        'status': 'error',
-                        'message': f'XT 스팟 잔고 조회 실패: {response.status_code}'
-                    }
             
             elif self.exchange == 'hyperliquid':
                 try:
