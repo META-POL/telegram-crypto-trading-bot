@@ -1883,143 +1883,45 @@ class UnifiedFuturesTrader:
                     }
             
             elif self.exchange == 'backpack':
-                # Backpack Exchange 실제 지원 심볼들 (웹사이트 기반)
-                # 실제 형식: BTCUSDPERP, ETHUSDPERP, SOLUSDPERP (언더스코어 없음)
+                # Backpack Exchange 실제 지원 심볼들 (API 기반)
+                # 실제 형식: BTC_USDC_PERP, ETH_USDC_PERP, SOL_USDC_PERP
                 backpack_futures_symbols = [
-                    'BTCUSDPERP',
-                    'ETHUSDPERP', 
-                    'SOLUSDPERP',
-                    'MATICUSDPERP',
-                    'AVAXUSDPERP',
-                    'APTUSDPERP',
-                    'ARBUSDPERP',
-                    'OPUSDPERP',
-                    'SUIUSDPERP',
-                    'SEIUSDPERP',
-                    'JUPUSDPERP',
-                    'PYTHUSDPERP',
-                    'BONKUSDPERP',
-                    'WIFUSDPERP',
-                    'DOGEUSDPERP',
-                    'SHIBUSDPERP',
-                    'PEPEUSDPERP',
-                    'FLOKIUSDPERP',
-                    'BOMEUSDPERP',
-                    'WLDUSDPERP',
-                    'RNDRUSDPERP',
-                    'FETUSDPERP',
-                    'OCEANUSDPERP',
-                    'AGIXUSDPERP',
-                    'LINKUSDPERP',
-                    'UNIUSDPERP',
-                    'AAVEUSDPERP',
-                    'COMPUSDPERP',
-                    'MKRUSDPERP',
-                    'CRVUSDPERP',
-                    'SNXUSDPERP',
-                    'YFIUSDPERP',
-                    'SUSHIUSDPERP',
-                    '1INCHUSDPERP',
-                    'ZRXUSDPERP',
-                    'BALUSDPERP',
-                    'KNCUSDPERP',
-                    'BANDUSDPERP',
-                    'UMAUSDPERP',
-                    'RENUSDPERP',
-                    'STORJUSDPERP',
-                    'MANAUSDPERP',
-                    'SANDUSDPERP',
-                    'ENJUSDPERP',
-                    'AXSUSDPERP',
-                    'CHZUSDPERP',
-                    'ALGOUSDPERP',
-                    'VETUSDPERP',
-                    'ICPUSDPERP',
-                    'FILUSDPERP',
-                    'NEARUSDPERP',
-                    'FTMUSDPERP',
-                    'ATOMUSDPERP',
-                    'DOTUSDPERP',
-                    'ADAUSDPERP',
-                    'XRPUSDPERP',
-                    'LTCUSDPERP',
-                    'BCHUSDPERP',
-                    'EOSUSDPERP',
-                    'TRXUSDPERP',
-                    'XLMUSDPERP',
-                    'XMRUSDPERP',
-                    'ZECUSDPERP',
-                    'DASHUSDPERP',
-                    'ETCUSDPERP',
-                    'BATUSDPERP',
-                    'ZILUSDPERP',
-                    'IOTAUSDPERP',
-                    'NEOUSDPERP',
-                    'QTUMUSDPERP',
-                    'ONTUSDPERP',
-                    'ICXUSDPERP',
-                    'WAVESUSDPERP',
-                    'OMGUSDPERP',
-                    'NANOUSDPERP',
-                    'HBARUSDPERP',
-                    'HOTUSDPERP',
-                    'ANKRUSDPERP',
-                    'COTIUSDPERP',
-                    'DENTUSDPERP',
-                    'DUSKUSDPERP',
-                    'EGLDUSDPERP',
-                    'FLOWUSDPERP',
-                    'GALAUSDPERP',
-                    'HIVEUSDPERP',
-                    'IOTXUSDPERP',
-                    'KAVAUSDPERP',
-                    'KDAUSDPERP',
-                    'KSMUSDPERP',
-                    'LRCUSDPERP',
-                    'MASKUSDPERP',
-                    'MINAUSDPERP',
-                    'MKRUSDPERP',
-                    'MULTIUSDPERP',
-                    'NMRUSDPERP',
-                    'OGNUSDPERP',
-                    'ONEUSDPERP',
-                    'PAXGUSDPERP',
-                    'POLSUSDPERP',
-                    'PONDUSDPERP',
-                    'PUNDIXUSDPERP',
-                    'QNTUSDPERP',
-                    'RADUSDPERP',
-                    'RAYUSDPERP',
-                    'REEFUSDPERP',
-                    'RSRUSDPERP',
-                    'RVNUSDPERP',
-                    'SCRTUSDPERP',
-                    'SKLUSDPERP',
-                    'SLPUSDPERP',
-                    'SNTUSDPERP',
-                    'SPELLUSDPERP',
-                    'SRMUSDPERP',
-                    'STXUSDPERP',
-                    'SYSUSDPERP',
-                    'TFUELUSDPERP',
-                    'THETAUSDPERP',
-                    'TLMUSDPERP',
-                    'TOKEUSDPERP',
-                    'TRBUSDPERP',
-                    'TRIBEUSDPERP',
-                    'TUSDUSDPERP',
-                    'UMAUSDPERP',
-                    'UNFIUSDPERP',
-                    'USDCUSDPERP',
-                    'USDTUSDPERP',
-                    'VTHOUSDPERP',
-                    'WAXPUSDPERP',
-                    'XECUSDPERP',
-                    'XEMUSDPERP',
-                    'XVSUSDPERP',
-                    'YGGUSDPERP',
-                    'ZENUSDPERP',
-                    'ZRXUSDPERP'
+                    'SOL_USDC_PERP',
+                    'BTC_USDC_PERP',
+                    'ETH_USDC_PERP',
+                    'XRP_USDC_PERP',
+                    'SUI_USDC_PERP',
+                    'DOGE_USDC_PERP',
+                    'JUP_USDC_PERP',
+                    'TRUMP_USDC_PERP',
+                    'WIF_USDC_PERP',
+                    'BERA_USDC_PERP',
+                    'LTC_USDC_PERP',
+                    'ADA_USDC_PERP',
+                    'LINK_USDC_PERP',
+                    'IP_USDC_PERP',
+                    'HYPE_USDC_PERP',
+                    'BNB_USDC_PERP',
+                    'AVAX_USDC_PERP',
+                    'S_USDC_PERP',
+                    'ONDO_USDC_PERP',
+                    'KAITO_USDC_PERP',
+                    'ARB_USDC_PERP',
+                    'ENA_USDC_PERP',
+                    'AAVE_USDC_PERP',
+                    'DOT_USDC_PERP',
+                    'FARTCOIN_USDC_PERP',
+                    'NEAR_USDC_PERP',
+                    'OP_USDC_PERP',
+                    'PENGU_USDC_PERP',
+                    'kPEPE_USDC_PERP',
+                    'TAO_USDC_PERP',
+                    'VIRTUAL_USDC_PERP',
+                    'TIA_USDC_PERP',
+                    'kBONK_USDC_PERP',
+                    'FRAG_USDC_PERP',
+                    'PUMP_USDC_PERP',
+                    'SEI_USDC_PERP'
                 ]
                 
                 return {
@@ -2083,12 +1985,12 @@ class UnifiedFuturesTrader:
                     backpack_order_type = 'Market'  # 기본값
                 
                 # Backpack Exchange API 문서에 따른 올바른 파라미터 구조
-                # Backpack Exchange 실제 심볼 형식: BTCUSDPERP, ETHUSDPERP, SOLUSDPERP (언더스코어 없음)
+                # Backpack Exchange 실제 심볼 형식: BTC_USDC_PERP, ETH_USDC_PERP, SOL_USDC_PERP
                 backpack_symbol = symbol
-                if not symbol.endswith('PERP'):
-                    # 실제 심볼 형식으로 변환 (언더스코어 없음)
-                    # BTC -> BTCUSDPERP, ETH -> ETHUSDPERP, SOL -> SOLUSDPERP
-                    backpack_symbol = f"{symbol}USDPERP"  # USD 페어 (모든 선물 거래)
+                if not symbol.endswith('_PERP'):
+                    # 실제 심볼 형식으로 변환 (USDC 페어)
+                    # BTC -> BTC_USDC_PERP, ETH -> ETH_USDC_PERP, SOL -> SOL_USDC_PERP
+                    backpack_symbol = f"{symbol}_USDC_PERP"  # USDC 페어 (모든 선물 거래)
                 
                 params = {
                     'symbol': backpack_symbol,
@@ -2177,12 +2079,12 @@ class UnifiedFuturesTrader:
                     backpack_order_type = 'Market'  # 기본값
                 
                 # Backpack Exchange API 문서에 따른 올바른 파라미터 구조
-                # Backpack Exchange 실제 심볼 형식: BTCUSDPERP, ETHUSDPERP, SOLUSDPERP (언더스코어 없음)
+                # Backpack Exchange 실제 심볼 형식: BTC_USDC_PERP, ETH_USDC_PERP, SOL_USDC_PERP
                 backpack_symbol = symbol
-                if not symbol.endswith('PERP'):
-                    # 실제 심볼 형식으로 변환 (언더스코어 없음)
-                    # BTC -> BTCUSDPERP, ETH -> ETHUSDPERP, SOL -> SOLUSDPERP
-                    backpack_symbol = f"{symbol}USDPERP"  # USD 페어 (모든 선물 거래)
+                if not symbol.endswith('_PERP'):
+                    # 실제 심볼 형식으로 변환 (USDC 페어)
+                    # BTC -> BTC_USDC_PERP, ETH -> ETH_USDC_PERP, SOL -> SOL_USDC_PERP
+                    backpack_symbol = f"{symbol}_USDC_PERP"  # USDC 페어 (모든 선물 거래)
                 
                 params = {
                     'symbol': backpack_symbol,
