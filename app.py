@@ -1241,9 +1241,9 @@ class UnifiedFuturesTrader:
                     }
             
             elif self.exchange == 'backpack':
-                # Backpack Exchange는 /capital 대신 /account 사용
+                # Backpack Exchange API 연결 테스트 - 계좌 정보 조회
                 url = f"{self.base_url}/account"
-                headers = self._get_headers_backpack("queryAccount")
+                headers = self._get_headers_backpack("accountQuery")
                 response = requests.get(url, headers=headers)
                 
                 if response.status_code == 200:
@@ -1325,8 +1325,9 @@ class UnifiedFuturesTrader:
                     }
             
             elif self.exchange == 'backpack':
-                url = f"{self.base_url}/account"
-                headers = self._get_headers_backpack("queryAccount")
+                # Backpack Exchange 잔고 조회 - /capital 엔드포인트 사용
+                url = f"{self.base_url}/capital"
+                headers = self._get_headers_backpack("balanceQuery")
                 response = requests.get(url, headers=headers)
                 
                 if response.status_code == 200:
