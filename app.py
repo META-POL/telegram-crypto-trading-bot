@@ -808,7 +808,10 @@ async def show_trade_type_menu(telegram_app, chat_id, user_id, trade_type, excha
 
 async def show_symbol_selection_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, callback_query):
     """심볼 선택 메뉴"""
-    trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
+    if market_type == "spot":
+        trade_type_text = "📈 매수" if trade_type == "long" else "📉 매도"
+    else:
+        trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
     market_type_text = "💱 스팟" if market_type == "spot" else "📊 선물"
     exchange_names = {
         "xt": "XT Exchange",
@@ -1006,7 +1009,10 @@ async def show_futures_quantity_input(telegram_app, chat_id, user_id, exchange, 
 
 async def show_order_type_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, callback_query):
     """주문 타입 선택 메뉴 (시장가/지정가)"""
-    trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
+    if market_type == "spot":
+        trade_type_text = "📈 매수" if trade_type == "long" else "📉 매도"
+    else:
+        trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
     market_type_text = "💱 스팟" if market_type == "spot" else "📊 선물"
     symbol_display = symbol.replace('_', '/')
     
@@ -1030,7 +1036,10 @@ async def show_order_type_menu(telegram_app, chat_id, user_id, trade_type, excha
 
 async def show_leverage_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, order_type, callback_query):
     """레버리지 선택 메뉴 (선물 거래용)"""
-    trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
+    if market_type == "spot":
+        trade_type_text = "📈 매수" if trade_type == "long" else "📉 매도"
+    else:
+        trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
     symbol_display = symbol.replace('_', '/')
     order_type_text = "⚡ 시장가" if order_type == "market" else "📝 지정가"
     
@@ -1058,7 +1067,10 @@ async def show_leverage_menu(telegram_app, chat_id, user_id, trade_type, exchang
 
 async def show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, order_type, leverage=None, callback_query=None):
     """수량 입력 안내"""
-    trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
+    if market_type == "spot":
+        trade_type_text = "📈 매수" if trade_type == "long" else "📉 매도"
+    else:
+        trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
     market_type_text = "💱 스팟" if market_type == "spot" else "📊 선물"
     symbol_display = symbol.replace('_', '/')
     order_type_text = "⚡ 시장가" if order_type == "market" else "📝 지정가"
@@ -1089,12 +1101,14 @@ async def show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchan
     if callback_query:
         # 스팟 거래와 선물 거래에 따른 명령어 형식 결정
         if market_type == 'spot':
-            command_format = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량]"
+            # 스팟 거래에서는 long -> buy, short -> sell로 변환
+            spot_action = "buy" if trade_type == "long" else "sell"
+            command_format = f"`/trade {exchange} {symbol_display} {spot_action} {order_type} [수량]"
             if order_type == 'limit':
                 command_format += " [가격]"
             command_format += "`"
             
-            example = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001"
+            example = f"`/trade {exchange} {symbol_display} {spot_action} {order_type} 0.001"
             if order_type == 'limit':
                 example += " 50000"
             example += "`"
@@ -1120,12 +1134,14 @@ async def show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchan
     else:
         # 스팟 거래와 선물 거래에 따른 명령어 형식 결정
         if market_type == 'spot':
-            command_format = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량]"
+            # 스팟 거래에서는 long -> buy, short -> sell로 변환
+            spot_action = "buy" if trade_type == "long" else "sell"
+            command_format = f"`/trade {exchange} {symbol_display} {spot_action} {order_type} [수량]"
             if order_type == 'limit':
                 command_format += " [가격]"
             command_format += "`"
             
-            example = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001"
+            example = f"`/trade {exchange} {symbol_display} {spot_action} {order_type} 0.001"
             if order_type == 'limit':
                 example += " 50000"
             example += "`"
