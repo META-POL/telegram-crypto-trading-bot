@@ -32,6 +32,15 @@ except ImportError:
     ccxt = None
     print("⚠️ ccxt 라이브러리 로드 실패 (선택적 기능)")
 
+# 텔레그램 라이브러리 import
+try:
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    print("✅ telegram 라이브러리 로드 성공")
+except ImportError:
+    InlineKeyboardButton = None
+    InlineKeyboardMarkup = None
+    print("⚠️ telegram 라이브러리 로드 실패")
+
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -279,7 +288,6 @@ def webhook():
 
 async def show_main_menu(telegram_app, chat_id):
     """메인 메뉴 표시"""
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
     keyboard = [
         [InlineKeyboardButton("🔑 API 키 관리", callback_data="api_management")],
@@ -367,7 +375,6 @@ async def handle_api_setup(telegram_app, chat_id, user_id, text):
 async def handle_callback_query(callback_query, telegram_app):
     """콜백 쿼리 처리 (버튼 클릭)"""
     try:
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         
         chat_id = callback_query.message.chat_id
         data = callback_query.data
@@ -979,7 +986,6 @@ async def handle_close_command(telegram_app, chat_id, user_id, text):
 
 async def show_api_management_menu(telegram_app, chat_id, user_id, callback_query=None):
     """API 관리 메뉴 표시"""
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
     # 사용자 API 키 상태 확인
     user_keys = get_user_api_keys(user_id)
@@ -1026,7 +1032,6 @@ async def show_api_management_menu(telegram_app, chat_id, user_id, callback_quer
             
 async def show_balance_menu(telegram_app, chat_id, user_id, callback_query=None):
     """잔고 조회 메뉴 표시"""
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
     keyboard = [
         [InlineKeyboardButton("XT Exchange", callback_data="balance_xt")],
@@ -1057,7 +1062,6 @@ async def show_balance_menu(telegram_app, chat_id, user_id, callback_query=None)
             
 async def show_symbols_menu(telegram_app, chat_id, user_id):
     """거래쌍 조회 메뉴 표시"""
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
     keyboard = [
         [InlineKeyboardButton("XT Exchange", callback_data="symbols_xt")],
@@ -1078,7 +1082,6 @@ async def show_symbols_menu(telegram_app, chat_id, user_id):
 
 async def show_position_menu(telegram_app, chat_id, user_id):
     """포지션 관리 메뉴 표시"""
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
     keyboard = [
         [InlineKeyboardButton("📊 포지션 조회", callback_data="position_list")],
@@ -1097,7 +1100,6 @@ async def show_position_menu(telegram_app, chat_id, user_id):
 
 async def show_trade_menu(telegram_app, chat_id, user_id):
     """거래 메뉴 표시"""
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
     keyboard = [
         [InlineKeyboardButton("📈 롱 포지션", callback_data="trade_long")],
@@ -1116,7 +1118,6 @@ async def show_trade_menu(telegram_app, chat_id, user_id):
 
 async def show_settings_menu(telegram_app, chat_id, user_id):
     """설정 메뉴 표시"""
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
     keyboard = [
         [InlineKeyboardButton("⚙️ 리스크 설정", callback_data="settings_risk")],
@@ -1157,7 +1158,6 @@ async def show_help(telegram_app, chat_id):
         "• `/close [거래소] [심볼]` - 포지션 종료"
     )
             
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     keyboard = [[InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
             
