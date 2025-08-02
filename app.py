@@ -53,8 +53,6 @@ def init_database():
                 backpack_private_key TEXT,
                 hyperliquid_api_key TEXT,
                 hyperliquid_api_secret TEXT,
-                flipster_api_key TEXT,
-                flipster_api_secret TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -84,9 +82,7 @@ def get_user_api_keys(user_id):
                 'backpack_api_key': result[3],
                 'backpack_private_key': result[4],
                 'hyperliquid_api_key': result[5],
-                'hyperliquid_api_secret': result[6],
-                'flipster_api_key': result[7],
-                'flipster_api_secret': result[8]
+                'hyperliquid_api_secret': result[6]
             }
         return None
     except Exception as e:
@@ -123,12 +119,7 @@ def save_user_api_keys(user_id, exchange, api_key, api_secret):
                     SET hyperliquid_api_key = ?, hyperliquid_api_secret = ?, updated_at = CURRENT_TIMESTAMP 
                     WHERE user_id = ?
                 ''', (api_key, api_secret, user_id))
-            elif exchange == 'flipster':
-                cursor.execute('''
-                    UPDATE user_api_keys 
-                    SET flipster_api_key = ?, flipster_api_secret = ?, updated_at = CURRENT_TIMESTAMP 
-                    WHERE user_id = ?
-                ''', (api_key, api_secret, user_id))
+            
         else:
             # 새 사용자 생성
             if exchange == 'xt':
@@ -146,11 +137,7 @@ def save_user_api_keys(user_id, exchange, api_key, api_secret):
                     INSERT INTO user_api_keys (user_id, hyperliquid_api_key, hyperliquid_api_secret)
                     VALUES (?, ?, ?)
                 ''', (user_id, api_key, api_secret))
-            elif exchange == 'flipster':
-                cursor.execute('''
-                    INSERT INTO user_api_keys (user_id, flipster_api_key, flipster_api_secret)
-                    VALUES (?, ?, ?)
-                ''', (user_id, api_key, api_secret))
+            
         
         conn.commit()
         conn.close()
@@ -324,8 +311,7 @@ async def show_main_menu(telegram_app, chat_id):
             "**지원 거래소:**\n"
             "• XT Exchange\n"
             "• Backpack Exchange\n"
-            "• Hyperliquid\n"
-            "• Flipster\n\n"
+            "• Hyperliquid\n\n"
             "먼저 API 키를 설정해주세요!"
         )
 
@@ -479,8 +465,7 @@ async def handle_api_callback(telegram_app, chat_id, user_id, data, callback_que
     exchange_names = {
         "xt": "XT Exchange",
         "backpack": "Backpack Exchange", 
-        "hyperliquid": "Hyperliquid",
-        "flipster": "Flipster"
+        "hyperliquid": "Hyperliquid"
     }
     
     user_keys = get_user_api_keys(user_id)
@@ -663,7 +648,6 @@ async def show_position_list_menu(telegram_app, chat_id, user_id, callback_query
         [InlineKeyboardButton("XT Exchange", callback_data="position_list_xt")],
         [InlineKeyboardButton("Backpack Exchange", callback_data="position_list_backpack")],
         [InlineKeyboardButton("Hyperliquid", callback_data="position_list_hyperliquid")],
-        [InlineKeyboardButton("Flipster", callback_data="position_list_flipster")],
         [InlineKeyboardButton("🔙 포지션 메뉴", callback_data="position_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -682,7 +666,6 @@ async def show_position_close_menu(telegram_app, chat_id, user_id, callback_quer
         [InlineKeyboardButton("XT Exchange", callback_data="position_close_xt")],
         [InlineKeyboardButton("Backpack Exchange", callback_data="position_close_backpack")],
         [InlineKeyboardButton("Hyperliquid", callback_data="position_close_hyperliquid")],
-        [InlineKeyboardButton("Flipster", callback_data="position_close_flipster")],
         [InlineKeyboardButton("🔙 포지션 메뉴", callback_data="position_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -707,7 +690,7 @@ async def handle_trade_callback(telegram_app, chat_id, user_id, data, callback_q
         # 거래소 선택 후 처리
         parts = data.split("_")
         trade_type = parts[1]  # long 또는 short
-        exchange = parts[2]    # xt, backpack, hyperliquid, flipster
+        exchange = parts[2]    # xt, backpack, hyperliquid
         await show_trade_type_menu(telegram_app, chat_id, user_id, trade_type, exchange, callback_query)
     elif data.startswith("trade_type_"):
         # 거래 타입 선택 후 처리 (스팟/선물)
@@ -769,7 +752,7 @@ async def handle_trade_callback(telegram_app, chat_id, user_id, data, callback_q
     elif data.startswith("trade_exchange_"):
         # 거래소 선택 후 처리
         parts = data.split("_")
-        exchange = parts[2]     # xt, backpack, hyperliquid, flipster
+        exchange = parts[2]     # xt, backpack, hyperliquid
         await show_trade_type_menu(telegram_app, chat_id, user_id, "long", exchange, callback_query)
     elif data.startswith("futures_symbol_"):
         # 선물 거래 심볼 선택 후 처리
@@ -787,7 +770,6 @@ async def show_trade_setup_menu(telegram_app, chat_id, user_id, trade_type, call
         [InlineKeyboardButton("XT Exchange", callback_data=f"trade_{trade_type}_xt")],
         [InlineKeyboardButton("Backpack Exchange", callback_data=f"trade_{trade_type}_backpack")],
         [InlineKeyboardButton("Hyperliquid", callback_data=f"trade_{trade_type}_hyperliquid")],
-        [InlineKeyboardButton("Flipster", callback_data=f"trade_{trade_type}_flipster")],
         [InlineKeyboardButton("🔙 거래 메뉴", callback_data="trade_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -806,8 +788,7 @@ async def show_trade_type_menu(telegram_app, chat_id, user_id, trade_type, excha
     exchange_names = {
         "xt": "XT Exchange",
         "backpack": "Backpack Exchange",
-        "hyperliquid": "Hyperliquid",
-        "flipster": "Flipster"
+        "hyperliquid": "Hyperliquid"
     }
     
     keyboard = [
@@ -837,8 +818,7 @@ async def show_symbol_selection_menu(telegram_app, chat_id, user_id, trade_type,
     exchange_names = {
         "xt": "XT Exchange",
         "backpack": "Backpack Exchange",
-        "hyperliquid": "Hyperliquid",
-        "flipster": "Flipster"
+        "hyperliquid": "Hyperliquid"
     }
     
     # 일반적인 거래 심볼들 (더 많은 심볼 추가)
@@ -1816,13 +1796,9 @@ class UnifiedFuturesTrader:
             self.api_secret = kwargs.get('api_secret')
             # 지연 로딩으로 변경
             self.ccxt_client = None
-        elif self.exchange == 'flipster':
-            self.api_key = kwargs.get('api_key')
-            self.api_secret = kwargs.get('api_secret')
-            # 지연 로딩으로 변경
-            self.ccxt_client = None
+
         else:
-            raise ValueError('지원하지 않는 거래소입니다: xt, backpack, hyperliquid, flipster만 지원')
+            raise ValueError('지원하지 않는 거래소입니다: xt, backpack, hyperliquid만 지원')
 
     def test_api_connection(self):
         """API 연결 테스트"""
@@ -1874,30 +1850,23 @@ class UnifiedFuturesTrader:
                         'message': 'pynacl 패키지가 필요합니다'
                     }
             
-            elif self.exchange in ['hyperliquid', 'flipster']:
+            elif self.exchange == 'hyperliquid':
                 try:
                     # ccxt 지연 로딩
                     if ccxt is None:
                         import ccxt
                     
                     if self.ccxt_client is None:
-                        if self.exchange == 'hyperliquid':
-                            self.ccxt_client = ccxt.hyperliquid({
-                                'apiKey': self.api_key,
-                                'secret': self.api_secret,
-                                'enableRateLimit': True,
-                            })
-                        else:  # flipster
-                            self.ccxt_client = ccxt.flipster({
-                                'apiKey': self.api_key,
-                                'secret': self.api_secret,
-                                'enableRateLimit': True,
-                            })
+                        self.ccxt_client = ccxt.hyperliquid({
+                            'apiKey': self.api_key,
+                            'secret': self.api_secret,
+                            'enableRateLimit': True,
+                        })
                     
                     self.ccxt_client.fetch_balance()
                     return {
                         'status': 'success',
-                        'message': f'{self.exchange.capitalize()} 선물 API 연결 성공'
+                        'message': 'Hyperliquid 선물 API 연결 성공'
                     }
                 except ImportError:
                     return {
@@ -2000,12 +1969,12 @@ class UnifiedFuturesTrader:
                         'message': f'Backpack 선물 잔고 조회 실패: {response.status_code}'
                     }
             
-            elif self.exchange in ['hyperliquid', 'flipster']:
+            elif self.exchange == 'hyperliquid':
                 balance = self.ccxt_client.fetch_balance()
                 return {
                     'status': 'success',
                     'balance': balance,
-                    'message': f'{self.exchange.capitalize()} 선물 잔고 조회 성공'
+                    'message': 'Hyperliquid 선물 잔고 조회 성공'
                 }
             
         except Exception as e:
@@ -2090,13 +2059,13 @@ class UnifiedFuturesTrader:
                     'message': f'Backpack 선물 거래쌍 {len(backpack_futures_symbols)}개 조회 성공'
                 }
             
-            elif self.exchange in ['hyperliquid', 'flipster']:
+            elif self.exchange == 'hyperliquid':
                 markets = self.ccxt_client.load_markets()
                 futures_symbols = [symbol for symbol, market in markets.items() if market.get('type') == 'future']
                 return {
                     'status': 'success',
                     'symbols': futures_symbols,
-                    'message': f'{self.exchange.capitalize()} 선물 거래쌍 {len(futures_symbols)}개 조회 성공'
+                    'message': f'Hyperliquid 선물 거래쌍 {len(futures_symbols)}개 조회 성공'
                 }
             
         except Exception as e:
@@ -2188,7 +2157,7 @@ class UnifiedFuturesTrader:
                         'message': f'Backpack 롱 포지션 오픈 실패: {response.status_code} - {response.text}'
                     }
             
-            elif self.exchange in ['hyperliquid', 'flipster']:
+            elif self.exchange == 'hyperliquid':
                 order = self.ccxt_client.create_order(
                     symbol=symbol,
                     type=order_type,
@@ -2199,7 +2168,7 @@ class UnifiedFuturesTrader:
                 return {
                     'status': 'success',
                     'order_id': order.get('id'),
-                    'message': f'{self.exchange.capitalize()} 롱 포지션 오픈 성공'
+                    'message': 'Hyperliquid 롱 포지션 오픈 성공'
                 }
             
         except Exception as e:
@@ -2291,7 +2260,7 @@ class UnifiedFuturesTrader:
                         'message': f'Backpack 숏 포지션 오픈 실패: {response.status_code} - {response.text}'
                     }
             
-            elif self.exchange in ['hyperliquid', 'flipster']:
+            elif self.exchange == 'hyperliquid':
                 order = self.ccxt_client.create_order(
                     symbol=symbol,
                     type=order_type,
@@ -2302,7 +2271,7 @@ class UnifiedFuturesTrader:
                 return {
                     'status': 'success',
                     'order_id': order.get('id'),
-                    'message': f'{self.exchange.capitalize()} 숏 포지션 오픈 성공'
+                    'message': 'Hyperliquid 숏 포지션 오픈 성공'
                 }
             
         except Exception as e:
