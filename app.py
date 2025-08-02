@@ -1958,12 +1958,9 @@ class UnifiedFuturesTrader:
                 # Backpack Exchange 심볼 형식: SOL_USDC_PERP (선물), BTC_USDT (스팟)
                 backpack_symbol = symbol
                 if not symbol.endswith('_PERP'):
-                    # 실제 지원되는 심볼로 변환 (SOL_USDC_PERP 형식)
-                    # BTC -> BTC_USDT_PERP, ETH -> ETH_USDT_PERP, SOL -> SOL_USDC_PERP
-                    if symbol in ['SOL', 'MATIC', 'AVAX']:
-                        backpack_symbol = f"{symbol}_USDC_PERP"  # USDC 페어
-                    else:
-                        backpack_symbol = f"{symbol}_USDT_PERP"  # USDT 페어
+                    # 웹사이트 기반 실제 심볼 형식으로 변환
+                    # ETH -> ETH_USD_PERP, BTC -> BTC_USD_PERP, SOL -> SOL_USD_PERP
+                    backpack_symbol = f"{symbol}_USD_PERP"  # USD 페어 (모든 선물 거래)
                 
                 params = {
                     'symbol': backpack_symbol,
@@ -2055,12 +2052,9 @@ class UnifiedFuturesTrader:
                 # Backpack Exchange 심볼 형식: SOL_USDC_PERP (선물), BTC_USDT (스팟)
                 backpack_symbol = symbol
                 if not symbol.endswith('_PERP'):
-                    # 실제 지원되는 심볼로 변환 (SOL_USDC_PERP 형식)
-                    # BTC -> BTC_USDT_PERP, ETH -> ETH_USDT_PERP, SOL -> SOL_USDC_PERP
-                    if symbol in ['SOL', 'MATIC', 'AVAX']:
-                        backpack_symbol = f"{symbol}_USDC_PERP"  # USDC 페어
-                    else:
-                        backpack_symbol = f"{symbol}_USDT_PERP"  # USDT 페어
+                    # 웹사이트 기반 실제 심볼 형식으로 변환
+                    # ETH -> ETH_USD_PERP, BTC -> BTC_USD_PERP, SOL -> SOL_USD_PERP
+                    backpack_symbol = f"{symbol}_USD_PERP"  # USD 페어 (모든 선물 거래)
                 
                 params = {
                     'symbol': backpack_symbol,
