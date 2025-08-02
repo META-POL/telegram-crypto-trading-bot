@@ -2212,12 +2212,19 @@ class UnifiedFuturesTrader:
         else:
             sign_string = f"timestamp={timestamp}"
         
-        # 4. HMAC-SHA256 서명 생성
+        # 4. HMAC-SHA256 서명 생성 (PyXT 라이브러리 방식)
         signature = hmac.new(
             self.api_secret.encode('utf-8'), 
             sign_string.encode('utf-8'), 
             hashlib.sha256
         ).hexdigest()
+        
+        # 대안: Base64 인코딩 방식 (일부 API에서 사용)
+        # signature = base64.b64encode(hmac.new(
+        #     self.api_secret.encode('utf-8'), 
+        #     sign_string.encode('utf-8'), 
+        #     hashlib.sha256
+        # ).digest()).decode('utf-8')
         
         print(f"XT 서명 디버그: sign_string={sign_string}, signature={signature}")  # 디버깅용
         
@@ -2759,7 +2766,9 @@ class UnifiedFuturesTrader:
         try:
             if self.exchange == 'xt':
                 # XT 스팟 매수 - 공식 문서 기반 엔드포인트
+                # 대안 엔드포인트 시도
                 url = f"{self.base_url}/v4/order"
+                # 만약 실패하면 다른 엔드포인트 시도: f"{self.base_url}/v4/spot/order"
                 params = {
                     'symbol': symbol,
                     'side': 'buy',
@@ -2773,6 +2782,7 @@ class UnifiedFuturesTrader:
                 
                 headers = self._get_headers_xt(params)
                 print(f"XT API 요청: URL={url}, params={params}")  # 디버깅용
+                print(f"XT API 헤더: {headers}")  # 디버깅용
                 response = requests.post(url, headers=headers, json=params)
                 
                 if response.status_code == 200:
@@ -2904,6 +2914,7 @@ class UnifiedFuturesTrader:
                 
                 headers = self._get_headers_xt(params)
                 print(f"XT API 요청: URL={url}, params={params}")  # 디버깅용
+                print(f"XT API 헤더: {headers}")  # 디버깅용
                 response = requests.post(url, headers=headers, json=params)
                 
                 if response.status_code == 200:
