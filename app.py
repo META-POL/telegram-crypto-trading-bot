@@ -658,10 +658,58 @@ async def show_position_close_menu(telegram_app, chat_id, user_id, callback_quer
 
 async def handle_trade_callback(telegram_app, chat_id, user_id, data, callback_query):
     """거래 콜백 처리"""
+    print(f"🔘 거래 콜백 처리: {data}")
+    
     if data == "trade_long":
         await show_trade_setup_menu(telegram_app, chat_id, user_id, "long", callback_query)
     elif data == "trade_short":
         await show_trade_setup_menu(telegram_app, chat_id, user_id, "short", callback_query)
+    elif data.startswith("trade_long_") or data.startswith("trade_short_"):
+        # 거래소 선택 후 처리
+        parts = data.split("_")
+        trade_type = parts[1]  # long 또는 short
+        exchange = parts[2]    # xt, backpack, hyperliquid, flipster
+        await show_trade_type_menu(telegram_app, chat_id, user_id, trade_type, exchange, callback_query)
+    elif data.startswith("trade_type_"):
+        # 거래 타입 선택 후 처리 (스팟/선물)
+        parts = data.split("_")
+        trade_type = parts[2]  # long 또는 short
+        exchange = parts[3]    # 거래소
+        market_type = parts[4] # spot 또는 futures
+        await show_symbol_selection_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, callback_query)
+    elif data.startswith("trade_symbol_"):
+        # 심볼 선택 후 처리
+        parts = data.split("_")
+        trade_type = parts[2]  # long 또는 short
+        exchange = parts[3]    # 거래소
+        market_type = parts[4] # spot 또는 futures
+        symbol = parts[5]      # 심볼
+        await show_order_type_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, callback_query)
+    elif data.startswith("order_type_"):
+        # 주문 타입 선택 후 처리
+        parts = data.split("_")
+        trade_type = parts[2]  # long 또는 short
+        exchange = parts[3]    # 거래소
+        market_type = parts[4] # spot 또는 futures
+        symbol = parts[5]      # 심볼
+        order_type = parts[6]  # market 또는 limit
+        
+        if market_type == "futures":
+            # 선물 거래의 경우 레버리지 선택
+            await show_leverage_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, order_type, callback_query)
+        else:
+            # 스팟 거래의 경우 바로 수량 입력
+            await show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, order_type, callback_query=callback_query)
+    elif data.startswith("leverage_"):
+        # 레버리지 선택 후 처리 (선물 거래)
+        parts = data.split("_")
+        trade_type = parts[1]  # long 또는 short
+        exchange = parts[2]    # 거래소
+        market_type = parts[3] # futures
+        symbol = parts[4]      # 심볼
+        order_type = parts[5]  # market 또는 limit
+        leverage = parts[6]    # 레버리지
+        await show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, order_type, leverage, callback_query)
 
 async def show_trade_setup_menu(telegram_app, chat_id, user_id, trade_type, callback_query):
     """거래 설정 메뉴 표시"""
@@ -680,6 +728,172 @@ async def show_trade_setup_menu(telegram_app, chat_id, user_id, trade_type, call
         chat_id=chat_id,
         message_id=callback_query.message.message_id,
         text=f"{trade_type_text} **포지션 오픈**\n\n거래소를 선택하여 {trade_type_text.lower()} 포지션을 오픈하세요.",
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def show_trade_type_menu(telegram_app, chat_id, user_id, trade_type, exchange, callback_query):
+    """거래 타입 선택 메뉴 (스팟/선물)"""
+    trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
+    exchange_names = {
+        "xt": "XT Exchange",
+        "backpack": "Backpack Exchange",
+        "hyperliquid": "Hyperliquid",
+        "flipster": "Flipster"
+    }
+    
+    keyboard = [
+        [InlineKeyboardButton("💱 스팟 거래", callback_data=f"trade_type_{trade_type}_{exchange}_spot")],
+        [InlineKeyboardButton("📊 선물 거래", callback_data=f"trade_type_{trade_type}_{exchange}_futures")],
+        [InlineKeyboardButton("🔙 거래소 선택", callback_data=f"trade_{trade_type}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id,
+        text=f"{trade_type_text} **거래 타입 선택**\n\n"
+             f"거래소: {exchange_names.get(exchange, exchange.upper())}\n"
+             f"거래 타입을 선택하세요:",
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def show_symbol_selection_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, callback_query):
+    """심볼 선택 메뉴"""
+    trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
+    market_type_text = "💱 스팟" if market_type == "spot" else "📊 선물"
+    exchange_names = {
+        "xt": "XT Exchange",
+        "backpack": "Backpack Exchange",
+        "hyperliquid": "Hyperliquid",
+        "flipster": "Flipster"
+    }
+    
+    # 일반적인 거래 심볼들
+    common_symbols = [
+        ["BTC/USDT", "ETH/USDT", "BNB/USDT"],
+        ["ADA/USDT", "DOT/USDT", "LINK/USDT"],
+        ["SOL/USDT", "MATIC/USDT", "AVAX/USDT"]
+    ]
+    
+    keyboard = []
+    for row in common_symbols:
+        keyboard_row = []
+        for symbol in row:
+            keyboard_row.append(InlineKeyboardButton(
+                symbol, 
+                callback_data=f"trade_symbol_{trade_type}_{exchange}_{market_type}_{symbol.replace('/', '_')}"
+            ))
+        keyboard.append(keyboard_row)
+    
+    keyboard.append([InlineKeyboardButton("🔙 거래 타입 선택", callback_data=f"trade_{trade_type}_{exchange}")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id,
+        text=f"{trade_type_text} **심볼 선택**\n\n"
+             f"거래소: {exchange_names.get(exchange, exchange.upper())}\n"
+             f"거래 타입: {market_type_text}\n\n"
+             f"거래할 심볼을 선택하세요:",
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def show_order_type_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, callback_query):
+    """주문 타입 선택 메뉴 (시장가/지정가)"""
+    trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
+    market_type_text = "💱 스팟" if market_type == "spot" else "📊 선물"
+    symbol_display = symbol.replace('_', '/')
+    
+    keyboard = [
+        [InlineKeyboardButton("⚡ 시장가", callback_data=f"order_type_{trade_type}_{exchange}_{market_type}_{symbol}_market")],
+        [InlineKeyboardButton("📝 지정가", callback_data=f"order_type_{trade_type}_{exchange}_{market_type}_{symbol}_limit")],
+        [InlineKeyboardButton("🔙 심볼 선택", callback_data=f"trade_type_{trade_type}_{exchange}_{market_type}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id,
+        text=f"{trade_type_text} **주문 타입 선택**\n\n"
+             f"심볼: {symbol_display}\n"
+             f"거래 타입: {market_type_text}\n\n"
+             f"주문 타입을 선택하세요:",
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def show_leverage_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, order_type, callback_query):
+    """레버리지 선택 메뉴 (선물 거래용)"""
+    trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
+    symbol_display = symbol.replace('_', '/')
+    order_type_text = "⚡ 시장가" if order_type == "market" else "📝 지정가"
+    
+    # 일반적인 레버리지 옵션들
+    leverage_options = [
+        [InlineKeyboardButton("1x", callback_data=f"leverage_{trade_type}_{exchange}_{market_type}_{symbol}_{order_type}_1")],
+        [InlineKeyboardButton("2x", callback_data=f"leverage_{trade_type}_{exchange}_{market_type}_{symbol}_{order_type}_2")],
+        [InlineKeyboardButton("5x", callback_data=f"leverage_{trade_type}_{exchange}_{market_type}_{symbol}_{order_type}_5")],
+        [InlineKeyboardButton("10x", callback_data=f"leverage_{trade_type}_{exchange}_{market_type}_{symbol}_{order_type}_10")],
+        [InlineKeyboardButton("20x", callback_data=f"leverage_{trade_type}_{exchange}_{market_type}_{symbol}_{order_type}_20")],
+        [InlineKeyboardButton("🔙 주문 타입 선택", callback_data=f"trade_symbol_{trade_type}_{exchange}_{market_type}_{symbol}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(leverage_options)
+    
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id,
+        text=f"{trade_type_text} **레버리지 선택**\n\n"
+             f"심볼: {symbol_display}\n"
+             f"주문 타입: {order_type_text}\n\n"
+             f"레버리지를 선택하세요:",
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, order_type, leverage=None, callback_query=None):
+    """수량 입력 안내"""
+    trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
+    market_type_text = "💱 스팟" if market_type == "spot" else "📊 선물"
+    symbol_display = symbol.replace('_', '/')
+    order_type_text = "⚡ 시장가" if order_type == "market" else "📝 지정가"
+    
+    if market_type == "futures" and leverage:
+        leverage_text = f"\n레버리지: {leverage}x"
+    else:
+        leverage_text = ""
+    
+    # 거래 정보를 임시 저장 (실제로는 데이터베이스나 세션에 저장)
+    trade_info = {
+        'trade_type': trade_type,
+        'exchange': exchange,
+        'market_type': market_type,
+        'symbol': symbol,
+        'order_type': order_type,
+        'leverage': leverage
+    }
+    
+    # 실제 구현에서는 이 정보를 사용자별로 저장해야 함
+    print(f"🔘 거래 정보 저장: {trade_info}")
+    
+    keyboard = [
+        [InlineKeyboardButton("🔙 이전 단계", callback_data=f"order_type_{trade_type}_{exchange}_{market_type}_{symbol}_{order_type}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id if callback_query else None,
+        text=f"{trade_type_text} **수량 입력**\n\n"
+             f"심볼: {symbol_display}\n"
+             f"거래 타입: {market_type_text}\n"
+             f"주문 타입: {order_type_text}{leverage_text}\n\n"
+             f"다음 형식으로 수량을 입력하세요:\n\n"
+             f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량]`\n\n"
+             f"예시:\n"
+             f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001`",
         parse_mode='Markdown',
         reply_markup=reply_markup
     )
