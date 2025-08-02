@@ -1251,6 +1251,8 @@ async def show_leverage_menu(telegram_app, chat_id, user_id, trade_type, exchang
         [InlineKeyboardButton("5x", callback_data=f"leverage_{trade_type}_{exchange}_{market_type}_{symbol}_{order_type}_5")],
         [InlineKeyboardButton("10x", callback_data=f"leverage_{trade_type}_{exchange}_{market_type}_{symbol}_{order_type}_10")],
         [InlineKeyboardButton("20x", callback_data=f"leverage_{trade_type}_{exchange}_{market_type}_{symbol}_{order_type}_20")],
+        [InlineKeyboardButton("50x", callback_data=f"leverage_{trade_type}_{exchange}_{market_type}_{symbol}_{order_type}_50")],
+        [InlineKeyboardButton("100x", callback_data=f"leverage_{trade_type}_{exchange}_{market_type}_{symbol}_{order_type}_100")],
         [InlineKeyboardButton("🔙 주문 타입 선택", callback_data=f"trade_symbol_{trade_type}_{exchange}_{market_type}_{symbol}")]
     ]
     reply_markup = InlineKeyboardMarkup(leverage_options)
@@ -2449,11 +2451,25 @@ class UnifiedFuturesTrader:
                 
                 if response.status_code == 200:
                     data = response.json()
-                    result = data.get('result', {})
-                    if isinstance(result, dict):
-                        order_id = result.get('orderId', 'unknown')
-                    else:
-                        order_id = 'unknown'
+                    print(f"XT API 응답: {data}")  # 디버깅용 로그
+                    
+                    # 다양한 응답 구조 시도
+                    order_id = 'unknown'
+                    if isinstance(data, dict):
+                        # 직접 orderId 확인
+                        if 'orderId' in data:
+                            order_id = data['orderId']
+                        elif 'result' in data:
+                            result = data['result']
+                            if isinstance(result, dict):
+                                if 'orderId' in result:
+                                    order_id = result['orderId']
+                                elif 'id' in result:
+                                    order_id = result['id']
+                            elif isinstance(result, str):
+                                order_id = result
+                        elif 'id' in data:
+                            order_id = data['id']
                     
                     return {
                         'status': 'success',
@@ -2577,11 +2593,25 @@ class UnifiedFuturesTrader:
                 
                 if response.status_code == 200:
                     data = response.json()
-                    result = data.get('result', {})
-                    if isinstance(result, dict):
-                        order_id = result.get('orderId', 'unknown')
-                    else:
-                        order_id = 'unknown'
+                    print(f"XT API 응답: {data}")  # 디버깅용 로그
+                    
+                    # 다양한 응답 구조 시도
+                    order_id = 'unknown'
+                    if isinstance(data, dict):
+                        # 직접 orderId 확인
+                        if 'orderId' in data:
+                            order_id = data['orderId']
+                        elif 'result' in data:
+                            result = data['result']
+                            if isinstance(result, dict):
+                                if 'orderId' in result:
+                                    order_id = result['orderId']
+                                elif 'id' in result:
+                                    order_id = result['id']
+                            elif isinstance(result, str):
+                                order_id = result
+                        elif 'id' in data:
+                            order_id = data['id']
                     
                     return {
                         'status': 'success',
@@ -2705,11 +2735,25 @@ class UnifiedFuturesTrader:
                 
                 if response.status_code == 200:
                     data = response.json()
-                    result = data.get('result', {})
-                    if isinstance(result, dict):
-                        order_id = result.get('orderId', 'unknown')
-                    else:
-                        order_id = 'unknown'
+                    print(f"XT API 응답: {data}")  # 디버깅용 로그
+                    
+                    # 다양한 응답 구조 시도
+                    order_id = 'unknown'
+                    if isinstance(data, dict):
+                        # 직접 orderId 확인
+                        if 'orderId' in data:
+                            order_id = data['orderId']
+                        elif 'result' in data:
+                            result = data['result']
+                            if isinstance(result, dict):
+                                if 'orderId' in result:
+                                    order_id = result['orderId']
+                                elif 'id' in result:
+                                    order_id = result['id']
+                            elif isinstance(result, str):
+                                order_id = result
+                        elif 'id' in data:
+                            order_id = data['id']
                     
                     return {
                         'status': 'success',
@@ -2807,11 +2851,25 @@ class UnifiedFuturesTrader:
                 
                 if response.status_code == 200:
                     data = response.json()
-                    result = data.get('result', {})
-                    if isinstance(result, dict):
-                        order_id = result.get('orderId', 'unknown')
-                    else:
-                        order_id = 'unknown'
+                    print(f"XT API 응답: {data}")  # 디버깅용 로그
+                    
+                    # 다양한 응답 구조 시도
+                    order_id = 'unknown'
+                    if isinstance(data, dict):
+                        # 직접 orderId 확인
+                        if 'orderId' in data:
+                            order_id = data['orderId']
+                        elif 'result' in data:
+                            result = data['result']
+                            if isinstance(result, dict):
+                                if 'orderId' in result:
+                                    order_id = result['orderId']
+                                elif 'id' in result:
+                                    order_id = result['id']
+                            elif isinstance(result, str):
+                                order_id = result
+                        elif 'id' in data:
+                            order_id = data['id']
                     
                     return {
                         'status': 'success',
