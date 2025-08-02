@@ -420,6 +420,12 @@ async def handle_callback_query(callback_query, telegram_app):
             
         elif data.startswith("trade_"):
             await handle_trade_callback(telegram_app, chat_id, user_id, data, callback_query)
+            
+        elif data in ["position_list", "position_close"]:
+            await handle_position_callback(telegram_app, chat_id, user_id, data, callback_query)
+            
+        elif data in ["trade_long", "trade_short"]:
+            await handle_trade_callback(telegram_app, chat_id, user_id, data, callback_query)
         
         # 콜백 쿼리 응답
         await callback_query.answer()
