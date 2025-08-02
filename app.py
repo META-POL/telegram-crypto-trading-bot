@@ -1792,11 +1792,10 @@ class UnifiedFuturesTrader:
             # 지연 로딩으로 변경
             self.signing_key = None
         elif self.exchange == 'hyperliquid':
+            # Hyperliquid SDK가 설치되지 않은 경우 임시로 비활성화
             self.account_address = kwargs.get('api_key')  # 지갑 주소
             self.private_key = kwargs.get('api_secret')   # 개인키
-            # Hyperliquid SDK 지연 로딩
-            self.hyperliquid_info = None
-            self.hyperliquid_exchange = None
+            self.sdk_available = False  # SDK 미설치로 인해 비활성화
 
         else:
             raise ValueError('지원하지 않는 거래소입니다: xt, backpack, hyperliquid만 지원')
@@ -1852,30 +1851,10 @@ class UnifiedFuturesTrader:
                     }
             
             elif self.exchange == 'hyperliquid':
-                try:
-                    # Hyperliquid SDK 지연 로딩
-                    from hyperliquid.info import Info
-                    from hyperliquid.utils import constants
-                    
-                    if self.hyperliquid_info is None:
-                        self.hyperliquid_info = Info(constants.MAINNET_API_URL, skip_ws=True)
-                    
-                    # 사용자 상태 조회로 연결 테스트
-                    user_state = self.hyperliquid_info.user_state(self.account_address)
-                    return {
-                        'status': 'success',
-                        'message': 'Hyperliquid API 연결 성공'
-                    }
-                except ImportError:
-                    return {
-                        'status': 'error',
-                        'message': 'hyperliquid-python-sdk 패키지가 필요합니다'
-                    }
-                except Exception as e:
-                    return {
-                        'status': 'error',
-                        'message': f'Hyperliquid API 연결 실패: {str(e)}'
-                    }
+                return {
+                    'status': 'error',
+                    'message': 'Hyperliquid SDK가 설치되지 않았습니다. 패키지를 설치한 후 다시 시도해주세요.'
+                }
             
         except Exception as e:
             return {
