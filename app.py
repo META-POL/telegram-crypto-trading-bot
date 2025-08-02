@@ -20,20 +20,29 @@ from flask import Flask, jsonify, request
 # 라이브러리 import
 try:
     from nacl.signing import SigningKey
+    print("✅ pynacl 라이브러리 로드 성공")
 except ImportError:
     SigningKey = None
+    print("⚠️ pynacl 라이브러리 로드 실패 (선택적 기능)")
 
 try:
     import ccxt
+    print("✅ ccxt 라이브러리 로드 성공")
 except ImportError:
     ccxt = None
+    print("⚠️ ccxt 라이브러리 로드 실패 (선택적 기능)")
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Flask 앱 생성
-app = Flask(__name__)
+try:
+    app = Flask(__name__)
+    print("✅ Flask 앱 생성 성공")
+except Exception as e:
+    print(f"❌ Flask 앱 생성 실패: {e}")
+    raise
 
 # 데이터베이스 초기화
 def init_database():
