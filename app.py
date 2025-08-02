@@ -433,6 +433,9 @@ async def handle_callback_query(callback_query, telegram_app):
         elif data.startswith("futures_direction_"):
             await handle_trade_callback(telegram_app, chat_id, user_id, data, callback_query)
             
+        elif data.startswith("trade_exchange_"):
+            await handle_trade_callback(telegram_app, chat_id, user_id, data, callback_query)
+            
         elif data.startswith("futures_symbol_"):
             await handle_trade_callback(telegram_app, chat_id, user_id, data, callback_query)
             
@@ -742,6 +745,11 @@ async def handle_trade_callback(telegram_app, chat_id, user_id, data, callback_q
         exchange = parts[2]     # 거래소
         direction = parts[3]    # long 또는 short
         await show_futures_symbol_menu(telegram_app, chat_id, user_id, exchange, direction, callback_query)
+    elif data.startswith("trade_exchange_"):
+        # 거래소 선택 후 처리
+        parts = data.split("_")
+        exchange = parts[2]     # xt, backpack, hyperliquid, flipster
+        await show_trade_type_menu(telegram_app, chat_id, user_id, "long", exchange, callback_query)
     elif data.startswith("futures_symbol_"):
         # 선물 거래 심볼 선택 후 처리
         parts = data.split("_")
@@ -964,21 +972,37 @@ async def show_futures_quantity_input(telegram_app, chat_id, user_id, exchange, 
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await telegram_app.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=callback_query.message.message_id,
-        text=f"{direction_text} **수량 입력**\n\n"
-             f"거래소: {exchange_names.get(exchange, exchange.upper())}\n"
-             f"심볼: {symbol_display}\n"
-             f"레버리지: {leverage}x\n"
-             f"거래 타입: 📊 선물\n\n"
-             f"다음 형식으로 수량을 입력하세요:\n\n"
-             f"`/trade {exchange} {symbol_display} {direction} market [수량]`\n\n"
-             f"예시:\n"
-             f"`/trade {exchange} {symbol_display} {direction} market 0.001`",
-        parse_mode='Markdown',
-        reply_markup=reply_markup
-    )
+    if callback_query:
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text=f"{direction_text} **수량 입력**\n\n"
+                 f"거래소: {exchange_names.get(exchange, exchange.upper())}\n"
+                 f"심볼: {symbol_display}\n"
+                 f"레버리지: {leverage}x\n"
+                 f"거래 타입: 📊 선물\n\n"
+                 f"다음 형식으로 수량을 입력하세요:\n\n"
+                 f"`/trade {exchange} {symbol_display} {direction} market [수량]`\n\n"
+                 f"예시:\n"
+                 f"`/trade {exchange} {symbol_display} {direction} market 0.001`",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    else:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text=f"{direction_text} **수량 입력**\n\n"
+                 f"거래소: {exchange_names.get(exchange, exchange.upper())}\n"
+                 f"심볼: {symbol_display}\n"
+                 f"레버리지: {leverage}x\n"
+                 f"거래 타입: 📊 선물\n\n"
+                 f"다음 형식으로 수량을 입력하세요:\n\n"
+                 f"`/trade {exchange} {symbol_display} {direction} market [수량]`\n\n"
+                 f"예시:\n"
+                 f"`/trade {exchange} {symbol_display} {direction} market 0.001`",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
 
 async def show_order_type_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, callback_query):
     """주문 타입 선택 메뉴 (시장가/지정가)"""
@@ -1555,8 +1579,10 @@ async def show_trade_menu(telegram_app, chat_id, user_id, callback_query=None):
     """거래 메뉴 표시"""
     
     keyboard = [
-        [InlineKeyboardButton("📈 롱 포지션", callback_data="trade_long")],
-        [InlineKeyboardButton("📉 숏 포지션", callback_data="trade_short")],
+        [InlineKeyboardButton("XT Exchange", callback_data="trade_exchange_xt")],
+        [InlineKeyboardButton("Backpack Exchange", callback_data="trade_exchange_backpack")],
+        [InlineKeyboardButton("Hyperliquid", callback_data="trade_exchange_hyperliquid")],
+        [InlineKeyboardButton("Flipster", callback_data="trade_exchange_flipster")],
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1565,14 +1591,14 @@ async def show_trade_menu(telegram_app, chat_id, user_id, callback_query=None):
         await telegram_app.bot.edit_message_text(
             chat_id=chat_id,
             message_id=callback_query.message.message_id,
-            text="🔄 **거래하기**\n\n포지션을 오픈할 수 있습니다.",
+            text="🔄 **거래하기**\n\n거래소를 선택하여 거래를 시작하세요.",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
     else:
         await telegram_app.bot.send_message(
             chat_id=chat_id,
-            text="🔄 **거래하기**\n\n포지션을 오픈할 수 있습니다.",
+            text="🔄 **거래하기**\n\n거래소를 선택하여 거래를 시작하세요.",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
@@ -1923,9 +1949,12 @@ class UnifiedFuturesTrader:
                     'symbol': symbol,
                     'side': 'buy',
                     'type': order_type,
-                    'quantity': size,
-                    'leverage': leverage
+                    'quantity': str(size),
+                    'timeInForce': 'GTC'
                 }
+                if leverage > 1:
+                    params['leverage'] = str(leverage)
+                
                 headers = self._get_headers_backpack("order", params)
                 response = requests.post(url, headers=headers, json=params)
                 
@@ -1939,7 +1968,7 @@ class UnifiedFuturesTrader:
                 else:
                     return {
                         'status': 'error',
-                        'message': f'Backpack 롱 포지션 오픈 실패: {response.status_code}'
+                        'message': f'Backpack 롱 포지션 오픈 실패: {response.status_code} - {response.text}'
                     }
             
             elif self.exchange in ['hyperliquid', 'flipster']:
@@ -1996,9 +2025,12 @@ class UnifiedFuturesTrader:
                     'symbol': symbol,
                     'side': 'sell',
                     'type': order_type,
-                    'quantity': size,
-                    'leverage': leverage
+                    'quantity': str(size),
+                    'timeInForce': 'GTC'
                 }
+                if leverage > 1:
+                    params['leverage'] = str(leverage)
+                
                 headers = self._get_headers_backpack("order", params)
                 response = requests.post(url, headers=headers, json=params)
                 
@@ -2012,7 +2044,7 @@ class UnifiedFuturesTrader:
                 else:
                     return {
                         'status': 'error',
-                        'message': f'Backpack 숏 포지션 오픈 실패: {response.status_code}'
+                        'message': f'Backpack 숏 포지션 오픈 실패: {response.status_code} - {response.text}'
                     }
             
             elif self.exchange in ['hyperliquid', 'flipster']:
