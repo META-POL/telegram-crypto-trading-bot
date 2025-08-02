@@ -1948,23 +1948,25 @@ class UnifiedFuturesTrader:
                 
                 # Backpack Exchange API에 맞는 주문 타입 변환
                 if order_type == 'market':
-                    backpack_order_type = 'MARKET'
+                    backpack_order_type = 'Market'
                 elif order_type == 'limit':
-                    backpack_order_type = 'LIMIT'
+                    backpack_order_type = 'Limit'
                 else:
-                    backpack_order_type = 'MARKET'  # 기본값
+                    backpack_order_type = 'Market'  # 기본값
                 
+                # Backpack Exchange API 문서에 따른 올바른 파라미터 구조
                 params = {
                     'symbol': symbol,
-                    'side': 'buy',
-                    'type': backpack_order_type,
-                    'quantity': str(size),
-                    'timeInForce': 'GTC'
+                    'side': 'Bid',  # Backpack에서는 'Bid' (매수) 또는 'Ask' (매도)
+                    'orderType': backpack_order_type,  # 'type' 대신 'orderType' 사용
+                    'quantity': str(size)
                 }
+                
+                # 레버리지는 별도로 설정해야 함 (API 문서 참고)
                 if leverage > 1:
                     params['leverage'] = str(leverage)
                 
-                headers = self._get_headers_backpack("order", params)
+                headers = self._get_headers_backpack("orderExecute", params)  # instruction을 'orderExecute'로 변경
                 response = requests.post(url, headers=headers, json=params)
                 
                 if response.status_code == 200:
@@ -2033,23 +2035,25 @@ class UnifiedFuturesTrader:
                 
                 # Backpack Exchange API에 맞는 주문 타입 변환
                 if order_type == 'market':
-                    backpack_order_type = 'MARKET'
+                    backpack_order_type = 'Market'
                 elif order_type == 'limit':
-                    backpack_order_type = 'LIMIT'
+                    backpack_order_type = 'Limit'
                 else:
-                    backpack_order_type = 'MARKET'  # 기본값
+                    backpack_order_type = 'Market'  # 기본값
                 
+                # Backpack Exchange API 문서에 따른 올바른 파라미터 구조
                 params = {
                     'symbol': symbol,
-                    'side': 'sell',
-                    'type': backpack_order_type,
-                    'quantity': str(size),
-                    'timeInForce': 'GTC'
+                    'side': 'Ask',  # Backpack에서는 'Bid' (매수) 또는 'Ask' (매도)
+                    'orderType': backpack_order_type,  # 'type' 대신 'orderType' 사용
+                    'quantity': str(size)
                 }
+                
+                # 레버리지는 별도로 설정해야 함 (API 문서 참고)
                 if leverage > 1:
                     params['leverage'] = str(leverage)
                 
-                headers = self._get_headers_backpack("order", params)
+                headers = self._get_headers_backpack("orderExecute", params)  # instruction을 'orderExecute'로 변경
                 response = requests.post(url, headers=headers, json=params)
                 
                 if response.status_code == 200:
