@@ -176,15 +176,32 @@ def save_user_api_keys(user_id, exchange, api_key, api_secret):
 
 @app.route('/')
 def health_check():
-    return jsonify({
-        "status": "healthy", 
-        "message": "Enhanced Telegram Crypto Futures Trading Bot",
-        "timestamp": datetime.now().isoformat()
-    })
+    try:
+        return jsonify({
+            "status": "healthy", 
+            "message": "Enhanced Telegram Crypto Futures Trading Bot",
+            "timestamp": datetime.now().isoformat()
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 @app.route('/health')
 def health():
-    return jsonify({"status": "healthy"})
+    try:
+        # 간단한 헬스체크 - 라이브러리 import 없이 작동
+        return jsonify({
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "message": "Bot is running"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
