@@ -2199,12 +2199,12 @@ class UnifiedFuturesTrader:
         timestamp = str(int(time.time() * 1000))
         params = params or {}
         
-        # XT API 서명 생성 - 올바른 방식
+        # XT API 서명 생성 - 공식 문서 방식
         # 1. 파라미터를 알파벳 순으로 정렬
         sorted_params = sorted(params.items())
         
-        # 2. 쿼리 스트링 생성
-        query_string = '&'.join([f"{k}={v}" for k, v in sorted_params])
+        # 2. 쿼리 스트링 생성 (값을 문자열로 변환)
+        query_string = '&'.join([f"{k}={str(v)}" for k, v in sorted_params])
         
         # 3. 서명 문자열 생성 (timestamp 추가)
         if query_string:
@@ -2764,14 +2764,15 @@ class UnifiedFuturesTrader:
                     'symbol': symbol,
                     'side': 'buy',
                     'type': order_type,
-                    'quantity': size
+                    'quantity': str(size)  # 문자열로 변환
                 }
                 
                 # 지정가 주문의 경우 가격 추가
                 if order_type == 'limit' and price:
-                    params['price'] = price
+                    params['price'] = str(price)  # 문자열로 변환
                 
                 headers = self._get_headers_xt(params)
+                print(f"XT API 요청: URL={url}, params={params}")  # 디버깅용
                 response = requests.post(url, headers=headers, json=params)
                 
                 if response.status_code == 200:
@@ -2894,14 +2895,15 @@ class UnifiedFuturesTrader:
                     'symbol': symbol,
                     'side': 'sell',
                     'type': order_type,
-                    'quantity': size
+                    'quantity': str(size)  # 문자열로 변환
                 }
                 
                 # 지정가 주문의 경우 가격 추가
                 if order_type == 'limit' and price:
-                    params['price'] = price
+                    params['price'] = str(price)  # 문자열로 변환
                 
                 headers = self._get_headers_xt(params)
+                print(f"XT API 요청: URL={url}, params={params}")  # 디버깅용
                 response = requests.post(url, headers=headers, json=params)
                 
                 if response.status_code == 200:
