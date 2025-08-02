@@ -957,10 +957,10 @@ async def show_symbol_selection_menu(telegram_app, chat_id, user_id, trade_type,
                  f"거래 타입: {market_type_text}\n\n"
                  f"XT Exchange는 거래 가능한 심볼이 많아서 직접 입력해주세요.\n\n"
                  f"**입력 형식**:\n"
-                 f"`/trade {exchange} [심볼] {trade_type} [주문타입] [수량]`\n\n"
+                 f"`/trade {exchange} [심볼] {'buy' if trade_type == 'long' else 'sell'} [주문타입] [수량]`\n\n"
                  f"**예시**:\n"
-                 f"`/trade xt BTCUSDT long market 0.001`\n"
-                 f"`/trade xt ETHUSDT short limit 0.01 2000`",
+                 f"`/trade xt BTCUSDT buy market 0.001`\n"
+                 f"`/trade xt ETHUSDT sell limit 0.01 2000`",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
