@@ -1540,8 +1540,7 @@ async def show_api_management_menu(telegram_app, chat_id, user_id, callback_quer
     exchanges = [
         ("xt", "XT Exchange"),
         ("backpack", "Backpack Exchange"),
-        ("hyperliquid", "Hyperliquid"),
-        ("flipster", "Flipster")
+        ("hyperliquid", "Hyperliquid")
     ]
     
     for exchange, name in exchanges:
@@ -1583,7 +1582,6 @@ async def show_balance_menu(telegram_app, chat_id, user_id, callback_query=None)
         [InlineKeyboardButton("XT Exchange", callback_data="balance_xt")],
         [InlineKeyboardButton("Backpack Exchange", callback_data="balance_backpack")],
         [InlineKeyboardButton("Hyperliquid", callback_data="balance_hyperliquid")],
-        [InlineKeyboardButton("Flipster", callback_data="balance_flipster")],
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1613,7 +1611,6 @@ async def show_symbols_menu(telegram_app, chat_id, user_id, callback_query=None)
         [InlineKeyboardButton("XT Exchange", callback_data="symbols_xt")],
         [InlineKeyboardButton("Backpack Exchange", callback_data="symbols_backpack")],
         [InlineKeyboardButton("Hyperliquid", callback_data="symbols_hyperliquid")],
-        [InlineKeyboardButton("Flipster", callback_data="symbols_flipster")],
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
