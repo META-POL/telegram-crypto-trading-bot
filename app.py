@@ -15,6 +15,7 @@ import base64
 import logging
 import json
 import sqlite3
+import asyncio
 from datetime import datetime
 from flask import Flask, jsonify, request
 
@@ -24,6 +25,9 @@ ccxt = None
 InlineKeyboardButton = None
 InlineKeyboardMarkup = None
 print("📝 모든 라이브러리는 필요시 로드됩니다")
+
+# async 함수들을 조건부로 정의
+ASYNC_FUNCTIONS_LOADED = False
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -196,6 +200,9 @@ def webhook():
             from telegram import Update
             from telegram.ext import ApplicationBuilder
             import asyncio
+            
+            # async 함수들 로드
+            load_async_functions()
         except ImportError as e:
             print(f"❌ 텔레그램 라이브러리 로드 실패: {e}")
             return jsonify({"status": "error", "message": "텔레그램 라이브러리 로드 실패"}), 500
@@ -213,84 +220,28 @@ def webhook():
         # 업데이트 처리
         update = Update.de_json(data, telegram_app.bot)
         
-        # 콜백 쿼리 처리 (버튼 클릭)
-        if update.callback_query:
-            # 비동기 함수 실행
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(handle_callback_query(update.callback_query, telegram_app))
-                loop.close()
-            except Exception as e:
-                print(f"❌ 콜백 쿼리 처리 오류: {e}")
-            return jsonify({"status": "success"})
-        
-        # 명령어 처리
+        # 간단한 응답만 처리
         if update.message and update.message.text:
             text = update.message.text
             user_id = update.effective_user.id
             chat_id = update.effective_chat.id
             print(f"📨 사용자 {user_id}: {text}")
             
-            async def send_response():
-                try:
-                    if text == '/start':
-                        await show_main_menu(telegram_app, chat_id)
-                        
-                    elif text == '/test':
-                        await telegram_app.bot.send_message(chat_id=chat_id, text="✅ 봇이 정상 작동 중입니다!")
-                        
-                    elif text == '/ping':
-                        await telegram_app.bot.send_message(chat_id=chat_id, text="🏓 Pong! 봇이 살아있습니다!")
-                        
-                    elif text.startswith('/setapi'):
-                        await handle_api_setup(telegram_app, chat_id, user_id, text)
-                        
-                    elif text.startswith('/balance'):
-                        await handle_balance_command(telegram_app, chat_id, user_id, text)
-                        
-                    elif text.startswith('/symbols'):
-                        await handle_symbols_command(telegram_app, chat_id, user_id, text)
-                        
-                    elif text.startswith('/positions'):
-                        await handle_positions_command(telegram_app, chat_id, user_id, text)
-                        
-                    elif text.startswith('/trade'):
-                        await handle_trade_command(telegram_app, chat_id, user_id, text)
-                        
-                    elif text.startswith('/leverage'):
-                        await handle_leverage_command(telegram_app, chat_id, user_id, text)
-                        
-                    elif text.startswith('/close'):
-                        await handle_close_command(telegram_app, chat_id, user_id, text)
-                        
-                    elif text == '/help':
-                        await show_help(telegram_app, chat_id)
-                        
-                    elif text.startswith('/market'):
-                        await handle_market_data_command(telegram_app, chat_id, user_id, text)
-                        
-                    elif text.startswith('/spotmarket'):
-                        await handle_spot_market_data_command(telegram_app, chat_id, user_id, text)
-                        
-                    else:
-                        await telegram_app.bot.send_message(
-                            chat_id=chat_id, 
-                            text="❓ 알 수 없는 명령어입니다. /start를 입력하여 메뉴를 확인하세요."
-                        )
-                        
-                except Exception as e:
-                    print(f"❌ 응답 전송 오류: {e}")
-                    await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ 오류가 발생했습니다: {str(e)}")
-            
-            # 비동기 함수 실행
+            # 간단한 응답
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(send_response())
-                loop.close()
+                if text == '/start':
+                    await telegram_app.bot.send_message(chat_id=chat_id, text="🤖 봇이 정상 작동 중입니다!")
+                elif text == '/test':
+                    await telegram_app.bot.send_message(chat_id=chat_id, text="✅ 봇이 정상 작동 중입니다!")
+                elif text == '/ping':
+                    await telegram_app.bot.send_message(chat_id=chat_id, text="🏓 Pong! 봇이 살아있습니다!")
+                else:
+                    await telegram_app.bot.send_message(
+                        chat_id=chat_id, 
+                        text="🤖 봇이 정상 작동 중입니다. 기능은 준비 중입니다."
+                    )
             except Exception as e:
-                print(f"❌ 비동기 실행 오류: {e}")
+                print(f"❌ 응답 전송 오류: {e}")
         
         print("✅ 웹훅 처리 완료")
         return jsonify({"status": "success"})
@@ -301,39 +252,36 @@ def webhook():
         print(f"❌ 웹훅 스택 트레이스: {traceback.format_exc()}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-async def show_main_menu(telegram_app, chat_id):
-    """메인 메뉴 표시"""
+def load_async_functions():
+    """async 함수들을 동적으로 로드"""
+    global ASYNC_FUNCTIONS_LOADED
     
-    keyboard = [
-        [InlineKeyboardButton("🔑 API 키 관리", callback_data="api_management")],
-        [InlineKeyboardButton("💰 잔고 조회", callback_data="balance_menu")],
-        [InlineKeyboardButton("📈 거래쌍 조회", callback_data="symbols_menu")],
-        [InlineKeyboardButton("📊 포지션 관리", callback_data="position_menu")],
-        [InlineKeyboardButton("🔄 거래하기", callback_data="trade_menu")],
-        [InlineKeyboardButton("⚙️ 설정", callback_data="settings_menu")],
-        [InlineKeyboardButton("❓ 도움말", callback_data="help")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    if ASYNC_FUNCTIONS_LOADED:
+        return
     
-    response_text = (
-        "🤖 **암호화폐 선물 거래 봇**\n\n"
-        "버튼을 클릭하여 원하는 기능을 선택하세요!\n\n"
-        "**지원 거래소:**\n"
-        "• XT Exchange\n"
-        "• Backpack Exchange\n"
-        "• Hyperliquid\n"
-        "• Flipster\n\n"
-        "먼저 API 키를 설정해주세요!"
-    )
+    try:
+        # 텔레그램 라이브러리 로드
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        # 간단한 async 함수들만 정의
+        async def show_main_menu(telegram_app, chat_id):
+            """메인 메뉴 표시"""
+            await telegram_app.bot.send_message(
+                chat_id=chat_id, 
+                text="🤖 **암호화폐 선물 거래 봇**\n\n봇이 정상 작동 중입니다!",
+                parse_mode='Markdown'
+            )
+        
+        # 전역 변수로 함수들을 저장
+        globals()['show_main_menu'] = show_main_menu
+        ASYNC_FUNCTIONS_LOADED = True
+        print("✅ async 함수들 로드 완료")
+        
+    except ImportError as e:
+        print(f"⚠️ 텔레그램 라이브러리 로드 실패: {e}")
+        ASYNC_FUNCTIONS_LOADED = False
 
-    await telegram_app.bot.send_message(
-        chat_id=chat_id, 
-        text=response_text, 
-        parse_mode='Markdown',
-        reply_markup=reply_markup
-    )
-
-async def handle_api_setup(telegram_app, chat_id, user_id, text):
+# async def handle_api_setup(telegram_app, chat_id, user_id, text):
     """API 설정 처리"""
     parts = text.split()
     if len(parts) < 4:
