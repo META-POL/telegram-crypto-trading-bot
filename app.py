@@ -1958,7 +1958,8 @@ class UnifiedFuturesTrader:
                 # Backpack Exchange 심볼 형식: BTC_USDT_PERP (선물), BTC_USDT (스팟)
                 backpack_symbol = symbol
                 if not symbol.endswith('_PERP'):
-                    backpack_symbol = f"{symbol}_PERP"  # 선물 거래를 위해 _PERP 추가
+                    # BTC -> BTC_USDT_PERP, ETH -> ETH_USDT_PERP 등으로 변환
+                    backpack_symbol = f"{symbol}_USDT_PERP"  # 선물 거래를 위해 _USDT_PERP 추가
                 
                 params = {
                     'symbol': backpack_symbol,
@@ -2050,7 +2051,7 @@ class UnifiedFuturesTrader:
                 # Backpack Exchange 심볼 형식: BTC_USDT_PERP (선물), BTC_USDT (스팟)
                 backpack_symbol = symbol
                 if not symbol.endswith('_PERP'):
-                    backpack_symbol = f"{symbol}_PERP"  # 선물 거래를 위해 _PERP 추가
+                    backpack_symbol = f"{symbol}_USDT_PERP"  # 선물 거래를 위해 _USDT_PERP 추가
                 
                 params = {
                     'symbol': backpack_symbol,
