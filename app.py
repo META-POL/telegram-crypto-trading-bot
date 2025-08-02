@@ -2580,8 +2580,6 @@ class UnifiedFuturesTrader:
                         'status': 'error',
                         'message': f'XT 스팟 잔고 조회 실패: {response.status_code}'
                     }
-                            'message': 'XT 스팟 잔고 조회 성공'
-                        }
                 else:
                     return {
                         'status': 'error',
