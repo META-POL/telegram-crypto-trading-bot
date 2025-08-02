@@ -1087,6 +1087,21 @@ async def show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchan
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     if callback_query:
+        # 스팟 거래와 선물 거래에 따른 명령어 형식 결정
+        if market_type == 'spot':
+            command_format = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량]"
+            if order_type == 'limit':
+                command_format += " [가격]"
+            command_format += "`"
+            
+            example = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001"
+            if order_type == 'limit':
+                example += " 50000"
+            example += "`"
+        else:
+            command_format = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량] futures`"
+            example = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001 futures`"
+        
         await telegram_app.bot.edit_message_text(
             chat_id=chat_id,
             message_id=callback_query.message.message_id,
@@ -1095,13 +1110,29 @@ async def show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchan
                  f"거래 타입: {market_type_text}\n"
                  f"주문 타입: {order_type_text}{leverage_text}\n\n"
                  f"다음 형식으로 수량을 입력하세요:\n\n"
-                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량] {market_type}`\n\n"
+                 f"{'**스팟 거래**:' if market_type == 'spot' else '**선물 거래**:'}\n"
+                 f"{command_format}\n\n"
                  f"예시:\n"
-                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001 {market_type}`",
+                 f"{example}",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
     else:
+        # 스팟 거래와 선물 거래에 따른 명령어 형식 결정
+        if market_type == 'spot':
+            command_format = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량]"
+            if order_type == 'limit':
+                command_format += " [가격]"
+            command_format += "`"
+            
+            example = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001"
+            if order_type == 'limit':
+                example += " 50000"
+            example += "`"
+        else:
+            command_format = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량] futures`"
+            example = f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001 futures`"
+        
         await telegram_app.bot.send_message(
             chat_id=chat_id,
             text=f"{trade_type_text} **수량 입력**\n\n"
@@ -1109,9 +1140,10 @@ async def show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchan
                  f"거래 타입: {market_type_text}\n"
                  f"주문 타입: {order_type_text}{leverage_text}\n\n"
                  f"다음 형식으로 수량을 입력하세요:\n\n"
-                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량] {market_type}`\n\n"
+                 f"{'**스팟 거래**:' if market_type == 'spot' else '**선물 거래**:'}\n"
+                 f"{command_format}\n\n"
                  f"예시:\n"
-                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001 {market_type}`",
+                 f"{example}",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
@@ -1301,8 +1333,11 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
     if len(parts) < 5:
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
-            text="❌ 사용법: /trade [거래소] [심볼] [방향] [주문타입] [수량] [거래타입]\n\n"
-                 "예시: `/trade backpack BTC long limit 0.001 spot`\n"
+            text="❌ 사용법:\n\n"
+                 "**스팟 거래**: `/trade [거래소] [심볼] [매수/매도] [주문타입] [수량] [가격]`\n"
+                 "예시: `/trade backpack BTC buy market 0.001`\n"
+                 "예시: `/trade backpack BTC sell limit 0.001 50000`\n\n"
+                 "**선물 거래**: `/trade [거래소] [심볼] [long/short] [주문타입] [수량] [거래타입]`\n"
                  "예시: `/trade backpack BTC long market 0.001 futures`",
             parse_mode='Markdown'
         )
@@ -1310,17 +1345,28 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
     
     exchange = parts[1].lower()
     symbol = parts[2].upper()
-    direction = parts[3].lower()
+    action = parts[3].lower()  # buy/sell 또는 long/short
     order_type = parts[4].lower()  # market 또는 limit
-    size = float(parts[5])
     
-    # 거래 타입 설정 (기본값: futures)
-    market_type = 'futures'  # 기본값
-    if len(parts) > 6:
-        market_type = parts[6].lower()  # spot 또는 futures
-    
-    # 기본 레버리지 설정 (선물 거래의 경우)
-    leverage = 1  # 기본값
+    # 스팟 거래와 선물 거래 구분
+    if action in ['buy', 'sell']:
+        # 스팟 거래
+        market_type = 'spot'
+        direction = action  # buy/sell
+        size = float(parts[5])
+        price = None
+        if order_type == 'limit' and len(parts) > 6:
+            price = float(parts[6])
+        leverage = 1
+    else:
+        # 선물 거래
+        market_type = 'futures'
+        direction = action  # long/short
+        size = float(parts[5])
+        price = None
+        leverage = 1  # 기본값
+        if len(parts) > 6:
+            market_type = parts[6].lower()  # spot 또는 futures
     
     user_keys = get_user_api_keys(user_id)
     
@@ -1340,17 +1386,32 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
         
         trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
         
-        if direction == 'long':
-            result = trader.open_long_position(symbol, size, leverage, order_type, market_type)
-        elif direction == 'short':
-            result = trader.open_short_position(symbol, size, leverage, order_type, market_type)
+        if market_type == 'spot':
+            # 스팟 거래
+            if direction == 'buy':
+                result = trader.spot_buy(symbol, size, order_type, price)
+            elif direction == 'sell':
+                result = trader.spot_sell(symbol, size, order_type, price)
+            else:
+                await telegram_app.bot.send_message(
+                    chat_id=chat_id,
+                    text="❌ **잘못된 방향**\n\n스팟 거래에서는 'buy' 또는 'sell'이어야 합니다.",
+                    parse_mode='Markdown'
+                )
+                return
         else:
-            await telegram_app.bot.send_message(
-                chat_id=chat_id,
-                text="❌ **잘못된 방향**\n\n방향은 'long' 또는 'short'이어야 합니다.",
-                parse_mode='Markdown'
-            )
-            return
+            # 선물 거래
+            if direction == 'long':
+                result = trader.open_long_position(symbol, size, leverage, order_type, market_type)
+            elif direction == 'short':
+                result = trader.open_short_position(symbol, size, leverage, order_type, market_type)
+            else:
+                await telegram_app.bot.send_message(
+                    chat_id=chat_id,
+                    text="❌ **잘못된 방향**\n\n선물 거래에서는 'long' 또는 'short'이어야 합니다.",
+                    parse_mode='Markdown'
+                )
+                return
         
         if result.get('status') == 'success':
             await telegram_app.bot.send_message(
@@ -2144,6 +2205,138 @@ class UnifiedFuturesTrader:
             return {
                 'status': 'error',
                 'message': f'숏 포지션 오픈 오류: {str(e)}'
+            }
+
+    def spot_buy(self, symbol, size, order_type='market', price=None):
+        """스팟 매수"""
+        try:
+            if self.exchange == 'backpack':
+                url = f"{self.base_url}/order"
+                
+                # Backpack Exchange API에 맞는 주문 타입 변환
+                if order_type == 'market':
+                    backpack_order_type = 'Market'
+                elif order_type == 'limit':
+                    backpack_order_type = 'Limit'
+                else:
+                    backpack_order_type = 'Market'  # 기본값
+                
+                # 스팟 거래 심볼 형식: BTC_USDC
+                backpack_symbol = symbol
+                if not symbol.endswith('_USDC'):
+                    backpack_symbol = f"{symbol}_USDC"
+                
+                params = {
+                    'symbol': backpack_symbol,
+                    'side': 'Bid',  # 매수
+                    'orderType': backpack_order_type,
+                    'quantity': str(size)
+                }
+                
+                # 지정가 주문의 경우 가격 추가
+                if order_type == 'limit' and price:
+                    params['price'] = str(price)
+                
+                headers = self._get_headers_backpack("orderExecute", params)
+                response = requests.post(url, headers=headers, json=params)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'status': 'success',
+                        'order_id': data.get('orderId'),
+                        'message': 'Backpack 스팟 매수 성공'
+                    }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'Backpack 스팟 매수 실패: {response.status_code} - {response.text}'
+                    }
+            
+            elif self.exchange in ['hyperliquid', 'flipster']:
+                order = self.ccxt_client.create_order(
+                    symbol=symbol,
+                    type=order_type,
+                    side='buy',
+                    amount=size,
+                    price=price if order_type == 'limit' else None
+                )
+                return {
+                    'status': 'success',
+                    'order_id': order.get('id'),
+                    'message': f'{self.exchange.capitalize()} 스팟 매수 성공'
+                }
+            
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'스팟 매수 오류: {str(e)}'
+            }
+
+    def spot_sell(self, symbol, size, order_type='market', price=None):
+        """스팟 매도"""
+        try:
+            if self.exchange == 'backpack':
+                url = f"{self.base_url}/order"
+                
+                # Backpack Exchange API에 맞는 주문 타입 변환
+                if order_type == 'market':
+                    backpack_order_type = 'Market'
+                elif order_type == 'limit':
+                    backpack_order_type = 'Limit'
+                else:
+                    backpack_order_type = 'Market'  # 기본값
+                
+                # 스팟 거래 심볼 형식: BTC_USDC
+                backpack_symbol = symbol
+                if not symbol.endswith('_USDC'):
+                    backpack_symbol = f"{symbol}_USDC"
+                
+                params = {
+                    'symbol': backpack_symbol,
+                    'side': 'Ask',  # 매도
+                    'orderType': backpack_order_type,
+                    'quantity': str(size)
+                }
+                
+                # 지정가 주문의 경우 가격 추가
+                if order_type == 'limit' and price:
+                    params['price'] = str(price)
+                
+                headers = self._get_headers_backpack("orderExecute", params)
+                response = requests.post(url, headers=headers, json=params)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'status': 'success',
+                        'order_id': data.get('orderId'),
+                        'message': 'Backpack 스팟 매도 성공'
+                    }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'Backpack 스팟 매도 실패: {response.status_code} - {response.text}'
+                    }
+            
+            elif self.exchange in ['hyperliquid', 'flipster']:
+                order = self.ccxt_client.create_order(
+                    symbol=symbol,
+                    type=order_type,
+                    side='sell',
+                    amount=size,
+                    price=price if order_type == 'limit' else None
+                )
+                return {
+                    'status': 'success',
+                    'order_id': order.get('id'),
+                    'message': f'{self.exchange.capitalize()} 스팟 매도 성공'
+                }
+            
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'스팟 매도 오류: {str(e)}'
             }
 
 if __name__ == '__main__':
