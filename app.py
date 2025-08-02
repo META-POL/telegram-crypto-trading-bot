@@ -18,29 +18,12 @@ import sqlite3
 from datetime import datetime
 from flask import Flask, jsonify, request
 
-# 라이브러리 import
-try:
-    from nacl.signing import SigningKey
-    print("✅ pynacl 라이브러리 로드 성공")
-except ImportError:
-    SigningKey = None
-    print("⚠️ pynacl 라이브러리 로드 실패 (선택적 기능)")
-
-try:
-    import ccxt
-    print("✅ ccxt 라이브러리 로드 성공")
-except ImportError:
-    ccxt = None
-    print("⚠️ ccxt 라이브러리 로드 실패 (선택적 기능)")
-
-# 텔레그램 라이브러리 import
-try:
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    print("✅ telegram 라이브러리 로드 성공")
-except ImportError:
-    InlineKeyboardButton = None
-    InlineKeyboardMarkup = None
-    print("⚠️ telegram 라이브러리 로드 실패")
+# 라이브러리 import (지연 로딩으로 변경)
+SigningKey = None
+ccxt = None
+InlineKeyboardButton = None
+InlineKeyboardMarkup = None
+print("📝 모든 라이브러리는 필요시 로드됩니다")
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -208,9 +191,14 @@ def webhook():
     """텔레그램 웹훅 처리"""
     print("📨 웹훅 요청 수신")
     try:
-        from telegram import Update
-        from telegram.ext import ApplicationBuilder
-        import asyncio
+        # 텔레그램 라이브러리 지연 로딩
+        try:
+            from telegram import Update
+            from telegram.ext import ApplicationBuilder
+            import asyncio
+        except ImportError as e:
+            print(f"❌ 텔레그램 라이브러리 로드 실패: {e}")
+            return jsonify({"status": "error", "message": "텔레그램 라이브러리 로드 실패"}), 500
         
         # 텔레그램 봇 토큰
         token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
@@ -1812,30 +1800,18 @@ class UnifiedFuturesTrader:
             self.api_key = kwargs.get('api_key')
             self.private_key = kwargs.get('private_key') or kwargs.get('api_secret')
             self.base_url = "https://api.backpack.exchange/api/v1"
-            if SigningKey and self.private_key:
-                self.signing_key = SigningKey(base64.b64decode(self.private_key))
-            else:
-                raise ImportError("pynacl 패키지가 필요하거나 private_key가 설정되지 않았습니다.")
+            # 지연 로딩으로 변경
+            self.signing_key = None
         elif self.exchange == 'hyperliquid':
-            if ccxt is None:
-                raise ImportError("ccxt 패키지가 필요합니다.")
             self.api_key = kwargs.get('api_key')
             self.api_secret = kwargs.get('api_secret')
-            self.ccxt_client = ccxt.hyperliquid({
-                'apiKey': self.api_key,
-                'secret': self.api_secret,
-                'enableRateLimit': True,
-            })
+            # 지연 로딩으로 변경
+            self.ccxt_client = None
         elif self.exchange == 'flipster':
-            if ccxt is None:
-                raise ImportError("ccxt 패키지가 필요합니다.")
             self.api_key = kwargs.get('api_key')
             self.api_secret = kwargs.get('api_secret')
-            self.ccxt_client = ccxt.flipster({
-                'apiKey': self.api_key,
-                'secret': self.api_secret,
-                'enableRateLimit': True,
-            })
+            # 지연 로딩으로 변경
+            self.ccxt_client = None
         else:
             raise ValueError('지원하지 않는 거래소입니다: xt, backpack, hyperliquid, flipster만 지원')
 
@@ -1861,27 +1837,64 @@ class UnifiedFuturesTrader:
             
             elif self.exchange == 'backpack':
                 # Backpack Exchange API 연결 테스트 - 계좌 정보 조회
-                url = f"{self.base_url}/account"
-                headers = self._get_headers_backpack("accountQuery")
-                response = requests.get(url, headers=headers)
-                
-                if response.status_code == 200:
-                    return {
-                        'status': 'success',
-                        'message': 'Backpack 선물 API 연결 성공'
-                    }
-                else:
+                try:
+                    # pynacl 지연 로딩
+                    if SigningKey is None:
+                        from nacl.signing import SigningKey
+                    
+                    if self.private_key:
+                        self.signing_key = SigningKey(base64.b64decode(self.private_key))
+                    
+                    url = f"{self.base_url}/account"
+                    headers = self._get_headers_backpack("accountQuery")
+                    response = requests.get(url, headers=headers)
+                    
+                    if response.status_code == 200:
+                        return {
+                            'status': 'success',
+                            'message': 'Backpack 선물 API 연결 성공'
+                        }
+                    else:
+                        return {
+                            'status': 'error',
+                            'message': f'Backpack 선물 API 연결 실패: {response.status_code}'
+                        }
+                except ImportError:
                     return {
                         'status': 'error',
-                        'message': f'Backpack 선물 API 연결 실패: {response.status_code}'
+                        'message': 'pynacl 패키지가 필요합니다'
                     }
             
             elif self.exchange in ['hyperliquid', 'flipster']:
-                self.ccxt_client.fetch_balance()
-                return {
-                    'status': 'success',
-                    'message': f'{self.exchange.capitalize()} 선물 API 연결 성공'
-                }
+                try:
+                    # ccxt 지연 로딩
+                    if ccxt is None:
+                        import ccxt
+                    
+                    if self.ccxt_client is None:
+                        if self.exchange == 'hyperliquid':
+                            self.ccxt_client = ccxt.hyperliquid({
+                                'apiKey': self.api_key,
+                                'secret': self.api_secret,
+                                'enableRateLimit': True,
+                            })
+                        else:  # flipster
+                            self.ccxt_client = ccxt.flipster({
+                                'apiKey': self.api_key,
+                                'secret': self.api_secret,
+                                'enableRateLimit': True,
+                            })
+                    
+                    self.ccxt_client.fetch_balance()
+                    return {
+                        'status': 'success',
+                        'message': f'{self.exchange.capitalize()} 선물 API 연결 성공'
+                    }
+                except ImportError:
+                    return {
+                        'status': 'error',
+                        'message': 'ccxt 패키지가 필요합니다'
+                    }
             
         except Exception as e:
             return {
@@ -1907,23 +1920,35 @@ class UnifiedFuturesTrader:
 
     def _get_headers_backpack(self, instruction, params=None):
         """Backpack API 헤더 생성"""
-        timestamp = str(int(time.time() * 1000))
-        window = "5000"
-        params = params or {}
-        param_str = '&'.join([f"{k}={params[k]}" for k in sorted(params)])
-        sign_str = f"instruction={instruction}"
-        if param_str:
-            sign_str += f"&{param_str}"
-        sign_str += f"&timestamp={timestamp}&window={window}"
-        signature = self.signing_key.sign(sign_str.encode())
-        signature_b64 = base64.b64encode(signature.signature).decode()
-        return {
-            "X-API-Key": self.api_key,
-            "X-Signature": signature_b64,
-            "X-Timestamp": timestamp,
-            "X-Window": window,
-            "Content-Type": "application/json"
-        }
+        try:
+            # pynacl 지연 로딩
+            if SigningKey is None:
+                from nacl.signing import SigningKey
+            
+            if self.signing_key is None and self.private_key:
+                self.signing_key = SigningKey(base64.b64decode(self.private_key))
+            
+            timestamp = str(int(time.time() * 1000))
+            window = "5000"
+            params = params or {}
+            param_str = '&'.join([f"{k}={params[k]}" for k in sorted(params)])
+            sign_str = f"instruction={instruction}"
+            if param_str:
+                sign_str += f"&{param_str}"
+            sign_str += f"&timestamp={timestamp}&window={window}"
+            signature = self.signing_key.sign(sign_str.encode())
+            signature_b64 = base64.b64encode(signature.signature).decode()
+            return {
+                "X-API-Key": self.api_key,
+                "X-Signature": signature_b64,
+                "X-Timestamp": timestamp,
+                "X-Window": window,
+                "Content-Type": "application/json"
+            }
+        except ImportError:
+            raise ImportError("pynacl 패키지가 필요합니다")
+        except Exception as e:
+            raise Exception(f"Backpack 헤더 생성 오류: {str(e)}")
 
     def get_futures_balance(self):
         """선물 계좌 잔고 조회"""
