@@ -1789,7 +1789,7 @@ class UnifiedFuturesTrader:
             self.api_key = kwargs.get('api_key')
             self.api_secret = kwargs.get('api_secret')
             # XT API 베이스 URL (공식 문서 기반)
-            self.base_url = "https://fapi.xt.com"  # 선물 API
+            self.base_url = "https://api.xt.com"  # 공식 API
             self.spot_base_url = "https://api.xt.com"  # 스팟 API
         elif self.exchange == 'backpack':
             self.api_key = kwargs.get('api_key')
@@ -1827,7 +1827,7 @@ class UnifiedFuturesTrader:
         try:
             if self.exchange == 'xt':
                 # XT API 연결 테스트 - 서버 시간 조회 (공개 엔드포인트)
-                url = f"{self.base_url}/v1/public/time"
+                url = f"{self.base_url}/v4/public/time"
                 response = requests.get(url)
                 
                 if response.status_code == 200:
@@ -1841,12 +1841,12 @@ class UnifiedFuturesTrader:
                     else:
                         return {
                             'status': 'success',
-                            'message': 'XT 선물 API 연결 성공'
+                            'message': 'XT API 연결 성공'
                         }
                 else:
                     return {
                         'status': 'error',
-                        'message': f'XT 선물 API 연결 실패: {response.status_code}'
+                        'message': f'XT API 연결 실패: {response.status_code}'
                     }
             
             elif self.exchange == 'backpack':
@@ -1919,8 +1919,8 @@ class UnifiedFuturesTrader:
         """선물 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 선물 잔고 조회 - 공식 문서 기반 엔드포인트
-                url = f"{self.base_url}/v1/account/balance"
+                # XT 잔고 조회 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v4/account/balance"
                 headers = self._get_headers_xt()
                 response = requests.get(url, headers=headers)
                 
@@ -1936,12 +1936,12 @@ class UnifiedFuturesTrader:
                         return {
                             'status': 'success',
                             'balance': data.get('result', {}),
-                            'message': 'XT 선물 잔고 조회 성공'
+                            'message': 'XT 잔고 조회 성공'
                         }
                 else:
                     return {
                         'status': 'error',
-                        'message': f'XT 선물 잔고 조회 실패: {response.status_code}'
+                        'message': f'XT 잔고 조회 실패: {response.status_code}'
                     }
             
             elif self.exchange == 'backpack':
@@ -1981,8 +1981,8 @@ class UnifiedFuturesTrader:
         """선물 거래쌍 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 선물 거래쌍 조회 - 공식 문서 기반 엔드포인트
-                url = f"{self.base_url}/v1/public/contracts"
+                # XT 거래쌍 조회 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v4/public/symbols"
                 response = requests.get(url)
                 
                 if response.status_code == 200:
@@ -1995,21 +1995,21 @@ class UnifiedFuturesTrader:
                         }
                     else:
                         # 실제 데이터에서 심볼 추출
-                        contracts = data.get('result', [])
+                        symbols_data = data.get('result', [])
                         symbols = []
-                        for contract in contracts:
-                            if isinstance(contract, dict) and 'symbol' in contract:
-                                symbols.append(contract['symbol'])
+                        for symbol_info in symbols_data:
+                            if isinstance(symbol_info, dict) and 'symbol' in symbol_info:
+                                symbols.append(symbol_info['symbol'])
                         
                         return {
                             'status': 'success',
                             'symbols': symbols,
-                            'message': f'XT 선물 거래쌍 {len(symbols)}개 조회 성공'
+                            'message': f'XT 거래쌍 {len(symbols)}개 조회 성공'
                         }
                 else:
                     return {
                         'status': 'error',
-                        'message': f'XT 선물 거래쌍 조회 실패: {response.status_code}'
+                        'message': f'XT 거래쌍 조회 실패: {response.status_code}'
                     }
             
             elif self.exchange == 'backpack':
@@ -2079,15 +2079,19 @@ class UnifiedFuturesTrader:
         """롱 포지션 오픈"""
         try:
             if self.exchange == 'xt':
-                # XT 선물 주문 - 공식 문서 기반 엔드포인트
-                url = f"{self.base_url}/v1/order"
+                # XT 주문 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v4/order"
                 params = {
                     'symbol': symbol,
                     'side': 'buy',
                     'type': order_type,
-                    'size': size,
-                    'leverage': leverage
+                    'quantity': size
                 }
+                
+                # 레버리지는 선물 거래에서만 설정
+                if market_type == 'futures' and leverage > 1:
+                    params['leverage'] = leverage
+                
                 headers = self._get_headers_xt(params)
                 response = requests.post(url, headers=headers, json=params)
                 
@@ -2185,15 +2189,19 @@ class UnifiedFuturesTrader:
         """숏 포지션 오픈"""
         try:
             if self.exchange == 'xt':
-                # XT 선물 주문 - 공식 문서 기반 엔드포인트
-                url = f"{self.base_url}/v1/order"
+                # XT 주문 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v4/order"
                 params = {
                     'symbol': symbol,
                     'side': 'sell',
                     'type': order_type,
-                    'size': size,
-                    'leverage': leverage
+                    'quantity': size
                 }
+                
+                # 레버리지는 선물 거래에서만 설정
+                if market_type == 'futures' and leverage > 1:
+                    params['leverage'] = leverage
+                
                 headers = self._get_headers_xt(params)
                 response = requests.post(url, headers=headers, json=params)
                 
@@ -2292,7 +2300,7 @@ class UnifiedFuturesTrader:
         try:
             if self.exchange == 'xt':
                 # XT 스팟 매수 - 공식 문서 기반 엔드포인트
-                url = f"{self.spot_base_url}/v4/order"
+                url = f"{self.base_url}/v4/order"
                 params = {
                     'symbol': symbol,
                     'side': 'buy',
@@ -2395,7 +2403,7 @@ class UnifiedFuturesTrader:
         try:
             if self.exchange == 'xt':
                 # XT 스팟 매도 - 공식 문서 기반 엔드포인트
-                url = f"{self.spot_base_url}/v4/order"
+                url = f"{self.base_url}/v4/order"
                 params = {
                     'symbol': symbol,
                     'side': 'sell',
@@ -2498,7 +2506,7 @@ class UnifiedFuturesTrader:
         try:
             if self.exchange == 'xt':
                 # XT 스팟 잔고 조회 - 공식 문서 기반 엔드포인트
-                url = f"{self.spot_base_url}/v4/account/balance"
+                url = f"{self.base_url}/v4/account/balance"
                 headers = self._get_headers_xt()
                 response = requests.get(url, headers=headers)
                 
@@ -2582,19 +2590,19 @@ class UnifiedFuturesTrader:
         try:
             if self.exchange == 'xt':
                 if data_type == 'ticker':
-                    # XT 선물 시장 데이터 조회
-                    url = f"{self.base_url}/v1/public/ticker"
+                    # XT 시장 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/ticker/24hr"
                     if symbol:
                         url += f"?symbol={symbol}"
                     response = requests.get(url)
                 elif data_type == 'depth':
-                    # XT 선물 깊이 데이터 조회
-                    url = f"{self.base_url}/v1/public/depth"
+                    # XT 깊이 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/depth"
                     params = {'symbol': symbol, 'limit': 10}
                     response = requests.get(url, params=params)
                 elif data_type == 'kline':
-                    # XT 선물 K라인 데이터 조회
-                    url = f"{self.base_url}/v1/public/kline"
+                    # XT K라인 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/kline"
                     params = {'symbol': symbol, 'interval': '1m', 'limit': 10}
                     response = requests.get(url, params=params)
                 else:
@@ -2638,19 +2646,19 @@ class UnifiedFuturesTrader:
         try:
             if self.exchange == 'xt':
                 if data_type == 'ticker':
-                    # XT 스팟 시장 데이터 조회
-                    url = f"{self.spot_base_url}/v4/public/ticker"
+                    # XT 스팟 시장 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/ticker/24hr"
                     if symbol:
                         url += f"?symbol={symbol}"
                     response = requests.get(url)
                 elif data_type == 'depth':
-                    # XT 스팟 깊이 데이터 조회
-                    url = f"{self.spot_base_url}/v4/public/depth"
+                    # XT 스팟 깊이 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/depth"
                     params = {'symbol': symbol, 'limit': 10}
                     response = requests.get(url, params=params)
                 elif data_type == 'kline':
-                    # XT 스팟 K라인 데이터 조회
-                    url = f"{self.spot_base_url}/v4/public/kline"
+                    # XT 스팟 K라인 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/kline"
                     params = {'symbol': symbol, 'interval': '1m', 'limit': 10}
                     response = requests.get(url, params=params)
                 else:
