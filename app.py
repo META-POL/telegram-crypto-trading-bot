@@ -2239,10 +2239,12 @@ class UnifiedFuturesTrader:
         """선물 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 잔고 조회 - 공식 문서 기반 엔드포인트
+                # XT 잔고 조회 - 올바른 엔드포인트
                 url = f"{self.base_url}/v4/account/balance"
                 headers = self._get_headers_xt()
                 response = requests.get(url, headers=headers)
+                
+                print(f"XT 잔고 조회 응답: {response.status_code} - {response.text}")  # 디버깅용
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -2252,10 +2254,24 @@ class UnifiedFuturesTrader:
                         'message': 'XT 잔고 조회 성공'
                     }
                 else:
-                    return {
-                        'status': 'error',
-                        'message': f'XT 잔고 조회 실패: {response.status_code}'
-                    }
+                    # 다른 엔드포인트 시도
+                    url2 = f"{self.base_url}/v4/account/assets"
+                    response2 = requests.get(url2, headers=headers)
+                    
+                    print(f"XT 잔고 조회 대체 응답: {response2.status_code} - {response2.text}")  # 디버깅용
+                    
+                    if response2.status_code == 200:
+                        data2 = response2.json()
+                        return {
+                            'status': 'success',
+                            'balance': data2.get('result', {}),
+                            'message': 'XT 잔고 조회 성공 (대체 엔드포인트)'
+                        }
+                    else:
+                        return {
+                            'status': 'error',
+                            'message': f'XT 잔고 조회 실패: {response.status_code} - {response.text}'
+                        }
             
             elif self.exchange == 'backpack':
                 # Backpack Exchange 잔고 조회 - /capital 엔드포인트 사용
