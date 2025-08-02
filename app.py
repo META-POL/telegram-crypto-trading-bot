@@ -2787,10 +2787,6 @@ class UnifiedFuturesTrader:
                         'status': 'error',
                         'message': f'XT 스팟 {data_type} 데이터 조회 실패: {response.status_code}'
                     }
-                            'status': 'success',
-                            'data': data.get('result', {}),
-                            'message': f'XT 스팟 {data_type} 데이터 조회 성공'
-                        }
                 else:
                     return {
                         'status': 'error',
