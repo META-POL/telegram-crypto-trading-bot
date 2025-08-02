@@ -2433,15 +2433,21 @@ class UnifiedFuturesTrader:
                 
                 if response.status_code == 200:
                     data = response.json()
+                    result = data.get('result', {})
+                    if isinstance(result, dict):
+                        order_id = result.get('orderId', 'unknown')
+                    else:
+                        order_id = 'unknown'
+                    
                     return {
                         'status': 'success',
-                        'order_id': data.get('result', {}).get('orderId'),
+                        'order_id': order_id,
                         'message': 'XT 롱 포지션 오픈 성공'
                     }
                 else:
                     return {
                         'status': 'error',
-                        'message': f'XT 롱 포지션 오픈 실패: {response.status_code}'
+                        'message': f'XT 롱 포지션 오픈 실패: {response.status_code} - {response.text}'
                     }
             
             elif self.exchange == 'backpack':
@@ -2555,15 +2561,21 @@ class UnifiedFuturesTrader:
                 
                 if response.status_code == 200:
                     data = response.json()
+                    result = data.get('result', {})
+                    if isinstance(result, dict):
+                        order_id = result.get('orderId', 'unknown')
+                    else:
+                        order_id = 'unknown'
+                    
                     return {
                         'status': 'success',
-                        'order_id': data.get('result', {}).get('orderId'),
+                        'order_id': order_id,
                         'message': 'XT 숏 포지션 오픈 성공'
                     }
                 else:
                     return {
                         'status': 'error',
-                        'message': f'XT 숏 포지션 오픈 실패: {response.status_code}'
+                        'message': f'XT 숏 포지션 오픈 실패: {response.status_code} - {response.text}'
                     }
             
             elif self.exchange == 'backpack':
@@ -2677,15 +2689,21 @@ class UnifiedFuturesTrader:
                 
                 if response.status_code == 200:
                     data = response.json()
+                    result = data.get('result', {})
+                    if isinstance(result, dict):
+                        order_id = result.get('orderId', 'unknown')
+                    else:
+                        order_id = 'unknown'
+                    
                     return {
                         'status': 'success',
-                        'order_id': data.get('result', {}).get('orderId'),
+                        'order_id': order_id,
                         'message': 'XT 스팟 매수 성공'
                     }
                 else:
                     return {
                         'status': 'error',
-                        'message': f'XT 스팟 매수 실패: {response.status_code}'
+                        'message': f'XT 스팟 매수 실패: {response.status_code} - {response.text}'
                     }
             
             elif self.exchange == 'backpack':
@@ -2773,15 +2791,21 @@ class UnifiedFuturesTrader:
                 
                 if response.status_code == 200:
                     data = response.json()
+                    result = data.get('result', {})
+                    if isinstance(result, dict):
+                        order_id = result.get('orderId', 'unknown')
+                    else:
+                        order_id = 'unknown'
+                    
                     return {
                         'status': 'success',
-                        'order_id': data.get('result', {}).get('orderId'),
+                        'order_id': order_id,
                         'message': 'XT 스팟 매도 성공'
                     }
                 else:
                     return {
                         'status': 'error',
-                        'message': f'XT 스팟 매도 실패: {response.status_code}'
+                        'message': f'XT 스팟 매도 실패: {response.status_code} - {response.text}'
                     }
             
             elif self.exchange == 'backpack':
