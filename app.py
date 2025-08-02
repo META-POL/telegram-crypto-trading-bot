@@ -2206,11 +2206,17 @@ class UnifiedFuturesTrader:
         # 2. 쿼리 스트링 생성 (값을 문자열로 변환)
         query_string = '&'.join([f"{k}={str(v)}" for k, v in sorted_params])
         
-        # 3. 서명 문자열 생성 (timestamp 추가)
+        # 3. 서명 문자열 생성 (PyXT 라이브러리 방식)
         if query_string:
-            sign_string = f"{query_string}&timestamp={timestamp}"
+            sign_string = f"access_key={self.api_key}&{query_string}&timestamp={timestamp}"
         else:
-            sign_string = f"timestamp={timestamp}"
+            sign_string = f"access_key={self.api_key}&timestamp={timestamp}"
+        
+        # 공식 문서 방식 대안
+        # if query_string:
+        #     sign_string = f"{query_string}&timestamp={timestamp}"
+        # else:
+        #     sign_string = f"timestamp={timestamp}"
         
         # 4. HMAC-SHA256 서명 생성 (PyXT 라이브러리 방식)
         # PyXT 라이브러리 방식: digest().hex() 사용
@@ -2238,17 +2244,17 @@ class UnifiedFuturesTrader:
         
         # PyXT 라이브러리 방식과 공식 문서 방식 모두 시도
         headers = {
-            "XT-API-KEY": self.api_key,
-            "XT-API-SIGN": signature,
-            "XT-API-TIMESTAMP": timestamp,
+            "access_key": self.api_key,  # PyXT 라이브러리 방식
+            "signature": signature,       # PyXT 라이브러리 방식
+            "timestamp": timestamp,       # PyXT 라이브러리 방식
             "Content-Type": "application/json"
         }
         
-        # PyXT 라이브러리 방식 대안 (일부 API에서 사용)
+        # 공식 문서 방식 대안 (필요시 사용)
         # headers = {
-        #     "access_key": self.api_key,
-        #     "signature": signature,
-        #     "timestamp": timestamp,
+        #     "XT-API-KEY": self.api_key,
+        #     "XT-API-SIGN": signature,
+        #     "XT-API-TIMESTAMP": timestamp,
         #     "Content-Type": "application/json"
         # }
         
