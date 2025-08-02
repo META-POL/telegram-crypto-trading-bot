@@ -38,110 +38,122 @@ app = Flask(__name__)
 # 데이터베이스 초기화
 def init_database():
     """사용자 API 키 데이터베이스 초기화"""
-    conn = sqlite3.connect('user_apis.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_api_keys (
-            user_id INTEGER PRIMARY KEY,
-            xt_api_key TEXT,
-            xt_api_secret TEXT,
-            backpack_api_key TEXT,
-            backpack_private_key TEXT,
-            hyperliquid_api_key TEXT,
-            hyperliquid_api_secret TEXT,
-            flipster_api_key TEXT,
-            flipster_api_secret TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect('user_apis.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_api_keys (
+                user_id INTEGER PRIMARY KEY,
+                xt_api_key TEXT,
+                xt_api_secret TEXT,
+                backpack_api_key TEXT,
+                backpack_private_key TEXT,
+                hyperliquid_api_key TEXT,
+                hyperliquid_api_secret TEXT,
+                flipster_api_key TEXT,
+                flipster_api_secret TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        print("✅ 데이터베이스 초기화 완료")
+    except Exception as e:
+        print(f"⚠️ 데이터베이스 초기화 오류 (무시됨): {e}")
 
 # 데이터베이스 초기화 실행
 init_database()
 
 def get_user_api_keys(user_id):
     """사용자 API 키 조회"""
-    conn = sqlite3.connect('user_apis.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM user_api_keys WHERE user_id = ?', (user_id,))
-    result = cursor.fetchone()
-    conn.close()
-    
-    if result:
-        return {
-            'xt_api_key': result[1],
-            'xt_api_secret': result[2],
-            'backpack_api_key': result[3],
-            'backpack_private_key': result[4],
-            'hyperliquid_api_key': result[5],
-            'hyperliquid_api_secret': result[6],
-            'flipster_api_key': result[7],
-            'flipster_api_secret': result[8]
-        }
-    return None
+    try:
+        conn = sqlite3.connect('user_apis.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM user_api_keys WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            return {
+                'xt_api_key': result[1],
+                'xt_api_secret': result[2],
+                'backpack_api_key': result[3],
+                'backpack_private_key': result[4],
+                'hyperliquid_api_key': result[5],
+                'hyperliquid_api_secret': result[6],
+                'flipster_api_key': result[7],
+                'flipster_api_secret': result[8]
+            }
+        return None
+    except Exception as e:
+        print(f"⚠️ API 키 조회 오류: {e}")
+        return None
 
 def save_user_api_keys(user_id, exchange, api_key, api_secret):
     """사용자 API 키 저장"""
-    conn = sqlite3.connect('user_apis.db')
-    cursor = conn.cursor()
-    
-    # 사용자 존재 여부 확인
-    cursor.execute('SELECT user_id FROM user_api_keys WHERE user_id = ?', (user_id,))
-    exists = cursor.fetchone()
-    
-    if exists:
-        # 기존 사용자 업데이트
-        if exchange == 'xt':
-            cursor.execute('''
-                UPDATE user_api_keys 
-                SET xt_api_key = ?, xt_api_secret = ?, updated_at = CURRENT_TIMESTAMP 
-                WHERE user_id = ?
-            ''', (api_key, api_secret, user_id))
-        elif exchange == 'backpack':
-            cursor.execute('''
-                UPDATE user_api_keys 
-                SET backpack_api_key = ?, backpack_private_key = ?, updated_at = CURRENT_TIMESTAMP 
-                WHERE user_id = ?
-            ''', (api_key, api_secret, user_id))
-        elif exchange == 'hyperliquid':
-            cursor.execute('''
-                UPDATE user_api_keys 
-                SET hyperliquid_api_key = ?, hyperliquid_api_secret = ?, updated_at = CURRENT_TIMESTAMP 
-                WHERE user_id = ?
-            ''', (api_key, api_secret, user_id))
-        elif exchange == 'flipster':
-            cursor.execute('''
-                UPDATE user_api_keys 
-                SET flipster_api_key = ?, flipster_api_secret = ?, updated_at = CURRENT_TIMESTAMP 
-                WHERE user_id = ?
-            ''', (api_key, api_secret, user_id))
-    else:
-        # 새 사용자 생성
-        if exchange == 'xt':
-            cursor.execute('''
-                INSERT INTO user_api_keys (user_id, xt_api_key, xt_api_secret)
-                VALUES (?, ?, ?)
-            ''', (user_id, api_key, api_secret))
-        elif exchange == 'backpack':
-            cursor.execute('''
-                INSERT INTO user_api_keys (user_id, backpack_api_key, backpack_private_key)
-                VALUES (?, ?, ?)
-            ''', (user_id, api_key, api_secret))
-        elif exchange == 'hyperliquid':
-            cursor.execute('''
-                INSERT INTO user_api_keys (user_id, hyperliquid_api_key, hyperliquid_api_secret)
-                VALUES (?, ?, ?)
-            ''', (user_id, api_key, api_secret))
-        elif exchange == 'flipster':
-            cursor.execute('''
-                INSERT INTO user_api_keys (user_id, flipster_api_key, flipster_api_secret)
-                VALUES (?, ?, ?)
-            ''', (user_id, api_key, api_secret))
-    
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect('user_apis.db')
+        cursor = conn.cursor()
+        
+        # 사용자 존재 여부 확인
+        cursor.execute('SELECT user_id FROM user_api_keys WHERE user_id = ?', (user_id,))
+        exists = cursor.fetchone()
+        
+        if exists:
+            # 기존 사용자 업데이트
+            if exchange == 'xt':
+                cursor.execute('''
+                    UPDATE user_api_keys 
+                    SET xt_api_key = ?, xt_api_secret = ?, updated_at = CURRENT_TIMESTAMP 
+                    WHERE user_id = ?
+                ''', (api_key, api_secret, user_id))
+            elif exchange == 'backpack':
+                cursor.execute('''
+                    UPDATE user_api_keys 
+                    SET backpack_api_key = ?, backpack_private_key = ?, updated_at = CURRENT_TIMESTAMP 
+                    WHERE user_id = ?
+                ''', (api_key, api_secret, user_id))
+            elif exchange == 'hyperliquid':
+                cursor.execute('''
+                    UPDATE user_api_keys 
+                    SET hyperliquid_api_key = ?, hyperliquid_api_secret = ?, updated_at = CURRENT_TIMESTAMP 
+                    WHERE user_id = ?
+                ''', (api_key, api_secret, user_id))
+            elif exchange == 'flipster':
+                cursor.execute('''
+                    UPDATE user_api_keys 
+                    SET flipster_api_key = ?, flipster_api_secret = ?, updated_at = CURRENT_TIMESTAMP 
+                    WHERE user_id = ?
+                ''', (api_key, api_secret, user_id))
+        else:
+            # 새 사용자 생성
+            if exchange == 'xt':
+                cursor.execute('''
+                    INSERT INTO user_api_keys (user_id, xt_api_key, xt_api_secret)
+                    VALUES (?, ?, ?)
+                ''', (user_id, api_key, api_secret))
+            elif exchange == 'backpack':
+                cursor.execute('''
+                    INSERT INTO user_api_keys (user_id, backpack_api_key, backpack_private_key)
+                    VALUES (?, ?, ?)
+                ''', (user_id, api_key, api_secret))
+            elif exchange == 'hyperliquid':
+                cursor.execute('''
+                    INSERT INTO user_api_keys (user_id, hyperliquid_api_key, hyperliquid_api_secret)
+                    VALUES (?, ?, ?)
+                ''', (user_id, api_key, api_secret))
+            elif exchange == 'flipster':
+                cursor.execute('''
+                    INSERT INTO user_api_keys (user_id, flipster_api_key, flipster_api_secret)
+                    VALUES (?, ?, ?)
+                ''', (user_id, api_key, api_secret))
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ API 키 저장 완료: {exchange} for user {user_id}")
+    except Exception as e:
+        print(f"⚠️ API 키 저장 오류: {e}")
 
 @app.route('/')
 def health_check():
@@ -1362,8 +1374,17 @@ class UnifiedFuturesTrader:
             }
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    print(f"🚀 개선된 봇 서버 시작: 포트 {port}")
-    
-    # Flask 서버 시작
-    app.run(host='0.0.0.0', port=port, debug=False) 
+    try:
+        port = int(os.environ.get('PORT', 5000))
+        print(f"🚀 개선된 봇 서버 시작: 포트 {port}")
+        print(f"🌐 환경 변수 PORT: {os.environ.get('PORT', '기본값 5000')}")
+        print(f"📁 현재 작업 디렉토리: {os.getcwd()}")
+        print(f"📋 파일 목록: {os.listdir('.')}")
+        
+        # Flask 서버 시작
+        print("🌐 Flask 서버 시작 중...")
+        app.run(host='0.0.0.0', port=port, debug=False)
+    except Exception as e:
+        print(f"❌ 서버 시작 오류: {e}")
+        import traceback
+        print(f"❌ 스택 트레이스: {traceback.format_exc()}") 
