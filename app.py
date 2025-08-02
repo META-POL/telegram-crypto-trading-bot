@@ -1113,11 +1113,12 @@ async def handle_positions_command(telegram_app, chat_id, user_id, text):
 async def handle_trade_command(telegram_app, chat_id, user_id, text):
     """거래 명령어 처리"""
     parts = text.split()
-    if len(parts) < 6:
+    if len(parts) < 5:
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
-            text="❌ 사용법: /trade [거래소] [심볼] [방향] [수량] [레버리지]\n\n"
-                 "예시: `/trade xt BTCUSDT long 0.001 10`",
+            text="❌ 사용법: /trade [거래소] [심볼] [방향] [주문타입] [수량]\n\n"
+                 "예시: `/trade backpack BTC long limit 0.001`\n"
+                 "예시: `/trade backpack BTC long market 0.001`",
             parse_mode='Markdown'
         )
         return
@@ -1125,8 +1126,11 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
     exchange = parts[1].lower()
     symbol = parts[2].upper()
     direction = parts[3].lower()
-    size = float(parts[4])
-    leverage = int(parts[5])
+    order_type = parts[4].lower()  # market 또는 limit
+    size = float(parts[5])
+    
+    # 기본 레버리지 설정 (선물 거래의 경우)
+    leverage = 1  # 기본값
     
     user_keys = get_user_api_keys(user_id)
     
