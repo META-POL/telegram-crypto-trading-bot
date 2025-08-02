@@ -453,11 +453,13 @@ async def handle_callback_query(callback_query, telegram_app):
             await handle_trade_callback(telegram_app, chat_id, user_id, data, callback_query)
         
         # 콜백 쿼리 응답
-        await callback_query.answer()
+        if callback_query:
+            await callback_query.answer()
         
     except Exception as e:
         print(f"❌ 콜백 쿼리 처리 오류: {e}")
-        await callback_query.answer("❌ 오류가 발생했습니다.")
+        if callback_query:
+            await callback_query.answer("❌ 오류가 발생했습니다.")
 
 async def handle_api_callback(telegram_app, chat_id, user_id, data, callback_query):
     """API 관련 콜백 처리"""
