@@ -687,6 +687,7 @@ async def handle_trade_callback(telegram_app, chat_id, user_id, data, callback_q
         await show_order_type_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, callback_query)
     elif data.startswith("order_type_"):
         # 주문 타입 선택 후 처리
+        print(f"🔘 주문 타입 콜백 처리: {data}")
         parts = data.split("_")
         trade_type = parts[2]  # long 또는 short
         exchange = parts[3]    # 거래소
@@ -694,11 +695,15 @@ async def handle_trade_callback(telegram_app, chat_id, user_id, data, callback_q
         symbol = parts[5]      # 심볼
         order_type = parts[6]  # market 또는 limit
         
+        print(f"🔘 파싱된 데이터: trade_type={trade_type}, exchange={exchange}, market_type={market_type}, symbol={symbol}, order_type={order_type}")
+        
         if market_type == "futures":
             # 선물 거래의 경우 레버리지 선택
+            print(f"🔘 선물 거래 - 레버리지 메뉴 표시")
             await show_leverage_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, order_type, callback_query)
         else:
             # 스팟 거래의 경우 바로 수량 입력
+            print(f"🔘 스팟 거래 - 수량 입력 메뉴 표시")
             await show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, order_type, callback_query=callback_query)
     elif data.startswith("leverage_"):
         # 레버리지 선택 후 처리 (선물 거래)
@@ -770,11 +775,18 @@ async def show_symbol_selection_menu(telegram_app, chat_id, user_id, trade_type,
         "flipster": "Flipster"
     }
     
-    # 일반적인 거래 심볼들
+    # 일반적인 거래 심볼들 (더 많은 심볼 추가)
     common_symbols = [
         ["BTC/USDT", "ETH/USDT", "BNB/USDT"],
         ["ADA/USDT", "DOT/USDT", "LINK/USDT"],
-        ["SOL/USDT", "MATIC/USDT", "AVAX/USDT"]
+        ["SOL/USDT", "MATIC/USDT", "AVAX/USDT"],
+        ["XRP/USDT", "LTC/USDT", "BCH/USDT"],
+        ["UNI/USDT", "ATOM/USDT", "FTM/USDT"],
+        ["NEAR/USDT", "ALGO/USDT", "VET/USDT"],
+        ["ICP/USDT", "FIL/USDT", "TRX/USDT"],
+        ["ETC/USDT", "XLM/USDT", "HBAR/USDT"],
+        ["MANA/USDT", "SAND/USDT", "AXS/USDT"],
+        ["GALA/USDT", "CHZ/USDT", "ENJ/USDT"]
     ]
     
     keyboard = []
@@ -883,20 +895,35 @@ async def show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchan
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await telegram_app.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=callback_query.message.message_id if callback_query else None,
-        text=f"{trade_type_text} **수량 입력**\n\n"
-             f"심볼: {symbol_display}\n"
-             f"거래 타입: {market_type_text}\n"
-             f"주문 타입: {order_type_text}{leverage_text}\n\n"
-             f"다음 형식으로 수량을 입력하세요:\n\n"
-             f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량]`\n\n"
-             f"예시:\n"
-             f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001`",
-        parse_mode='Markdown',
-        reply_markup=reply_markup
-    )
+    if callback_query:
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text=f"{trade_type_text} **수량 입력**\n\n"
+                 f"심볼: {symbol_display}\n"
+                 f"거래 타입: {market_type_text}\n"
+                 f"주문 타입: {order_type_text}{leverage_text}\n\n"
+                 f"다음 형식으로 수량을 입력하세요:\n\n"
+                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량]`\n\n"
+                 f"예시:\n"
+                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001`",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    else:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text=f"{trade_type_text} **수량 입력**\n\n"
+                 f"심볼: {symbol_display}\n"
+                 f"거래 타입: {market_type_text}\n"
+                 f"주문 타입: {order_type_text}{leverage_text}\n\n"
+                 f"다음 형식으로 수량을 입력하세요:\n\n"
+                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량]`\n\n"
+                 f"예시:\n"
+                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001`",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
 
 async def handle_balance_command(telegram_app, chat_id, user_id, text):
     """잔고 조회 명령어 처리"""
