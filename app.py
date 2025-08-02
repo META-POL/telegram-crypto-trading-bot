@@ -421,6 +421,12 @@ async def handle_callback_query(callback_query, telegram_app):
         elif data.startswith("trade_"):
             await handle_trade_callback(telegram_app, chat_id, user_id, data, callback_query)
             
+        elif data.startswith("order_type_"):
+            await handle_trade_callback(telegram_app, chat_id, user_id, data, callback_query)
+            
+        elif data.startswith("leverage_"):
+            await handle_trade_callback(telegram_app, chat_id, user_id, data, callback_query)
+            
         elif data in ["position_list", "position_close"]:
             await handle_position_callback(telegram_app, chat_id, user_id, data, callback_query)
             
