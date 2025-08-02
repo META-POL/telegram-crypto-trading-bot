@@ -1955,8 +1955,13 @@ class UnifiedFuturesTrader:
                     backpack_order_type = 'Market'  # 기본값
                 
                 # Backpack Exchange API 문서에 따른 올바른 파라미터 구조
+                # Backpack Exchange 심볼 형식: BTC_USDT_PERP (선물), BTC_USDT (스팟)
+                backpack_symbol = symbol
+                if not symbol.endswith('_PERP'):
+                    backpack_symbol = f"{symbol}_PERP"  # 선물 거래를 위해 _PERP 추가
+                
                 params = {
-                    'symbol': symbol,
+                    'symbol': backpack_symbol,
                     'side': 'Bid',  # Backpack에서는 'Bid' (매수) 또는 'Ask' (매도)
                     'orderType': backpack_order_type,  # 'type' 대신 'orderType' 사용
                     'quantity': str(size)
@@ -2042,8 +2047,13 @@ class UnifiedFuturesTrader:
                     backpack_order_type = 'Market'  # 기본값
                 
                 # Backpack Exchange API 문서에 따른 올바른 파라미터 구조
+                # Backpack Exchange 심볼 형식: BTC_USDT_PERP (선물), BTC_USDT (스팟)
+                backpack_symbol = symbol
+                if not symbol.endswith('_PERP'):
+                    backpack_symbol = f"{symbol}_PERP"  # 선물 거래를 위해 _PERP 추가
+                
                 params = {
-                    'symbol': symbol,
+                    'symbol': backpack_symbol,
                     'side': 'Ask',  # Backpack에서는 'Bid' (매수) 또는 'Ask' (매도)
                     'orderType': backpack_order_type,  # 'type' 대신 'orderType' 사용
                     'quantity': str(size)
