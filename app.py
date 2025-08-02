@@ -1792,10 +1792,11 @@ class UnifiedFuturesTrader:
             # 지연 로딩으로 변경
             self.signing_key = None
         elif self.exchange == 'hyperliquid':
-            self.api_key = kwargs.get('api_key')
-            self.api_secret = kwargs.get('api_secret')
-            # 지연 로딩으로 변경
-            self.ccxt_client = None
+            self.account_address = kwargs.get('api_key')  # 지갑 주소
+            self.private_key = kwargs.get('api_secret')   # 개인키
+            # Hyperliquid SDK 지연 로딩
+            self.hyperliquid_info = None
+            self.hyperliquid_exchange = None
 
         else:
             raise ValueError('지원하지 않는 거래소입니다: xt, backpack, hyperliquid만 지원')
@@ -1852,26 +1853,28 @@ class UnifiedFuturesTrader:
             
             elif self.exchange == 'hyperliquid':
                 try:
-                    # ccxt 지연 로딩
-                    if ccxt is None:
-                        import ccxt
+                    # Hyperliquid SDK 지연 로딩
+                    from hyperliquid.info import Info
+                    from hyperliquid.utils import constants
                     
-                    if self.ccxt_client is None:
-                        self.ccxt_client = ccxt.hyperliquid({
-                            'apiKey': self.api_key,
-                            'secret': self.api_secret,
-                            'enableRateLimit': True,
-                        })
+                    if self.hyperliquid_info is None:
+                        self.hyperliquid_info = Info(constants.MAINNET_API_URL, skip_ws=True)
                     
-                    self.ccxt_client.fetch_balance()
+                    # 사용자 상태 조회로 연결 테스트
+                    user_state = self.hyperliquid_info.user_state(self.account_address)
                     return {
                         'status': 'success',
-                        'message': 'Hyperliquid 선물 API 연결 성공'
+                        'message': 'Hyperliquid API 연결 성공'
                     }
                 except ImportError:
                     return {
                         'status': 'error',
-                        'message': 'ccxt 패키지가 필요합니다'
+                        'message': 'hyperliquid-python-sdk 패키지가 필요합니다'
+                    }
+                except Exception as e:
+                    return {
+                        'status': 'error',
+                        'message': f'Hyperliquid API 연결 실패: {str(e)}'
                     }
             
         except Exception as e:
@@ -1970,12 +1973,40 @@ class UnifiedFuturesTrader:
                     }
             
             elif self.exchange == 'hyperliquid':
-                balance = self.ccxt_client.fetch_balance()
-                return {
-                    'status': 'success',
-                    'balance': balance,
-                    'message': 'Hyperliquid 선물 잔고 조회 성공'
-                }
+                try:
+                    # Hyperliquid SDK 지연 로딩
+                    from hyperliquid.info import Info
+                    from hyperliquid.utils import constants
+                    
+                    if self.hyperliquid_info is None:
+                        self.hyperliquid_info = Info(constants.MAINNET_API_URL, skip_ws=True)
+                    
+                    # 사용자 상태 조회
+                    user_state = self.hyperliquid_info.user_state(self.account_address)
+                    
+                    # 잔고 정보 추출
+                    balance_data = {}
+                    if 'assetPositions' in user_state:
+                        for position in user_state['assetPositions']:
+                            if 'position' in position and 'szi' in position['position']:
+                                size = float(position['position']['szi'])
+                                if size != 0:  # 0이 아닌 포지션만
+                                    coin = position.get('coin', 'UNKNOWN')
+                                    balance_data[coin] = {
+                                        'available': size,
+                                        'total': size
+                                    }
+                    
+                    return {
+                        'status': 'success',
+                        'balance': balance_data,
+                        'message': 'Hyperliquid 잔고 조회 성공'
+                    }
+                except Exception as e:
+                    return {
+                        'status': 'error',
+                        'message': f'Hyperliquid 잔고 조회 실패: {str(e)}'
+                    }
             
         except Exception as e:
             return {
@@ -2060,13 +2091,33 @@ class UnifiedFuturesTrader:
                 }
             
             elif self.exchange == 'hyperliquid':
-                markets = self.ccxt_client.load_markets()
-                futures_symbols = [symbol for symbol, market in markets.items() if market.get('type') == 'future']
-                return {
-                    'status': 'success',
-                    'symbols': futures_symbols,
-                    'message': f'Hyperliquid 선물 거래쌍 {len(futures_symbols)}개 조회 성공'
-                }
+                try:
+                    # Hyperliquid SDK 지연 로딩
+                    from hyperliquid.info import Info
+                    from hyperliquid.utils import constants
+                    
+                    if self.hyperliquid_info is None:
+                        self.hyperliquid_info = Info(constants.MAINNET_API_URL, skip_ws=True)
+                    
+                    # 메타데이터 조회로 사용 가능한 심볼 가져오기
+                    meta = self.hyperliquid_info.meta()
+                    symbols = []
+                    
+                    if 'universe' in meta:
+                        for asset in meta['universe']:
+                            if 'name' in asset:
+                                symbols.append(asset['name'])
+                    
+                    return {
+                        'status': 'success',
+                        'symbols': symbols,
+                        'message': f'Hyperliquid 거래쌍 {len(symbols)}개 조회 성공'
+                    }
+                except Exception as e:
+                    return {
+                        'status': 'error',
+                        'message': f'Hyperliquid 거래쌍 조회 실패: {str(e)}'
+                    }
             
         except Exception as e:
             return {
@@ -2158,18 +2209,37 @@ class UnifiedFuturesTrader:
                     }
             
             elif self.exchange == 'hyperliquid':
-                order = self.ccxt_client.create_order(
-                    symbol=symbol,
-                    type=order_type,
-                    side='buy',
-                    amount=size,
-                    params={'leverage': leverage}
-                )
-                return {
-                    'status': 'success',
-                    'order_id': order.get('id'),
-                    'message': 'Hyperliquid 롱 포지션 오픈 성공'
-                }
+                try:
+                    # Hyperliquid SDK 지연 로딩
+                    from hyperliquid.exchange import Exchange
+                    from hyperliquid.utils import constants
+                    
+                    if self.hyperliquid_exchange is None:
+                        self.hyperliquid_exchange = Exchange(
+                            self.account_address, 
+                            self.private_key, 
+                            constants.MAINNET_API_URL
+                        )
+                    
+                    # 주문 실행
+                    order = self.hyperliquid_exchange.order(
+                        symbol=symbol,
+                        side='B',  # B = Buy (롱)
+                        size=size,
+                        price=None if order_type == 'market' else price,
+                        reduce_only=False
+                    )
+                    
+                    return {
+                        'status': 'success',
+                        'order_id': order.get('hash', 'unknown'),
+                        'message': 'Hyperliquid 롱 포지션 오픈 성공'
+                    }
+                except Exception as e:
+                    return {
+                        'status': 'error',
+                        'message': f'Hyperliquid 롱 포지션 오픈 실패: {str(e)}'
+                    }
             
         except Exception as e:
             return {
@@ -2261,18 +2331,37 @@ class UnifiedFuturesTrader:
                     }
             
             elif self.exchange == 'hyperliquid':
-                order = self.ccxt_client.create_order(
-                    symbol=symbol,
-                    type=order_type,
-                    side='sell',
-                    amount=size,
-                    params={'leverage': leverage}
-                )
-                return {
-                    'status': 'success',
-                    'order_id': order.get('id'),
-                    'message': 'Hyperliquid 숏 포지션 오픈 성공'
-                }
+                try:
+                    # Hyperliquid SDK 지연 로딩
+                    from hyperliquid.exchange import Exchange
+                    from hyperliquid.utils import constants
+                    
+                    if self.hyperliquid_exchange is None:
+                        self.hyperliquid_exchange = Exchange(
+                            self.account_address, 
+                            self.private_key, 
+                            constants.MAINNET_API_URL
+                        )
+                    
+                    # 주문 실행
+                    order = self.hyperliquid_exchange.order(
+                        symbol=symbol,
+                        side='A',  # A = Ask (숏)
+                        size=size,
+                        price=None if order_type == 'market' else price,
+                        reduce_only=False
+                    )
+                    
+                    return {
+                        'status': 'success',
+                        'order_id': order.get('hash', 'unknown'),
+                        'message': 'Hyperliquid 숏 포지션 오픈 성공'
+                    }
+                except Exception as e:
+                    return {
+                        'status': 'error',
+                        'message': f'Hyperliquid 숏 포지션 오픈 실패: {str(e)}'
+                    }
             
         except Exception as e:
             return {
@@ -2452,19 +2541,38 @@ class UnifiedFuturesTrader:
                         'message': f'Backpack 스팟 매도 실패: {response.status_code} - {response.text}'
                     }
             
-            elif self.exchange in ['hyperliquid', 'flipster']:
-                order = self.ccxt_client.create_order(
-                    symbol=symbol,
-                    type=order_type,
-                    side='sell',
-                    amount=size,
-                    price=price if order_type == 'limit' else None
-                )
-                return {
-                    'status': 'success',
-                    'order_id': order.get('id'),
-                    'message': f'{self.exchange.capitalize()} 스팟 매도 성공'
-                }
+            elif self.exchange == 'hyperliquid':
+                try:
+                    # Hyperliquid SDK 지연 로딩
+                    from hyperliquid.exchange import Exchange
+                    from hyperliquid.utils import constants
+                    
+                    if self.hyperliquid_exchange is None:
+                        self.hyperliquid_exchange = Exchange(
+                            self.account_address, 
+                            self.private_key, 
+                            constants.MAINNET_API_URL
+                        )
+                    
+                    # 스팟 매도 주문 (Hyperliquid는 주로 선물 거래를 지원)
+                    order = self.hyperliquid_exchange.order(
+                        symbol=symbol,
+                        side='A',  # A = Ask (매도)
+                        size=size,
+                        price=None if order_type == 'market' else price,
+                        reduce_only=False
+                    )
+                    
+                    return {
+                        'status': 'success',
+                        'order_id': order.get('hash', 'unknown'),
+                        'message': 'Hyperliquid 스팟 매도 성공'
+                    }
+                except Exception as e:
+                    return {
+                        'status': 'error',
+                        'message': f'Hyperliquid 스팟 매도 실패: {str(e)}'
+                    }
             
         except Exception as e:
             return {
@@ -2500,6 +2608,40 @@ class UnifiedFuturesTrader:
                         'status': 'error',
                         'message': f'XT 스팟 잔고 조회 실패: {response.status_code}'
                     }
+            
+            elif self.exchange == 'hyperliquid':
+                try:
+                    # Hyperliquid SDK 지연 로딩
+                    from hyperliquid.info import Info
+                    from hyperliquid.utils import constants
+                    
+                    if self.hyperliquid_info is None:
+                        self.hyperliquid_info = Info(constants.MAINNET_API_URL, skip_ws=True)
+                    
+                    # 사용자 상태 조회
+                    user_state = self.hyperliquid_info.user_state(self.account_address)
+                    
+                    # 스팟 잔고 정보 추출 (USDC 잔고 등)
+                    balance_data = {}
+                    if 'marginSummary' in user_state:
+                        margin = user_state['marginSummary']
+                        if 'accountValue' in margin:
+                            balance_data['USDC'] = {
+                                'available': float(margin['accountValue']),
+                                'total': float(margin['accountValue'])
+                            }
+                    
+                    return {
+                        'status': 'success',
+                        'balance': balance_data,
+                        'message': 'Hyperliquid 스팟 잔고 조회 성공'
+                    }
+                except Exception as e:
+                    return {
+                        'status': 'error',
+                        'message': f'Hyperliquid 스팟 잔고 조회 실패: {str(e)}'
+                    }
+            
             else:
                 return {
                     'status': 'error',
@@ -2545,6 +2687,36 @@ class UnifiedFuturesTrader:
                         'status': 'error',
                         'message': f'XT 스팟 거래쌍 조회 실패: {response.status_code}'
                     }
+            
+            elif self.exchange == 'hyperliquid':
+                try:
+                    # Hyperliquid SDK 지연 로딩
+                    from hyperliquid.info import Info
+                    from hyperliquid.utils import constants
+                    
+                    if self.hyperliquid_info is None:
+                        self.hyperliquid_info = Info(constants.MAINNET_API_URL, skip_ws=True)
+                    
+                    # 메타데이터 조회로 사용 가능한 심볼 가져오기
+                    meta = self.hyperliquid_info.meta()
+                    symbols = []
+                    
+                    if 'universe' in meta:
+                        for asset in meta['universe']:
+                            if 'name' in asset:
+                                symbols.append(asset['name'])
+                    
+                    return {
+                        'status': 'success',
+                        'symbols': symbols,
+                        'message': f'Hyperliquid 스팟 거래쌍 {len(symbols)}개 조회 성공'
+                    }
+                except Exception as e:
+                    return {
+                        'status': 'error',
+                        'message': f'Hyperliquid 스팟 거래쌍 조회 실패: {str(e)}'
+                    }
+            
             else:
                 return {
                     'status': 'error',
