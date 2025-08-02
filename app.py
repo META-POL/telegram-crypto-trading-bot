@@ -1529,6 +1529,13 @@ async def handle_close_command(telegram_app, chat_id, user_id, text):
 async def show_api_management_menu(telegram_app, chat_id, user_id, callback_query=None):
     """API 관리 메뉴 표시"""
     
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        return
+    
     # 사용자 API 키 상태 확인
     user_keys = get_user_api_keys(user_id)
     
@@ -1573,6 +1580,13 @@ async def show_api_management_menu(telegram_app, chat_id, user_id, callback_quer
             
 async def show_balance_menu(telegram_app, chat_id, user_id, callback_query=None):
     """잔고 조회 메뉴 표시"""
+    
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        return
     
     keyboard = [
         [InlineKeyboardButton("XT Exchange", callback_data="balance_xt")],
