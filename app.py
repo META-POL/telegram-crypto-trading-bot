@@ -463,6 +463,14 @@ async def handle_callback_query(callback_query, telegram_app):
 
 async def handle_api_callback(telegram_app, chat_id, user_id, data, callback_query):
     """API 관련 콜백 처리"""
+    
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        return
+    
     exchange = data.replace("api_", "")
     exchange_names = {
         "xt": "XT Exchange",
@@ -472,7 +480,15 @@ async def handle_api_callback(telegram_app, chat_id, user_id, data, callback_que
     
     user_keys = get_user_api_keys(user_id)
     
-    if user_keys and user_keys.get(f'{exchange}_api_key'):
+    # API 키 존재 여부 확인 (더 정확한 체크)
+    has_api_key = False
+    if user_keys:
+        if exchange == 'backpack':
+            has_api_key = bool(user_keys.get('backpack_api_key') and user_keys.get('backpack_private_key'))
+        else:
+            has_api_key = bool(user_keys.get(f'{exchange}_api_key') and user_keys.get(f'{exchange}_api_secret'))
+    
+    if has_api_key:
         # API 키가 이미 설정된 경우
         keyboard = [
             [InlineKeyboardButton("🔄 API 키 재설정", callback_data=f"api_reset_{exchange}")],
@@ -491,17 +507,55 @@ async def handle_api_callback(telegram_app, chat_id, user_id, data, callback_que
             reply_markup=reply_markup
         )
     else:
-        # API 키가 설정되지 않은 경우
+        # API 키가 설정되지 않은 경우 - 거래소별 맞춤 안내
+        setup_instructions = {
+            "xt": (
+                f"🔑 **{exchange_names[exchange]} API 설정**\n\n"
+                f"다음 형식으로 API 키를 입력하세요:\n\n"
+                f"`/setapi {exchange} YOUR_API_KEY YOUR_SECRET_KEY`\n\n"
+                f"예시:\n"
+                f"`/setapi {exchange} abc123def456 ghi789jkl012`\n\n"
+                f"📋 **API 키 발급 방법:**\n"
+                f"1. XT Exchange 로그인\n"
+                f"2. API 관리 → 새 API 키 생성\n"
+                f"3. 거래 권한 활성화\n"
+                f"4. API 키와 시크릿 키 복사\n\n"
+                f"⚠️ **주의:** API 키는 안전하게 저장됩니다.\n\n"
+                f"🔙 API 관리로 돌아가려면 /start를 입력하세요."
+            ),
+            "backpack": (
+                f"🔑 **{exchange_names[exchange]} API 설정**\n\n"
+                f"다음 형식으로 API 키를 입력하세요:\n\n"
+                f"`/setapi {exchange} YOUR_API_KEY YOUR_PRIVATE_KEY`\n\n"
+                f"예시:\n"
+                f"`/setapi {exchange} abc123def456 ghi789jkl012`\n\n"
+                f"📋 **API 키 발급 방법:**\n"
+                f"1. Backpack Exchange 로그인\n"
+                f"2. 설정 → API 키 → 새 키 생성\n"
+                f"3. 거래 권한 활성화\n"
+                f"4. API 키와 개인키 복사\n\n"
+                f"⚠️ **주의:** API 키는 안전하게 저장됩니다.\n\n"
+                f"🔙 API 관리로 돌아가려면 /start를 입력하세요."
+            ),
+            "hyperliquid": (
+                f"🔑 **{exchange_names[exchange]} API 설정**\n\n"
+                f"다음 형식으로 지갑 정보를 입력하세요:\n\n"
+                f"`/setapi {exchange} YOUR_WALLET_ADDRESS YOUR_PRIVATE_KEY`\n\n"
+                f"예시:\n"
+                f"`/setapi {exchange} 0x1234...abcd 0x5678...efgh`\n\n"
+                f"📋 **설정 방법:**\n"
+                f"1. 지갑 주소와 개인키 준비\n"
+                f"2. Hyperliquid에서 거래 권한 확인\n"
+                f"3. 위 형식으로 입력\n\n"
+                f"⚠️ **주의:** 개인키는 안전하게 저장됩니다.\n\n"
+                f"🔙 API 관리로 돌아가려면 /start를 입력하세요."
+            )
+        }
+        
         await telegram_app.bot.edit_message_text(
             chat_id=chat_id,
             message_id=callback_query.message.message_id,
-            text=f"🔑 **{exchange_names[exchange]} API 설정**\n\n"
-                 f"다음 형식으로 API 키를 입력하세요:\n\n"
-                 f"`/setapi {exchange} YOUR_API_KEY YOUR_SECRET_KEY`\n\n"
-                 f"예시:\n"
-                 f"`/setapi {exchange} abc123def456 ghi789jkl012`\n\n"
-                 f"⚠️ **주의:** API 키는 안전하게 저장됩니다.\n\n"
-                 f"🔙 API 관리로 돌아가려면 /start를 입력하세요.",
+            text=setup_instructions.get(exchange, f"🔑 **{exchange_names[exchange]} API 설정**\n\nAPI 키 설정 안내가 준비 중입니다."),
             parse_mode='Markdown'
         )
 
@@ -510,11 +564,24 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
     exchange = data.replace("balance_", "")
     user_keys = get_user_api_keys(user_id)
     
-    if not user_keys or not user_keys.get(f'{exchange}_api_key'):
+    # API 키 존재 여부 확인 (더 정확한 체크)
+    has_api_key = False
+    if user_keys:
+        if exchange == 'backpack':
+            has_api_key = bool(user_keys.get('backpack_api_key') and user_keys.get('backpack_private_key'))
+        else:
+            has_api_key = bool(user_keys.get(f'{exchange}_api_key') and user_keys.get(f'{exchange}_api_secret'))
+    
+    if not has_api_key:
+        exchange_names = {
+            "xt": "XT Exchange",
+            "backpack": "Backpack Exchange",
+            "hyperliquid": "Hyperliquid"
+        }
         await telegram_app.bot.edit_message_text(
             chat_id=chat_id,
             message_id=callback_query.message.message_id,
-            text=f"❌ **{exchange.upper()} API 키가 설정되지 않았습니다.**\n\n"
+            text=f"❌ **{exchange_names.get(exchange, exchange.upper())} API 키가 설정되지 않았습니다.**\n\n"
                  f"먼저 API 키를 설정해주세요.\n\n"
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
             parse_mode='Markdown'
@@ -534,18 +601,24 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
             # 잔고 데이터를 보기 좋게 포맷팅
             if isinstance(balance_data, dict):
                 formatted_balance = ""
+                total_balance = 0
+                
                 for currency, amount in balance_data.items():
                     if isinstance(amount, dict) and 'available' in amount:
-                        available = amount.get('available', 0)
-                        if float(available) > 0:
-                            formatted_balance += f"💰 {currency}: {available}\n"
+                        available = float(amount.get('available', 0))
+                        if available > 0:
+                            formatted_balance += f"💰 **{currency}**: {available:,.8f}\n"
+                            total_balance += 1
                     elif isinstance(amount, (int, float)) and float(amount) > 0:
-                        formatted_balance += f"💰 {currency}: {amount}\n"
+                        formatted_balance += f"💰 **{currency}**: {float(amount):,.8f}\n"
+                        total_balance += 1
                 
                 if not formatted_balance:
-                    formatted_balance = "사용 가능한 잔고가 없습니다."
+                    formatted_balance = "💡 사용 가능한 잔고가 없습니다."
                 else:
-                    formatted_balance = str(balance_data)
+                    formatted_balance = f"📊 **총 {total_balance}개 자산**\n\n{formatted_balance}"
+            else:
+                formatted_balance = f"📊 **잔고 정보**\n\n{str(balance_data)}"
             
             keyboard = [
                 [InlineKeyboardButton("🔄 새로고침", callback_data=data)],
@@ -580,11 +653,24 @@ async def handle_symbols_callback(telegram_app, chat_id, user_id, data, callback
     exchange = data.replace("symbols_", "")
     user_keys = get_user_api_keys(user_id)
     
-    if not user_keys or not user_keys.get(f'{exchange}_api_key'):
+    # API 키 존재 여부 확인 (더 정확한 체크)
+    has_api_key = False
+    if user_keys:
+        if exchange == 'backpack':
+            has_api_key = bool(user_keys.get('backpack_api_key') and user_keys.get('backpack_private_key'))
+        else:
+            has_api_key = bool(user_keys.get(f'{exchange}_api_key') and user_keys.get(f'{exchange}_api_secret'))
+    
+    if not has_api_key:
+        exchange_names = {
+            "xt": "XT Exchange",
+            "backpack": "Backpack Exchange",
+            "hyperliquid": "Hyperliquid"
+        }
         await telegram_app.bot.edit_message_text(
             chat_id=chat_id,
             message_id=callback_query.message.message_id,
-            text=f"❌ **{exchange.upper()} API 키가 설정되지 않았습니다.**\n\n"
+            text=f"❌ **{exchange_names.get(exchange, exchange.upper())} API 키가 설정되지 않았습니다.**\n\n"
                  f"먼저 API 키를 설정해주세요.\n\n"
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
             parse_mode='Markdown'
@@ -684,6 +770,14 @@ async def handle_trade_callback(telegram_app, chat_id, user_id, data, callback_q
     """거래 콜백 처리"""
     print(f"🔘 거래 콜백 처리: {data}")
     
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        await callback_query.answer("❌ 오류가 발생했습니다.")
+        return
+    
     if data == "trade_long":
         await show_trade_setup_menu(telegram_app, chat_id, user_id, "long", callback_query)
     elif data == "trade_short":
@@ -766,6 +860,14 @@ async def handle_trade_callback(telegram_app, chat_id, user_id, data, callback_q
 
 async def show_trade_setup_menu(telegram_app, chat_id, user_id, trade_type, callback_query):
     """거래 설정 메뉴 표시"""
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        await callback_query.answer("❌ 오류가 발생했습니다.")
+        return
+    
     trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
     
     keyboard = [
@@ -786,6 +888,14 @@ async def show_trade_setup_menu(telegram_app, chat_id, user_id, trade_type, call
 
 async def show_trade_type_menu(telegram_app, chat_id, user_id, trade_type, exchange, callback_query):
     """거래 타입 선택 메뉴 (스팟/선물)"""
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        await callback_query.answer("❌ 오류가 발생했습니다.")
+        return
+    
     trade_type_text = "📈 롱" if trade_type == "long" else "📉 숏"
     exchange_names = {
         "xt": "XT Exchange",
@@ -812,6 +922,14 @@ async def show_trade_type_menu(telegram_app, chat_id, user_id, trade_type, excha
 
 async def show_symbol_selection_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, callback_query):
     """심볼 선택 메뉴"""
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        await callback_query.answer("❌ 오류가 발생했습니다.")
+        return
+    
     if market_type == "spot":
         trade_type_text = "📈 매수" if trade_type == "long" else "📉 매도"
     else:
@@ -863,6 +981,14 @@ async def show_symbol_selection_menu(telegram_app, chat_id, user_id, trade_type,
 
 async def show_futures_direction_menu(telegram_app, chat_id, user_id, exchange, callback_query):
     """선물 거래 방향 선택 메뉴 (롱/숏)"""
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        await callback_query.answer("❌ 오류가 발생했습니다.")
+        return
+    
     exchange_names = {
         "xt": "XT Exchange",
         "backpack": "Backpack Exchange",
@@ -889,6 +1015,14 @@ async def show_futures_direction_menu(telegram_app, chat_id, user_id, exchange, 
 
 async def show_futures_symbol_menu(telegram_app, chat_id, user_id, exchange, direction, callback_query):
     """선물 거래 심볼 선택 메뉴"""
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        await callback_query.answer("❌ 오류가 발생했습니다.")
+        return
+    
     direction_text = "📈 롱" if direction == "long" else "📉 숏"
     exchange_names = {
         "xt": "XT Exchange",
@@ -931,6 +1065,14 @@ async def show_futures_symbol_menu(telegram_app, chat_id, user_id, exchange, dir
 
 async def show_futures_leverage_input(telegram_app, chat_id, user_id, exchange, direction, symbol, callback_query):
     """선물 거래 레버리지 입력 안내"""
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        await callback_query.answer("❌ 오류가 발생했습니다.")
+        return
+    
     direction_text = "📈 롱" if direction == "long" else "📉 숏"
     symbol_display = symbol.replace('_', '/')
     exchange_names = {
@@ -1008,6 +1150,14 @@ async def show_futures_quantity_input(telegram_app, chat_id, user_id, exchange, 
 
 async def show_order_type_menu(telegram_app, chat_id, user_id, trade_type, exchange, market_type, symbol, callback_query):
     """주문 타입 선택 메뉴 (시장가/지정가)"""
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        await callback_query.answer("❌ 오류가 발생했습니다.")
+        return
+    
     if market_type == "spot":
         trade_type_text = "📈 매수" if trade_type == "long" else "📉 매도"
     else:
@@ -1200,18 +1350,24 @@ async def handle_balance_command(telegram_app, chat_id, user_id, text):
             # 잔고 데이터를 보기 좋게 포맷팅
             if isinstance(balance_data, dict):
                 formatted_balance = ""
+                total_balance = 0
+                
                 for currency, amount in balance_data.items():
                     if isinstance(amount, dict) and 'available' in amount:
-                        available = amount.get('available', 0)
-                        if float(available) > 0:
-                            formatted_balance += f"💰 {currency}: {available}\n"
+                        available = float(amount.get('available', 0))
+                        if available > 0:
+                            formatted_balance += f"💰 **{currency}**: {available:,.8f}\n"
+                            total_balance += 1
                     elif isinstance(amount, (int, float)) and float(amount) > 0:
-                        formatted_balance += f"💰 {currency}: {amount}\n"
+                        formatted_balance += f"💰 **{currency}**: {float(amount):,.8f}\n"
+                        total_balance += 1
                 
                 if not formatted_balance:
-                    formatted_balance = "사용 가능한 잔고가 없습니다."
+                    formatted_balance = "💡 사용 가능한 잔고가 없습니다."
                 else:
-                    formatted_balance = str(balance_data)
+                    formatted_balance = f"📊 **총 {total_balance}개 자산**\n\n{formatted_balance}"
+            else:
+                formatted_balance = f"📊 **잔고 정보**\n\n{str(balance_data)}"
             
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
@@ -1245,10 +1401,23 @@ async def handle_symbols_command(telegram_app, chat_id, user_id, text):
     exchange = parts[1].lower()
     user_keys = get_user_api_keys(user_id)
     
-    if not user_keys or not user_keys.get(f'{exchange}_api_key'):
+    # API 키 존재 여부 확인 (더 정확한 체크)
+    has_api_key = False
+    if user_keys:
+        if exchange == 'backpack':
+            has_api_key = bool(user_keys.get('backpack_api_key') and user_keys.get('backpack_private_key'))
+        else:
+            has_api_key = bool(user_keys.get(f'{exchange}_api_key') and user_keys.get(f'{exchange}_api_secret'))
+    
+    if not has_api_key:
+        exchange_names = {
+            "xt": "XT Exchange",
+            "backpack": "Backpack Exchange",
+            "hyperliquid": "Hyperliquid"
+        }
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
-            text=f"❌ **{exchange.upper()} API 키가 설정되지 않았습니다.**\n\n"
+            text=f"❌ **{exchange_names.get(exchange, exchange.upper())} API 키가 설정되지 않았습니다.**\n\n"
                  f"먼저 API 키를 설정해주세요.\n\n"
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
             parse_mode='Markdown'
@@ -1305,10 +1474,23 @@ async def handle_positions_command(telegram_app, chat_id, user_id, text):
     exchange = parts[1].lower()
     user_keys = get_user_api_keys(user_id)
     
-    if not user_keys or not user_keys.get(f'{exchange}_api_key'):
+    # API 키 존재 여부 확인 (더 정확한 체크)
+    has_api_key = False
+    if user_keys:
+        if exchange == 'backpack':
+            has_api_key = bool(user_keys.get('backpack_api_key') and user_keys.get('backpack_private_key'))
+        else:
+            has_api_key = bool(user_keys.get(f'{exchange}_api_key') and user_keys.get(f'{exchange}_api_secret'))
+    
+    if not has_api_key:
+        exchange_names = {
+            "xt": "XT Exchange",
+            "backpack": "Backpack Exchange",
+            "hyperliquid": "Hyperliquid"
+        }
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
-            text=f"❌ **{exchange.upper()} API 키가 설정되지 않았습니다.**\n\n"
+            text=f"❌ **{exchange_names.get(exchange, exchange.upper())} API 키가 설정되지 않았습니다.**\n\n"
                  f"먼저 API 키를 설정해주세요.\n\n"
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
             parse_mode='Markdown'
@@ -1385,10 +1567,23 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
     
     user_keys = get_user_api_keys(user_id)
     
-    if not user_keys or not user_keys.get(f'{exchange}_api_key'):
+    # API 키 존재 여부 확인 (더 정확한 체크)
+    has_api_key = False
+    if user_keys:
+        if exchange == 'backpack':
+            has_api_key = bool(user_keys.get('backpack_api_key') and user_keys.get('backpack_private_key'))
+        else:
+            has_api_key = bool(user_keys.get(f'{exchange}_api_key') and user_keys.get(f'{exchange}_api_secret'))
+    
+    if not has_api_key:
+        exchange_names = {
+            "xt": "XT Exchange",
+            "backpack": "Backpack Exchange",
+            "hyperliquid": "Hyperliquid"
+        }
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
-            text=f"❌ **{exchange.upper()} API 키가 설정되지 않았습니다.**\n\n"
+            text=f"❌ **{exchange_names.get(exchange, exchange.upper())} API 키가 설정되지 않았습니다.**\n\n"
                  f"먼저 API 키를 설정해주세요.\n\n"
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
             parse_mode='Markdown'
@@ -1547,7 +1742,15 @@ async def show_api_management_menu(telegram_app, chat_id, user_id, callback_quer
     ]
     
     for exchange, name in exchanges:
-        if user_keys and user_keys.get(f'{exchange}_api_key'):
+        # API 키 존재 여부 확인 (더 정확한 체크)
+        has_api_key = False
+        if user_keys:
+            if exchange == 'backpack':
+                has_api_key = bool(user_keys.get('backpack_api_key') and user_keys.get('backpack_private_key'))
+            else:
+                has_api_key = bool(user_keys.get(f'{exchange}_api_key') and user_keys.get(f'{exchange}_api_secret'))
+        
+        if has_api_key:
             status = "✅ 설정됨"
         else:
             status = "❌ 미설정"
