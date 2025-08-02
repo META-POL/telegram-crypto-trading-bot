@@ -1789,8 +1789,8 @@ class UnifiedFuturesTrader:
             self.api_key = kwargs.get('api_key')
             self.api_secret = kwargs.get('api_secret')
             # XT API 베이스 URL (공식 문서 기반)
-            self.base_url = "https://api.xt.com"  # 공식 API
-            self.spot_base_url = "https://api.xt.com"  # 스팟 API
+            self.base_url = "https://sapi.xt.com"  # 공식 API
+            self.spot_base_url = "https://sapi.xt.com"  # 스팟 API
         elif self.exchange == 'backpack':
             self.api_key = kwargs.get('api_key')
             self.private_key = kwargs.get('private_key') or kwargs.get('api_secret')
@@ -1826,24 +1826,16 @@ class UnifiedFuturesTrader:
         """API 연결 테스트"""
         try:
             if self.exchange == 'xt':
-                # XT API 연결 테스트 - 실제 작동하는 엔드포인트 사용
-                url = f"{self.base_url}/v4/referal/invite/check"
-                params = {'uid': 123}  # 테스트용 UID
-                response = requests.get(url, params=params)
+                # XT API 연결 테스트 - 서버 시간 조회 (공개 엔드포인트)
+                url = f"{self.base_url}/v4/public/time"
+                response = requests.get(url)
                 
                 if response.status_code == 200:
                     data = response.json()
-                    # AUTH_001 오류는 인증이 필요한 엔드포인트이지만 API 서버는 정상 작동함을 의미
-                    if data.get('rc') == 1 and data.get('mc') == 'AUTH_001':
-                        return {
-                            'status': 'success',
-                            'message': 'XT API 서버 연결 성공 (인증 필요)'
-                        }
-                    else:
-                        return {
-                            'status': 'success',
-                            'message': 'XT API 연결 성공'
-                        }
+                    return {
+                        'status': 'success',
+                        'message': 'XT API 연결 성공'
+                    }
                 else:
                     return {
                         'status': 'error',
@@ -1920,11 +1912,23 @@ class UnifiedFuturesTrader:
         """선물 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 잔고 조회 - 현재 서비스 상태에 따른 처리
-                return {
-                    'status': 'error',
-                    'message': 'XT API 현재 서비스 중이 아닙니다. 잠시 후 다시 시도해주세요.'
-                }
+                # XT 잔고 조회 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v4/account/balance"
+                headers = self._get_headers_xt()
+                response = requests.get(url, headers=headers)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'status': 'success',
+                        'balance': data.get('result', {}),
+                        'message': 'XT 잔고 조회 성공'
+                    }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 잔고 조회 실패: {response.status_code}'
+                    }
             
             elif self.exchange == 'backpack':
                 # Backpack Exchange 잔고 조회 - /capital 엔드포인트 사용
@@ -1963,11 +1967,29 @@ class UnifiedFuturesTrader:
         """선물 거래쌍 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 거래쌍 조회 - 현재 서비스 상태에 따른 처리
-                return {
-                    'status': 'error',
-                    'message': 'XT API 현재 서비스 중이 아닙니다. 잠시 후 다시 시도해주세요.'
-                }
+                # XT 거래쌍 조회 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v4/public/symbols"
+                response = requests.get(url)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # 실제 데이터에서 심볼 추출
+                    symbols_data = data.get('result', [])
+                    symbols = []
+                    for symbol_info in symbols_data:
+                        if isinstance(symbol_info, dict) and 'symbol' in symbol_info:
+                            symbols.append(symbol_info['symbol'])
+                    
+                    return {
+                        'status': 'success',
+                        'symbols': symbols,
+                        'message': f'XT 거래쌍 {len(symbols)}개 조회 성공'
+                    }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 거래쌍 조회 실패: {response.status_code}'
+                    }
             
             elif self.exchange == 'backpack':
                 # Backpack Exchange 실제 지원 심볼들 (API 기반)
@@ -2036,11 +2058,34 @@ class UnifiedFuturesTrader:
         """롱 포지션 오픈"""
         try:
             if self.exchange == 'xt':
-                # XT 주문 - 현재 서비스 상태에 따른 처리
-                return {
-                    'status': 'error',
-                    'message': 'XT API 현재 서비스 중이 아닙니다. 잠시 후 다시 시도해주세요.'
+                # XT 주문 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v4/order"
+                params = {
+                    'symbol': symbol,
+                    'side': 'buy',
+                    'type': order_type,
+                    'quantity': size
                 }
+                
+                # 레버리지는 선물 거래에서만 설정
+                if market_type == 'futures' and leverage > 1:
+                    params['leverage'] = leverage
+                
+                headers = self._get_headers_xt(params)
+                response = requests.post(url, headers=headers, json=params)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'status': 'success',
+                        'order_id': data.get('result', {}).get('orderId'),
+                        'message': 'XT 롱 포지션 오픈 성공'
+                    }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 롱 포지션 오픈 실패: {response.status_code}'
+                    }
             
             elif self.exchange == 'backpack':
                 url = f"{self.base_url}/order"
@@ -2116,11 +2161,34 @@ class UnifiedFuturesTrader:
         """숏 포지션 오픈"""
         try:
             if self.exchange == 'xt':
-                # XT 주문 - 현재 서비스 상태에 따른 처리
-                return {
-                    'status': 'error',
-                    'message': 'XT API 현재 서비스 중이 아닙니다. 잠시 후 다시 시도해주세요.'
+                # XT 주문 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v4/order"
+                params = {
+                    'symbol': symbol,
+                    'side': 'sell',
+                    'type': order_type,
+                    'quantity': size
                 }
+                
+                # 레버리지는 선물 거래에서만 설정
+                if market_type == 'futures' and leverage > 1:
+                    params['leverage'] = leverage
+                
+                headers = self._get_headers_xt(params)
+                response = requests.post(url, headers=headers, json=params)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'status': 'success',
+                        'order_id': data.get('result', {}).get('orderId'),
+                        'message': 'XT 숏 포지션 오픈 성공'
+                    }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 숏 포지션 오픈 실패: {response.status_code}'
+                    }
             
             elif self.exchange == 'backpack':
                 url = f"{self.base_url}/order"
@@ -2196,11 +2264,34 @@ class UnifiedFuturesTrader:
         """스팟 매수"""
         try:
             if self.exchange == 'xt':
-                # XT 스팟 매수 - 현재 서비스 상태에 따른 처리
-                return {
-                    'status': 'error',
-                    'message': 'XT API 현재 서비스 중이 아닙니다. 잠시 후 다시 시도해주세요.'
+                # XT 스팟 매수 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v4/order"
+                params = {
+                    'symbol': symbol,
+                    'side': 'buy',
+                    'type': order_type,
+                    'quantity': size
                 }
+                
+                # 지정가 주문의 경우 가격 추가
+                if order_type == 'limit' and price:
+                    params['price'] = price
+                
+                headers = self._get_headers_xt(params)
+                response = requests.post(url, headers=headers, json=params)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'status': 'success',
+                        'order_id': data.get('result', {}).get('orderId'),
+                        'message': 'XT 스팟 매수 성공'
+                    }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 스팟 매수 실패: {response.status_code}'
+                    }
             
             elif self.exchange == 'backpack':
                 url = f"{self.base_url}/order"
@@ -2269,11 +2360,34 @@ class UnifiedFuturesTrader:
         """스팟 매도"""
         try:
             if self.exchange == 'xt':
-                # XT 스팟 매도 - 현재 서비스 상태에 따른 처리
-                return {
-                    'status': 'error',
-                    'message': 'XT API 현재 서비스 중이 아닙니다. 잠시 후 다시 시도해주세요.'
+                # XT 스팟 매도 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v4/order"
+                params = {
+                    'symbol': symbol,
+                    'side': 'sell',
+                    'type': order_type,
+                    'quantity': size
                 }
+                
+                # 지정가 주문의 경우 가격 추가
+                if order_type == 'limit' and price:
+                    params['price'] = price
+                
+                headers = self._get_headers_xt(params)
+                response = requests.post(url, headers=headers, json=params)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'status': 'success',
+                        'order_id': data.get('result', {}).get('orderId'),
+                        'message': 'XT 스팟 매도 성공'
+                    }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 스팟 매도 실패: {response.status_code}'
+                    }
             
             elif self.exchange == 'backpack':
                 url = f"{self.base_url}/order"
@@ -2342,11 +2456,23 @@ class UnifiedFuturesTrader:
         """스팟 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 스팟 잔고 조회 - 현재 서비스 상태에 따른 처리
-                return {
-                    'status': 'error',
-                    'message': 'XT API 현재 서비스 중이 아닙니다. 잠시 후 다시 시도해주세요.'
-                }
+                # XT 스팟 잔고 조회 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v4/account/balance"
+                headers = self._get_headers_xt()
+                response = requests.get(url, headers=headers)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'status': 'success',
+                        'balance': data.get('result', {}),
+                        'message': 'XT 스팟 잔고 조회 성공'
+                    }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 스팟 잔고 조회 실패: {response.status_code}'
+                    }
                             'message': 'XT 스팟 잔고 조회 성공'
                         }
                 else:
@@ -2414,11 +2540,40 @@ class UnifiedFuturesTrader:
         """시장 데이터 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 시장 데이터 조회 - 현재 서비스 상태에 따른 처리
-                return {
-                    'status': 'error',
-                    'message': 'XT API 현재 서비스 중이 아닙니다. 잠시 후 다시 시도해주세요.'
-                }
+                if data_type == 'ticker':
+                    # XT 시장 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/ticker/24hr"
+                    if symbol:
+                        url += f"?symbol={symbol}"
+                    response = requests.get(url)
+                elif data_type == 'depth':
+                    # XT 깊이 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/depth"
+                    params = {'symbol': symbol, 'limit': 10}
+                    response = requests.get(url, params=params)
+                elif data_type == 'kline':
+                    # XT K라인 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/kline"
+                    params = {'symbol': symbol, 'interval': '1m', 'limit': 10}
+                    response = requests.get(url, params=params)
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'지원하지 않는 데이터 타입: {data_type}'
+                    }
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'status': 'success',
+                        'data': data.get('result', {}),
+                        'message': f'XT {data_type} 데이터 조회 성공'
+                    }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT {data_type} 데이터 조회 실패: {response.status_code}'
+                    }
             else:
                 return {
                     'status': 'error',
@@ -2434,11 +2589,40 @@ class UnifiedFuturesTrader:
         """스팟 시장 데이터 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 스팟 시장 데이터 조회 - 현재 서비스 상태에 따른 처리
-                return {
-                    'status': 'error',
-                    'message': 'XT API 현재 서비스 중이 아닙니다. 잠시 후 다시 시도해주세요.'
-                }
+                if data_type == 'ticker':
+                    # XT 스팟 시장 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/ticker/24hr"
+                    if symbol:
+                        url += f"?symbol={symbol}"
+                    response = requests.get(url)
+                elif data_type == 'depth':
+                    # XT 스팟 깊이 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/depth"
+                    params = {'symbol': symbol, 'limit': 10}
+                    response = requests.get(url, params=params)
+                elif data_type == 'kline':
+                    # XT 스팟 K라인 데이터 조회 - 공식 문서 기반
+                    url = f"{self.base_url}/v4/public/kline"
+                    params = {'symbol': symbol, 'interval': '1m', 'limit': 10}
+                    response = requests.get(url, params=params)
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'지원하지 않는 데이터 타입: {data_type}'
+                    }
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'status': 'success',
+                        'data': data.get('result', {}),
+                        'message': f'XT 스팟 {data_type} 데이터 조회 성공'
+                    }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 스팟 {data_type} 데이터 조회 실패: {response.status_code}'
+                    }
                             'status': 'success',
                             'data': data.get('result', {}),
                             'message': f'XT 스팟 {data_type} 데이터 조회 성공'
