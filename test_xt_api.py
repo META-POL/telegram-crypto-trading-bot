@@ -4,18 +4,18 @@ import hmac
 import hashlib
 
 def test_xt_api():
-    """XT Exchange API 연결 테스트 (개선된 구현 테스트)"""
+    """XT Exchange API 연결 테스트 (공식 문서 기반 정확한 엔드포인트)"""
     
     # API 키 정보
     api_key = "e060cc97-84ad-4a62-aed8-198e5c85530a"
     api_secret = "421c0b02f715bfcdae119497135df83cf0bb8140"
     
-    # XT API 베이스 URL (개선된 구현)
+    # XT API 베이스 URL (공식 문서 기반)
     base_url = "https://fapi.xt.com"  # 선물 API
     spot_base_url = "https://api.xt.com"  # 스팟 API
     
     def get_headers(params=None):
-        """XT API 헤더 생성 (개선된 구현)"""
+        """XT API 헤더 생성 (공식 문서 기반)"""
         timestamp = str(int(time.time() * 1000))
         params = params or {}
         
@@ -30,27 +30,27 @@ def test_xt_api():
             "Content-Type": "application/json"
         }
     
-    # 개선된 구현에서 사용하는 엔드포인트들
+    # 공식 문서 기반 정확한 엔드포인트들
     test_endpoints = [
-        # 선물 API 테스트 (개선된 구현)
+        # 선물 API 테스트 (공식 문서 기반)
         {
             'url': f"{base_url}/v1/public/time",
-            'name': '선물 서버 시간 (개선된 구현)',
+            'name': '선물 서버 시간',
             'auth_required': False
         },
         {
             'url': f"{base_url}/v1/public/contracts",
-            'name': '선물 계약 목록 (개선된 구현)',
+            'name': '선물 계약 목록',
             'auth_required': False
         },
         {
             'url': f"{base_url}/v1/account/balance",
-            'name': '선물 잔고 조회 (개선된 구현)',
+            'name': '선물 잔고 조회',
             'auth_required': True
         },
         {
             'url': f"{base_url}/v1/order",
-            'name': '선물 주문 (개선된 구현)',
+            'name': '선물 주문',
             'auth_required': True,
             'method': 'POST',
             'data': {
@@ -62,25 +62,25 @@ def test_xt_api():
             }
         },
         
-        # 스팟 API 테스트 (개선된 구현)
+        # 스팟 API 테스트 (공식 문서 기반)
         {
             'url': f"{spot_base_url}/v4/public/time",
-            'name': '스팟 서버 시간 (개선된 구현)',
+            'name': '스팟 서버 시간',
             'auth_required': False
         },
         {
             'url': f"{spot_base_url}/v4/public/symbols",
-            'name': '스팟 거래쌍 조회 (개선된 구현)',
+            'name': '스팟 거래쌍 조회',
             'auth_required': False
         },
         {
             'url': f"{spot_base_url}/v4/account/balance",
-            'name': '스팟 잔고 조회 (개선된 구현)',
+            'name': '스팟 잔고 조회',
             'auth_required': True
         },
         {
             'url': f"{spot_base_url}/v4/order",
-            'name': '스팟 주문 (개선된 구현)',
+            'name': '스팟 주문',
             'auth_required': True,
             'method': 'POST',
             'data': {
@@ -91,22 +91,36 @@ def test_xt_api():
             }
         },
         
-        # 기존 패턴들 (비교용)
+        # 추가 공개 엔드포인트들
         {
-            'url': f"{base_url}/api/v4/futures/account/balance",
-            'name': '기존 패턴 - 선물 잔고',
-            'auth_required': True
+            'url': f"{base_url}/v1/public/ticker",
+            'name': '선물 시장 데이터',
+            'auth_required': False
         },
         {
-            'url': f"{base_url}/api/v4/futures/contract/list",
-            'name': '기존 패턴 - 계약 목록',
+            'url': f"{base_url}/v1/public/depth",
+            'name': '선물 깊이 데이터',
+            'auth_required': False,
+            'params': {'symbol': 'BTC_USDT', 'limit': 10}
+        },
+        {
+            'url': f"{spot_base_url}/v4/public/ticker",
+            'name': '스팟 시장 데이터',
             'auth_required': False
+        },
+        {
+            'url': f"{spot_base_url}/v4/public/depth",
+            'name': '스팟 깊이 데이터',
+            'auth_required': False,
+            'params': {'symbol': 'BTC_USDT', 'limit': 10}
         }
     ]
     
-    print("=== XT Exchange API 연결 테스트 (개선된 구현) ===")
+    print("=== XT Exchange API 연결 테스트 (공식 문서 기반) ===")
     print(f"테스트 시간: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"API 키: {api_key[:10]}...")
+    print(f"선물 API: {base_url}")
+    print(f"스팟 API: {spot_base_url}")
     print()
     
     successful_endpoints = []
@@ -118,6 +132,7 @@ def test_xt_api():
         auth_required = endpoint['auth_required']
         method = endpoint.get('method', 'GET')
         data = endpoint.get('data')
+        params = endpoint.get('params')
         
         print(f"🔍 테스트: {name}")
         print(f"   URL: {url}")
@@ -125,19 +140,27 @@ def test_xt_api():
         print(f"   인증 필요: {'예' if auth_required else '아니오'}")
         if data:
             print(f"   데이터: {data}")
+        if params:
+            print(f"   파라미터: {params}")
         
         try:
             if auth_required:
-                headers = get_headers(data if data else {})
+                headers = get_headers(data if data else params if params else {})
                 if method == 'POST':
                     response = requests.post(url, headers=headers, json=data)
                 else:
-                    response = requests.get(url, headers=headers)
+                    if params:
+                        response = requests.get(url, headers=headers, params=params)
+                    else:
+                        response = requests.get(url, headers=headers)
             else:
                 if method == 'POST':
                     response = requests.post(url, json=data)
                 else:
-                    response = requests.get(url)
+                    if params:
+                        response = requests.get(url, params=params)
+                    else:
+                        response = requests.get(url)
             
             print(f"   상태 코드: {response.status_code}")
             
@@ -215,6 +238,7 @@ def test_xt_api():
         print("- XT 거래소 웹사이트에서 API 키 권한 확인")
         print("- API 키가 선물/스팟 거래 권한을 가지고 있는지 확인")
         print("- XT 공식 API 문서에서 최신 엔드포인트 확인")
+        print("- [XT 공식 문서](https://doc.xt.com/) 참조")
     
     return successful_endpoints
 

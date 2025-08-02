@@ -1775,7 +1775,7 @@ class UnifiedFuturesTrader:
         if self.exchange == 'xt':
             self.api_key = kwargs.get('api_key')
             self.api_secret = kwargs.get('api_secret')
-            # XT API 베이스 URL 수정 (공식 문서 기반)
+            # XT API 베이스 URL (공식 문서 기반)
             self.base_url = "https://fapi.xt.com"  # 선물 API
             self.spot_base_url = "https://api.xt.com"  # 스팟 API
         elif self.exchange == 'backpack':
@@ -2478,6 +2478,90 @@ class UnifiedFuturesTrader:
             return {
                 'status': 'error',
                 'message': f'스팟 매도 오류: {str(e)}'
+            }
+
+    def get_spot_balance(self):
+        """스팟 계좌 잔고 조회"""
+        try:
+            if self.exchange == 'xt':
+                # XT 스팟 잔고 조회 - 공식 문서 기반 엔드포인트
+                url = f"{self.spot_base_url}/v4/account/balance"
+                headers = self._get_headers_xt()
+                response = requests.get(url, headers=headers)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # API 문서 링크 응답인지 확인
+                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
+                        return {
+                            'status': 'error',
+                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
+                        }
+                    else:
+                        return {
+                            'status': 'success',
+                            'balance': data.get('result', {}),
+                            'message': 'XT 스팟 잔고 조회 성공'
+                        }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 스팟 잔고 조회 실패: {response.status_code}'
+                    }
+            else:
+                return {
+                    'status': 'error',
+                    'message': f'{self.exchange.capitalize()}는 스팟 잔고 조회를 지원하지 않습니다.'
+                }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'스팟 잔고 조회 오류: {str(e)}'
+            }
+
+    def get_spot_symbols(self):
+        """스팟 거래쌍 조회"""
+        try:
+            if self.exchange == 'xt':
+                # XT 스팟 거래쌍 조회 - 공식 문서 기반 엔드포인트
+                url = f"{self.spot_base_url}/v4/public/symbols"
+                response = requests.get(url)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # API 문서 링크 응답인지 확인
+                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
+                        return {
+                            'status': 'error',
+                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
+                        }
+                    else:
+                        # 실제 데이터에서 심볼 추출
+                        symbols_data = data.get('result', [])
+                        symbols = []
+                        for symbol_data in symbols_data:
+                            if isinstance(symbol_data, dict) and 'symbol' in symbol_data:
+                                symbols.append(symbol_data['symbol'])
+                        
+                        return {
+                            'status': 'success',
+                            'symbols': symbols,
+                            'message': f'XT 스팟 거래쌍 {len(symbols)}개 조회 성공'
+                        }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 스팟 거래쌍 조회 실패: {response.status_code}'
+                    }
+            else:
+                return {
+                    'status': 'error',
+                    'message': f'{self.exchange.capitalize()}는 스팟 거래쌍 조회를 지원하지 않습니다.'
+                }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'스팟 거래쌍 조회 오류: {str(e)}'
             }
 
 if __name__ == '__main__':
