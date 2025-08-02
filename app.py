@@ -2213,27 +2213,46 @@ class UnifiedFuturesTrader:
             sign_string = f"timestamp={timestamp}"
         
         # 4. HMAC-SHA256 서명 생성 (PyXT 라이브러리 방식)
+        # PyXT 라이브러리 방식: digest().hex() 사용
         signature = hmac.new(
             self.api_secret.encode('utf-8'), 
             sign_string.encode('utf-8'), 
             hashlib.sha256
-        ).hexdigest()
+        ).digest().hex()
         
-        # 대안: Base64 인코딩 방식 (일부 API에서 사용)
+        # PyXT 라이브러리 대안: Base64 인코딩 방식
         # signature = base64.b64encode(hmac.new(
         #     self.api_secret.encode('utf-8'), 
         #     sign_string.encode('utf-8'), 
         #     hashlib.sha256
         # ).digest()).decode('utf-8')
         
+        # PyXT 라이브러리 대안: 다른 서명 방식
+        # signature = hmac.new(
+        #     self.api_secret.encode('utf-8'), 
+        #     sign_string.encode('utf-8'), 
+        #     hashlib.sha256
+        # ).digest().hex()
+        
         print(f"XT 서명 디버그: sign_string={sign_string}, signature={signature}")  # 디버깅용
         
-        return {
+        # PyXT 라이브러리 방식과 공식 문서 방식 모두 시도
+        headers = {
             "XT-API-KEY": self.api_key,
             "XT-API-SIGN": signature,
             "XT-API-TIMESTAMP": timestamp,
             "Content-Type": "application/json"
         }
+        
+        # PyXT 라이브러리 방식 대안 (일부 API에서 사용)
+        # headers = {
+        #     "access_key": self.api_key,
+        #     "signature": signature,
+        #     "timestamp": timestamp,
+        #     "Content-Type": "application/json"
+        # }
+        
+        return headers
 
     def _get_headers_backpack(self, instruction, params=None):
         """Backpack API 헤더 생성"""
