@@ -200,7 +200,14 @@ def webhook():
         
         # 콜백 쿼리 처리 (버튼 클릭)
         if update.callback_query:
-            await handle_callback_query(update.callback_query, telegram_app)
+            # 비동기 함수 실행
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(handle_callback_query(update.callback_query, telegram_app))
+                loop.close()
+            except Exception as e:
+                print(f"❌ 콜백 쿼리 처리 오류: {e}")
             return jsonify({"status": "success"})
         
         # 명령어 처리
@@ -272,40 +279,40 @@ def webhook():
 
 async def show_main_menu(telegram_app, chat_id):
     """메인 메뉴 표시"""
-                        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                        
-                        keyboard = [
-        [InlineKeyboardButton("🔑 API 키 관리", callback_data="api_management")],
-                            [InlineKeyboardButton("💰 잔고 조회", callback_data="balance_menu")],
-                            [InlineKeyboardButton("📈 거래쌍 조회", callback_data="symbols_menu")],
-                            [InlineKeyboardButton("📊 포지션 관리", callback_data="position_menu")],
-        [InlineKeyboardButton("🔄 거래하기", callback_data="trade_menu")],
-                            [InlineKeyboardButton("⚙️ 설정", callback_data="settings_menu")],
-                            [InlineKeyboardButton("❓ 도움말", callback_data="help")]
-                        ]
-                        reply_markup = InlineKeyboardMarkup(keyboard)
-                        
-                        response_text = (
-                            "🤖 **암호화폐 선물 거래 봇**\n\n"
-                            "버튼을 클릭하여 원하는 기능을 선택하세요!\n\n"
-                            "**지원 거래소:**\n"
-                            "• XT Exchange\n"
-                            "• Backpack Exchange\n"
-                            "• Hyperliquid\n"
-                            "• Flipster\n\n"
-                            "먼저 API 키를 설정해주세요!"
-                        )
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
-                        await telegram_app.bot.send_message(
-                            chat_id=chat_id, 
-                            text=response_text, 
-                            parse_mode='Markdown',
-                            reply_markup=reply_markup
-                        )
+    keyboard = [
+        [InlineKeyboardButton("🔑 API 키 관리", callback_data="api_management")],
+        [InlineKeyboardButton("💰 잔고 조회", callback_data="balance_menu")],
+        [InlineKeyboardButton("📈 거래쌍 조회", callback_data="symbols_menu")],
+        [InlineKeyboardButton("📊 포지션 관리", callback_data="position_menu")],
+        [InlineKeyboardButton("🔄 거래하기", callback_data="trade_menu")],
+        [InlineKeyboardButton("⚙️ 설정", callback_data="settings_menu")],
+        [InlineKeyboardButton("❓ 도움말", callback_data="help")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    response_text = (
+        "🤖 **암호화폐 선물 거래 봇**\n\n"
+        "버튼을 클릭하여 원하는 기능을 선택하세요!\n\n"
+        "**지원 거래소:**\n"
+        "• XT Exchange\n"
+        "• Backpack Exchange\n"
+        "• Hyperliquid\n"
+        "• Flipster\n\n"
+        "먼저 API 키를 설정해주세요!"
+    )
+
+    await telegram_app.bot.send_message(
+        chat_id=chat_id, 
+        text=response_text, 
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
 
 async def handle_api_setup(telegram_app, chat_id, user_id, text):
     """API 설정 처리"""
-                        parts = text.split()
+    parts = text.split()
     if len(parts) < 4:
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
@@ -314,9 +321,9 @@ async def handle_api_setup(telegram_app, chat_id, user_id, text):
                  "`/setapi xt YOUR_API_KEY YOUR_SECRET_KEY`",
             parse_mode='Markdown'
         )
-                            return
-                        
-                        exchange = parts[1].lower()
+        return
+    
+    exchange = parts[1].lower()
     api_key = parts[2]
     api_secret = parts[3]
     
@@ -470,17 +477,17 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
             parse_mode='Markdown'
         )
-                            return
+        return
     
     try:
         api_key = user_keys.get(f'{exchange}_api_key')
         api_secret = user_keys.get(f'{exchange}_api_secret') or user_keys.get(f'{exchange}_private_key')
-                        
-                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-                        result = trader.get_futures_balance()
-                        
-                        if result.get('status') == 'success':
-                            balance_data = result.get('balance', {})
+        
+        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+        result = trader.get_futures_balance()
+        
+        if result.get('status') == 'success':
+            balance_data = result.get('balance', {})
             
             # 잔고 데이터를 보기 좋게 포맷팅
             if isinstance(balance_data, dict):
@@ -495,8 +502,8 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
                 
                 if not formatted_balance:
                     formatted_balance = "사용 가능한 잔고가 없습니다."
-                        else:
-                formatted_balance = str(balance_data)
+                else:
+                    formatted_balance = str(balance_data)
             
             keyboard = [
                 [InlineKeyboardButton("🔄 새로고침", callback_data=data)],
@@ -540,24 +547,24 @@ async def handle_symbols_callback(telegram_app, chat_id, user_id, data, callback
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
             parse_mode='Markdown'
         )
-                            return
+        return
     
     try:
         api_key = user_keys.get(f'{exchange}_api_key')
         api_secret = user_keys.get(f'{exchange}_api_secret') or user_keys.get(f'{exchange}_private_key')
-                        
-                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-                        result = trader.get_futures_symbols()
-                        
-                        if result.get('status') == 'success':
-                            symbols_data = result.get('symbols', [])
+        
+        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+        result = trader.get_futures_symbols()
+        
+        if result.get('status') == 'success':
+            symbols_data = result.get('symbols', [])
             
             # 심볼 목록을 보기 좋게 포맷팅 (최대 20개만 표시)
             symbols_text = f"📈 **{exchange.upper()} 거래쌍** ({len(symbols_data)}개)\n\n"
-                            for i, symbol in enumerate(symbols_data[:20], 1):
-                                symbols_text += f"{i}. {symbol}\n"
+            for i, symbol in enumerate(symbols_data[:20], 1):
+                symbols_text += f"{i}. {symbol}\n"
             
-                            if len(symbols_data) > 20:
+            if len(symbols_data) > 20:
                 symbols_text += f"\n... 및 {len(symbols_data) - 20}개 더"
             
             keyboard = [
@@ -573,7 +580,7 @@ async def handle_symbols_callback(telegram_app, chat_id, user_id, data, callback
                 parse_mode='Markdown',
                 reply_markup=reply_markup
             )
-                        else:
+        else:
             await telegram_app.bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=callback_query.message.message_id,
@@ -663,16 +670,16 @@ async def show_trade_setup_menu(telegram_app, chat_id, user_id, trade_type, call
 
 async def handle_balance_command(telegram_app, chat_id, user_id, text):
     """잔고 조회 명령어 처리"""
-                        parts = text.split()
+    parts = text.split()
     if len(parts) < 2:
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
             text="❌ 사용법: /balance [거래소]\n\n예시: `/balance xt`",
             parse_mode='Markdown'
         )
-                            return
-                        
-                        exchange = parts[1].lower()
+        return
+    
+    exchange = parts[1].lower()
     user_keys = get_user_api_keys(user_id)
     
     if not user_keys or not user_keys.get(f'{exchange}_api_key'):
@@ -683,16 +690,16 @@ async def handle_balance_command(telegram_app, chat_id, user_id, text):
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
             parse_mode='Markdown'
         )
-                            return
+        return
     
     try:
         api_key = user_keys.get(f'{exchange}_api_key')
         api_secret = user_keys.get(f'{exchange}_api_secret') or user_keys.get(f'{exchange}_private_key')
-                        
-                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+        
+        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
         result = trader.get_futures_balance()
-                        
-                        if result.get('status') == 'success':
+        
+        if result.get('status') == 'success':
             balance_data = result.get('balance', {})
             
             # 잔고 데이터를 보기 좋게 포맷팅
@@ -708,8 +715,8 @@ async def handle_balance_command(telegram_app, chat_id, user_id, text):
                 
                 if not formatted_balance:
                     formatted_balance = "사용 가능한 잔고가 없습니다."
-                        else:
-                formatted_balance = str(balance_data)
+                else:
+                    formatted_balance = str(balance_data)
             
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
@@ -731,16 +738,16 @@ async def handle_balance_command(telegram_app, chat_id, user_id, text):
 
 async def handle_symbols_command(telegram_app, chat_id, user_id, text):
     """거래쌍 조회 명령어 처리"""
-                        parts = text.split()
+    parts = text.split()
     if len(parts) < 2:
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
             text="❌ 사용법: /symbols [거래소]\n\n예시: `/symbols xt`",
             parse_mode='Markdown'
         )
-                            return
-                        
-                        exchange = parts[1].lower()
+        return
+    
+    exchange = parts[1].lower()
     user_keys = get_user_api_keys(user_id)
     
     if not user_keys or not user_keys.get(f'{exchange}_api_key'):
@@ -751,16 +758,16 @@ async def handle_symbols_command(telegram_app, chat_id, user_id, text):
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
             parse_mode='Markdown'
         )
-                            return
+        return
     
     try:
         api_key = user_keys.get(f'{exchange}_api_key')
         api_secret = user_keys.get(f'{exchange}_api_secret') or user_keys.get(f'{exchange}_private_key')
-                        
-                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+        
+        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
         result = trader.get_futures_symbols()
-                        
-                        if result.get('status') == 'success':
+        
+        if result.get('status') == 'success':
             symbols_data = result.get('symbols', [])
             
             # 심볼 목록을 보기 좋게 포맷팅 (최대 20개만 표시)
@@ -776,7 +783,7 @@ async def handle_symbols_command(telegram_app, chat_id, user_id, text):
                 text=symbols_text,
                 parse_mode='Markdown'
             )
-                        else:
+        else:
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
                 text=f"❌ **거래쌍 조회 실패**\n\n오류: {result.get('message', '알 수 없는 오류')}",
@@ -791,16 +798,16 @@ async def handle_symbols_command(telegram_app, chat_id, user_id, text):
 
 async def handle_positions_command(telegram_app, chat_id, user_id, text):
     """포지션 조회 명령어 처리"""
-                        parts = text.split()
-                        if len(parts) < 2:
+    parts = text.split()
+    if len(parts) < 2:
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
             text="❌ 사용법: /positions [거래소]\n\n예시: `/positions xt`",
             parse_mode='Markdown'
         )
-                            return
-                        
-                        exchange = parts[1].lower()
+        return
+    
+    exchange = parts[1].lower()
     user_keys = get_user_api_keys(user_id)
     
     if not user_keys or not user_keys.get(f'{exchange}_api_key'):
@@ -811,23 +818,23 @@ async def handle_positions_command(telegram_app, chat_id, user_id, text):
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
             parse_mode='Markdown'
         )
-                            return
+        return
     
     try:
         api_key = user_keys.get(f'{exchange}_api_key')
         api_secret = user_keys.get(f'{exchange}_api_secret') or user_keys.get(f'{exchange}_private_key')
-                        
-                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-                        result = trader.get_positions()
-                        
-                        if result.get('status') == 'success':
-                            positions_data = result.get('positions', {})
+        
+        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+        result = trader.get_positions()
+        
+        if result.get('status') == 'success':
+            positions_data = result.get('positions', {})
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
                 text=f"📊 **{exchange.upper()} 포지션**\n\n```\n{positions_data}\n```",
                 parse_mode='Markdown'
             )
-                        else:
+        else:
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
                 text=f"❌ **포지션 조회 실패**\n\n오류: {result.get('message', '알 수 없는 오류')}",
@@ -842,7 +849,7 @@ async def handle_positions_command(telegram_app, chat_id, user_id, text):
 
 async def handle_trade_command(telegram_app, chat_id, user_id, text):
     """거래 명령어 처리"""
-                        parts = text.split()
+    parts = text.split()
     if len(parts) < 6:
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
@@ -850,10 +857,10 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
                  "예시: `/trade xt BTCUSDT long 0.001 10`",
             parse_mode='Markdown'
         )
-                            return
-                        
-                        exchange = parts[1].lower()
-                        symbol = parts[2].upper()
+        return
+    
+    exchange = parts[1].lower()
+    symbol = parts[2].upper()
     direction = parts[3].lower()
     size = float(parts[4])
     leverage = int(parts[5])
@@ -868,13 +875,13 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
             parse_mode='Markdown'
         )
-                            return
+        return
     
     try:
         api_key = user_keys.get(f'{exchange}_api_key')
         api_secret = user_keys.get(f'{exchange}_api_secret') or user_keys.get(f'{exchange}_private_key')
-                        
-                        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+        
+        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
         
         if direction == 'long':
             result = trader.open_long_position(symbol, size, leverage)
@@ -887,8 +894,8 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
                 parse_mode='Markdown'
             )
             return
-                        
-                        if result.get('status') == 'success':
+        
+        if result.get('status') == 'success':
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
                 text=f"✅ **{direction.upper()} 포지션 오픈 성공**\n\n"
@@ -899,7 +906,7 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
                      f"주문 ID: {result.get('order_id', 'N/A')}",
                 parse_mode='Markdown'
             )
-                        else:
+        else:
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
                 text=f"❌ **포지션 오픈 실패**\n\n오류: {result.get('message', '알 수 없는 오류')}",
@@ -914,23 +921,23 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
 
 async def handle_close_command(telegram_app, chat_id, user_id, text):
     """포지션 종료 명령어 처리"""
-                        parts = text.split()
+    parts = text.split()
     if len(parts) < 3:
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
             text="❌ 사용법: /close [거래소] [심볼]\n\n예시: `/close xt BTCUSDT`",
             parse_mode='Markdown'
         )
-                            return
-                        
-                        exchange = parts[1].lower()
+        return
+    
+    exchange = parts[1].lower()
     symbol = parts[2].upper()
-                        
+    
     user_keys = get_user_api_keys(user_id)
-                        
+    
     if not user_keys or not user_keys.get(f'{exchange}_api_key'):
-                        await telegram_app.bot.send_message(
-                            chat_id=chat_id, 
+        await telegram_app.bot.send_message(
+            chat_id=chat_id, 
             text=f"❌ **{exchange.upper()} API 키가 설정되지 않았습니다.**\n\n"
                  f"먼저 API 키를 설정해주세요.\n\n"
                  f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
@@ -969,8 +976,8 @@ async def handle_close_command(telegram_app, chat_id, user_id, text):
 
 async def show_api_management_menu(telegram_app, chat_id, user_id):
     """API 관리 메뉴 표시"""
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    
     # 사용자 API 키 상태 확인
     user_keys = get_user_api_keys(user_id)
     
@@ -994,38 +1001,38 @@ async def show_api_management_menu(telegram_app, chat_id, user_id):
                 [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ])
     
-            reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = InlineKeyboardMarkup(keyboard)
     
     text = "🔑 **API 키 관리**\n\n각 거래소의 API 키 상태를 확인하고 설정할 수 있습니다."
             
-            await telegram_app.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=callback_query.message.message_id,
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id,
         text=text,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
             
 async def show_balance_menu(telegram_app, chat_id, user_id):
     """잔고 조회 메뉴 표시"""
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
-            keyboard = [
-                [InlineKeyboardButton("XT Exchange", callback_data="balance_xt")],
-                [InlineKeyboardButton("Backpack Exchange", callback_data="balance_backpack")],
-                [InlineKeyboardButton("Hyperliquid", callback_data="balance_hyperliquid")],
-                [InlineKeyboardButton("Flipster", callback_data="balance_flipster")],
-                [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+    keyboard = [
+        [InlineKeyboardButton("XT Exchange", callback_data="balance_xt")],
+        [InlineKeyboardButton("Backpack Exchange", callback_data="balance_backpack")],
+        [InlineKeyboardButton("Hyperliquid", callback_data="balance_hyperliquid")],
+        [InlineKeyboardButton("Flipster", callback_data="balance_flipster")],
+        [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await telegram_app.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=callback_query.message.message_id,
-                text="💰 **잔고 조회**\n\n거래소를 선택하여 잔고를 조회하세요.",
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id,
+        text="💰 **잔고 조회**\n\n거래소를 선택하여 잔고를 조회하세요.",
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
             
 async def show_symbols_menu(telegram_app, chat_id, user_id):
     """거래쌍 조회 메뉴 표시"""
@@ -1039,10 +1046,10 @@ async def show_symbols_menu(telegram_app, chat_id, user_id):
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
-                await telegram_app.bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=callback_query.message.message_id,
+            
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id,
         text="📈 **거래쌍 조회**\n\n거래소를 선택하여 거래 가능한 심볼을 조회하세요.",
         parse_mode='Markdown',
         reply_markup=reply_markup
@@ -1058,10 +1065,10 @@ async def show_position_menu(telegram_app, chat_id, user_id):
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
-                    await telegram_app.bot.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=callback_query.message.message_id,
+            
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id,
         text="📊 **포지션 관리**\n\n포지션을 조회하고 관리할 수 있습니다.",
         parse_mode='Markdown',
         reply_markup=reply_markup
@@ -1077,10 +1084,10 @@ async def show_trade_menu(telegram_app, chat_id, user_id):
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
-                    await telegram_app.bot.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=callback_query.message.message_id,
+            
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id,
         text="🔄 **거래하기**\n\n포지션을 오픈할 수 있습니다.",
         parse_mode='Markdown',
         reply_markup=reply_markup
@@ -1090,56 +1097,56 @@ async def show_settings_menu(telegram_app, chat_id, user_id):
     """설정 메뉴 표시"""
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
-            keyboard = [
+    keyboard = [
         [InlineKeyboardButton("⚙️ 리스크 설정", callback_data="settings_risk")],
         [InlineKeyboardButton("🔔 알림 설정", callback_data="settings_notifications")],
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await telegram_app.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=callback_query.message.message_id,
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id,
         text="⚙️ **설정**\n\n봇의 설정을 관리할 수 있습니다.",
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
             
 async def show_help(telegram_app, chat_id):
     """도움말 표시"""
-            help_text = (
-                "❓ **도움말**\n\n"
-                "**사용 방법:**\n"
+    help_text = (
+        "❓ **도움말**\n\n"
+        "**사용 방법:**\n"
         "1. 🔑 API 키 관리 - 거래소 API 키 설정\n"
-                "2. 💰 잔고 조회 - 계좌 잔고 확인\n"
-                "3. 📈 거래쌍 조회 - 거래 가능한 심볼 확인\n"
+        "2. 💰 잔고 조회 - 계좌 잔고 확인\n"
+        "3. 📈 거래쌍 조회 - 거래 가능한 심볼 확인\n"
         "4. 📊 포지션 관리 - 포지션 조회/종료\n"
         "5. 🔄 거래하기 - 포지션 오픈\n\n"
-                "**지원 거래소:**\n"
-                "• XT Exchange\n"
-                "• Backpack Exchange\n"
-                "• Hyperliquid\n"
-                "• Flipster\n\n"
-                "**명령어:**\n"
-                "• `/setapi [거래소] [API_KEY] [SECRET_KEY]` - API 키 설정\n"
-                "• `/balance [거래소]` - 잔고 조회\n"
+        "**지원 거래소:**\n"
+        "• XT Exchange\n"
+        "• Backpack Exchange\n"
+        "• Hyperliquid\n"
+        "• Flipster\n\n"
+        "**명령어:**\n"
+        "• `/setapi [거래소] [API_KEY] [SECRET_KEY]` - API 키 설정\n"
+        "• `/balance [거래소]` - 잔고 조회\n"
         "• `/symbols [거래소]` - 거래쌍 조회\n"
         "• `/positions [거래소]` - 포지션 조회\n"
         "• `/trade [거래소] [심볼] [방향] [수량] [레버리지]` - 거래\n"
         "• `/close [거래소] [심볼]` - 포지션 종료"
-            )
+    )
             
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [[InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+    keyboard = [[InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await telegram_app.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=callback_query.message.message_id,
-                text=help_text,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
+    await telegram_app.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=callback_query.message.message_id,
+        text=help_text,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
         
 # UnifiedFuturesTrader 클래스는 기존 app.py와 동일하게 유지
 class UnifiedFuturesTrader:
