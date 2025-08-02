@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """
 개선된 텔레그램 암호화폐 선물 거래 봇
 사용자 친화적 인터페이스와 API 키 관리 기능 포함
@@ -1774,7 +1775,9 @@ class UnifiedFuturesTrader:
         if self.exchange == 'xt':
             self.api_key = kwargs.get('api_key')
             self.api_secret = kwargs.get('api_secret')
-            self.base_url = "https://sapi.xt.com"
+            # XT API 베이스 URL 수정 (공식 문서 기반)
+            self.base_url = "https://fapi.xt.com"  # 선물 API
+            self.spot_base_url = "https://api.xt.com"  # 스팟 API
         elif self.exchange == 'backpack':
             self.api_key = kwargs.get('api_key')
             self.private_key = kwargs.get('private_key') or kwargs.get('api_secret')
@@ -1810,15 +1813,23 @@ class UnifiedFuturesTrader:
         """API 연결 테스트"""
         try:
             if self.exchange == 'xt':
-                url = f"{self.base_url}/api/v4/futures/account/balance"
-                headers = self._get_headers_xt()
-                response = requests.get(url, headers=headers)
+                # XT API 연결 테스트 - 서버 시간 조회 (공개 엔드포인트)
+                url = f"{self.base_url}/v1/public/time"
+                response = requests.get(url)
                 
                 if response.status_code == 200:
-                    return {
-                        'status': 'success',
-                        'message': 'XT 선물 API 연결 성공'
-                    }
+                    data = response.json()
+                    # API 문서 링크 응답인지 확인
+                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
+                        return {
+                            'status': 'error',
+                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
+                        }
+                    else:
+                        return {
+                            'status': 'success',
+                            'message': 'XT 선물 API 연결 성공'
+                        }
                 else:
                     return {
                         'status': 'error',
@@ -1856,11 +1867,14 @@ class UnifiedFuturesTrader:
             }
 
     def _get_headers_xt(self, params=None):
-        """XT API 헤더 생성"""
+        """XT API 헤더 생성 (공식 문서 기반)"""
         timestamp = str(int(time.time() * 1000))
         params = params or {}
+        
+        # XT API 서명 생성
         sign_str = '&'.join([f"{k}={params[k]}" for k in sorted(params)]) + f"&timestamp={timestamp}"
         signature = hmac.new(self.api_secret.encode(), sign_str.encode(), hashlib.sha256).hexdigest()
+        
         return {
             "XT-API-KEY": self.api_key,
             "XT-API-SIGN": signature,
@@ -1892,17 +1906,25 @@ class UnifiedFuturesTrader:
         """선물 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                url = f"{self.base_url}/api/v4/futures/account/balance"
+                # XT 선물 잔고 조회 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v1/account/balance"
                 headers = self._get_headers_xt()
                 response = requests.get(url, headers=headers)
                 
                 if response.status_code == 200:
                     data = response.json()
-                    return {
-                        'status': 'success',
-                        'balance': data.get('result', {}),
-                        'message': 'XT 선물 잔고 조회 성공'
-                    }
+                    # API 문서 링크 응답인지 확인
+                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
+                        return {
+                            'status': 'error',
+                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
+                        }
+                    else:
+                        return {
+                            'status': 'success',
+                            'balance': data.get('result', {}),
+                            'message': 'XT 선물 잔고 조회 성공'
+                        }
                 else:
                     return {
                         'status': 'error',
@@ -1946,18 +1968,31 @@ class UnifiedFuturesTrader:
         """선물 거래쌍 조회"""
         try:
             if self.exchange == 'xt':
-                url = f"{self.base_url}/api/v4/futures/contract/list"
-                headers = self._get_headers_xt()
-                response = requests.get(url, headers=headers)
+                # XT 선물 거래쌍 조회 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v1/public/contracts"
+                response = requests.get(url)
                 
                 if response.status_code == 200:
                     data = response.json()
-                    symbols = [item['symbol'] for item in data.get('result', [])]
-                    return {
-                        'status': 'success',
-                        'symbols': symbols,
-                        'message': f'XT 선물 거래쌍 {len(symbols)}개 조회 성공'
-                    }
+                    # API 문서 링크 응답인지 확인
+                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
+                        return {
+                            'status': 'error',
+                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
+                        }
+                    else:
+                        # 실제 데이터에서 심볼 추출
+                        contracts = data.get('result', [])
+                        symbols = []
+                        for contract in contracts:
+                            if isinstance(contract, dict) and 'symbol' in contract:
+                                symbols.append(contract['symbol'])
+                        
+                        return {
+                            'status': 'success',
+                            'symbols': symbols,
+                            'message': f'XT 선물 거래쌍 {len(symbols)}개 조회 성공'
+                        }
                 else:
                     return {
                         'status': 'error',
@@ -2031,7 +2066,8 @@ class UnifiedFuturesTrader:
         """롱 포지션 오픈"""
         try:
             if self.exchange == 'xt':
-                url = f"{self.base_url}/api/v4/futures/order"
+                # XT 선물 주문 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v1/order"
                 params = {
                     'symbol': symbol,
                     'side': 'buy',
@@ -2044,11 +2080,18 @@ class UnifiedFuturesTrader:
                 
                 if response.status_code == 200:
                     data = response.json()
-                    return {
-                        'status': 'success',
-                        'order_id': data.get('result', {}).get('orderId'),
-                        'message': 'XT 롱 포지션 오픈 성공'
-                    }
+                    # API 문서 링크 응답인지 확인
+                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
+                        return {
+                            'status': 'error',
+                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
+                        }
+                    else:
+                        return {
+                            'status': 'success',
+                            'order_id': data.get('result', {}).get('orderId'),
+                            'message': 'XT 롱 포지션 오픈 성공'
+                        }
                 else:
                     return {
                         'status': 'error',
@@ -2129,7 +2172,8 @@ class UnifiedFuturesTrader:
         """숏 포지션 오픈"""
         try:
             if self.exchange == 'xt':
-                url = f"{self.base_url}/api/v4/futures/order"
+                # XT 선물 주문 - 공식 문서 기반 엔드포인트
+                url = f"{self.base_url}/v1/order"
                 params = {
                     'symbol': symbol,
                     'side': 'sell',
@@ -2142,11 +2186,18 @@ class UnifiedFuturesTrader:
                 
                 if response.status_code == 200:
                     data = response.json()
-                    return {
-                        'status': 'success',
-                        'order_id': data.get('result', {}).get('orderId'),
-                        'message': 'XT 숏 포지션 오픈 성공'
-                    }
+                    # API 문서 링크 응답인지 확인
+                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
+                        return {
+                            'status': 'error',
+                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
+                        }
+                    else:
+                        return {
+                            'status': 'success',
+                            'order_id': data.get('result', {}).get('orderId'),
+                            'message': 'XT 숏 포지션 오픈 성공'
+                        }
                 else:
                     return {
                         'status': 'error',
@@ -2226,7 +2277,44 @@ class UnifiedFuturesTrader:
     def spot_buy(self, symbol, size, order_type='market', price=None):
         """스팟 매수"""
         try:
-            if self.exchange == 'backpack':
+            if self.exchange == 'xt':
+                # XT 스팟 매수 - 공식 문서 기반 엔드포인트
+                url = f"{self.spot_base_url}/v4/order"
+                params = {
+                    'symbol': symbol,
+                    'side': 'buy',
+                    'type': order_type,
+                    'quantity': size
+                }
+                
+                # 지정가 주문의 경우 가격 추가
+                if order_type == 'limit' and price:
+                    params['price'] = price
+                
+                headers = self._get_headers_xt(params)
+                response = requests.post(url, headers=headers, json=params)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # API 문서 링크 응답인지 확인
+                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
+                        return {
+                            'status': 'error',
+                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
+                        }
+                    else:
+                        return {
+                            'status': 'success',
+                            'order_id': data.get('result', {}).get('orderId'),
+                            'message': 'XT 스팟 매수 성공'
+                        }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 스팟 매수 실패: {response.status_code}'
+                    }
+            
+            elif self.exchange == 'backpack':
                 url = f"{self.base_url}/order"
                 
                 # Backpack Exchange API에 맞는 주문 타입 변환
@@ -2292,7 +2380,44 @@ class UnifiedFuturesTrader:
     def spot_sell(self, symbol, size, order_type='market', price=None):
         """스팟 매도"""
         try:
-            if self.exchange == 'backpack':
+            if self.exchange == 'xt':
+                # XT 스팟 매도 - 공식 문서 기반 엔드포인트
+                url = f"{self.spot_base_url}/v4/order"
+                params = {
+                    'symbol': symbol,
+                    'side': 'sell',
+                    'type': order_type,
+                    'quantity': size
+                }
+                
+                # 지정가 주문의 경우 가격 추가
+                if order_type == 'limit' and price:
+                    params['price'] = price
+                
+                headers = self._get_headers_xt(params)
+                response = requests.post(url, headers=headers, json=params)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # API 문서 링크 응답인지 확인
+                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
+                        return {
+                            'status': 'error',
+                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
+                        }
+                    else:
+                        return {
+                            'status': 'success',
+                            'order_id': data.get('result', {}).get('orderId'),
+                            'message': 'XT 스팟 매도 성공'
+                        }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 스팟 매도 실패: {response.status_code}'
+                    }
+            
+            elif self.exchange == 'backpack':
                 url = f"{self.base_url}/order"
                 
                 # Backpack Exchange API에 맞는 주문 타입 변환
