@@ -1617,6 +1617,13 @@ async def show_balance_menu(telegram_app, chat_id, user_id, callback_query=None)
 async def show_symbols_menu(telegram_app, chat_id, user_id, callback_query=None):
     """거래쌍 조회 메뉴 표시"""
     
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        return
+    
     keyboard = [
         [InlineKeyboardButton("XT Exchange", callback_data="symbols_xt")],
         [InlineKeyboardButton("Backpack Exchange", callback_data="symbols_backpack")],
@@ -1644,6 +1651,13 @@ async def show_symbols_menu(telegram_app, chat_id, user_id, callback_query=None)
 async def show_position_menu(telegram_app, chat_id, user_id, callback_query=None):
     """포지션 관리 메뉴 표시"""
     
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        return
+    
     keyboard = [
         [InlineKeyboardButton("📊 포지션 조회", callback_data="position_list")],
         [InlineKeyboardButton("❌ 포지션 종료", callback_data="position_close")],
@@ -1669,6 +1683,13 @@ async def show_position_menu(telegram_app, chat_id, user_id, callback_query=None
 
 async def show_trade_menu(telegram_app, chat_id, user_id, callback_query=None):
     """거래 메뉴 표시"""
+    
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        return
     
     keyboard = [
         [InlineKeyboardButton("XT Exchange", callback_data="trade_exchange_xt")],
@@ -1697,6 +1718,13 @@ async def show_trade_menu(telegram_app, chat_id, user_id, callback_query=None):
 async def show_settings_menu(telegram_app, chat_id, user_id, callback_query=None):
     """설정 메뉴 표시"""
     
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        return
+    
     keyboard = [
         [InlineKeyboardButton("⚙️ 리스크 설정", callback_data="settings_risk")],
         [InlineKeyboardButton("🔔 알림 설정", callback_data="settings_notifications")],
@@ -1722,6 +1750,14 @@ async def show_settings_menu(telegram_app, chat_id, user_id, callback_query=None
             
 async def show_help(telegram_app, chat_id, callback_query=None):
     """도움말 표시"""
+    
+    # Telegram 라이브러리 지연 로딩
+    try:
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    except ImportError:
+        print("❌ Telegram 라이브러리 import 실패")
+        return
+    
     help_text = (
         "❓ **도움말**\n\n"
         "**사용 방법:**\n"
