@@ -962,7 +962,8 @@ async def show_symbol_selection_menu(telegram_app, chat_id, user_id, trade_type,
                  f"**예시**:\n"
                  f"`/trade xt BTCUSDT buy market 0.001`\n"
                  f"`/trade xt ETHUSDT buy limit 0.01 2000`\n"
-                 f"`/trade xt CTSI sell market 100`",
+                 f"`/trade xt CTSI sell market 100`\n\n"
+                 f"**주의**: `market`을 정확히 입력해주세요 (martket 아님)",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
@@ -1665,9 +1666,11 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
                     )
                     return
             except Exception as e:
+                # 텔레그램 메시지 파싱 오류 방지를 위해 특수문자 처리
+                error_msg = str(e).replace('*', '\\*').replace('_', '\\_').replace('`', '\\`').replace('[', '\\[').replace(']', '\\]')
                 await telegram_app.bot.send_message(
                     chat_id=chat_id,
-                    text=f"❌ **스팟 거래 오류**\n\n오류: {str(e)}\n\nAPI 키와 심볼을 확인해주세요.",
+                    text=f"❌ **스팟 거래 오류**\n\n오류: {error_msg}\n\nAPI 키와 심볼을 확인해주세요.",
                     parse_mode='Markdown'
                 )
                 return
@@ -1708,10 +1711,14 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
             )
         else:
             # 스팟 거래와 선물 거래에 따른 실패 메시지 구분
+            error_msg = result.get('message', '알 수 없는 오류')
+            # 텔레그램 메시지 파싱 오류 방지를 위해 특수문자 처리
+            error_msg = error_msg.replace('*', '\\*').replace('_', '\\_').replace('`', '\\`').replace('[', '\\[').replace(']', '\\]')
+            
             if market_type == 'spot':
-                error_message = f"❌ **거래 실패**\n\n오류: {result.get('message', '알 수 없는 오류')}"
+                error_message = f"❌ **거래 실패**\n\n오류: {error_msg}"
             else:
-                error_message = f"❌ **포지션 오픈 실패**\n\n오류: {result.get('message', '알 수 없는 오류')}"
+                error_message = f"❌ **포지션 오픈 실패**\n\n오류: {error_msg}"
             
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
