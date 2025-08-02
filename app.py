@@ -957,10 +957,12 @@ async def show_symbol_selection_menu(telegram_app, chat_id, user_id, trade_type,
                  f"거래 타입: {market_type_text}\n\n"
                  f"XT Exchange는 거래 가능한 심볼이 많아서 직접 입력해주세요.\n\n"
                  f"**입력 형식**:\n"
-                 f"`/trade {exchange} [심볼] {'buy' if trade_type == 'long' else 'sell'} [주문타입] [수량]`\n\n"
+                 f"**시장가**: `/trade {exchange} [심볼] {'buy' if trade_type == 'long' else 'sell'} market [수량]`\n"
+                 f"**지정가**: `/trade {exchange} [심볼] {'buy' if trade_type == 'long' else 'sell'} limit [수량] [가격]`\n\n"
                  f"**예시**:\n"
                  f"`/trade xt BTCUSDT buy market 0.001`\n"
-                 f"`/trade xt ETHUSDT sell limit 0.01 2000`",
+                 f"`/trade xt ETHUSDT buy limit 0.01 2000`\n"
+                 f"`/trade xt CTSI sell market 100`",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
@@ -1612,7 +1614,7 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
         size = float(parts[5])
         price = None
         leverage = 1  # 기본값
-        if len(parts) > 6:
+        if len(parts) > 6 and parts[6].lower() in ['spot', 'futures']:
             market_type = parts[6].lower()  # spot 또는 futures
     
     user_keys = get_user_api_keys(user_id)
@@ -1648,14 +1650,22 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
         
         if market_type == 'spot':
             # 스팟 거래
-            if direction == 'buy':
-                result = trader.spot_buy(symbol, size, order_type, price)
-            elif direction == 'sell':
-                result = trader.spot_sell(symbol, size, order_type, price)
-            else:
+            try:
+                if direction == 'buy':
+                    result = trader.spot_buy(symbol, size, order_type, price)
+                elif direction == 'sell':
+                    result = trader.spot_sell(symbol, size, order_type, price)
+                else:
+                    await telegram_app.bot.send_message(
+                        chat_id=chat_id,
+                        text="❌ **잘못된 방향**\n\n스팟 거래에서는 'buy' 또는 'sell'이어야 합니다.",
+                        parse_mode='Markdown'
+                    )
+                    return
+            except Exception as e:
                 await telegram_app.bot.send_message(
                     chat_id=chat_id,
-                    text="❌ **잘못된 방향**\n\n스팟 거래에서는 'buy' 또는 'sell'이어야 합니다.",
+                    text=f"❌ **스팟 거래 오류**\n\n오류: {str(e)}\n\nAPI 키와 심볼을 확인해주세요.",
                     parse_mode='Markdown'
                 )
                 return
