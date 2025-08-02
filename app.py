@@ -262,6 +262,12 @@ def webhook():
                     elif text == '/help':
                         await show_help(telegram_app, chat_id)
                         
+                    elif text.startswith('/market'):
+                        await handle_market_data_command(telegram_app, chat_id, user_id, text)
+                        
+                    elif text.startswith('/spotmarket'):
+                        await handle_spot_market_data_command(telegram_app, chat_id, user_id, text)
+                        
                     else:
                         await telegram_app.bot.send_message(
                             chat_id=chat_id, 
@@ -1721,9 +1727,10 @@ async def show_help(telegram_app, chat_id, callback_query=None):
         "2. 💰 잔고 조회 - 계좌 잔고 확인\n"
         "3. 📈 거래쌍 조회 - 거래 가능한 심볼 확인\n"
         "4. 📊 포지션 관리 - 포지션 조회/종료\n"
-        "5. 🔄 거래하기 - 포지션 오픈\n\n"
+        "5. 🔄 거래하기 - 포지션 오픈\n"
+        "6. 📊 시장 데이터 - 실시간 시장 정보\n\n"
         "**지원 거래소:**\n"
-        "• XT Exchange\n"
+        "• XT Exchange (선물/스팟)\n"
         "• Backpack Exchange\n"
         "• Hyperliquid\n"
         "• Flipster\n\n"
@@ -1733,7 +1740,13 @@ async def show_help(telegram_app, chat_id, callback_query=None):
         "• `/symbols [거래소]` - 거래쌍 조회\n"
         "• `/positions [거래소]` - 포지션 조회\n"
         "• `/trade [거래소] [심볼] [방향] [수량] [레버리지]` - 거래\n"
-        "• `/close [거래소] [심볼]` - 포지션 종료"
+        "• `/close [거래소] [심볼]` - 포지션 종료\n"
+        "• `/market [거래소] [심볼] [ticker/depth/kline]` - 선물 시장 데이터\n"
+        "• `/spotmarket [거래소] [심볼] [ticker/depth/kline]` - 스팟 시장 데이터\n\n"
+        "**시장 데이터 타입:**\n"
+        "• `ticker`: 시장 가격 정보\n"
+        "• `depth`: 호가창 데이터\n"
+        "• `kline`: K라인 데이터"
     )
             
     keyboard = [[InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]]
@@ -2563,6 +2576,310 @@ class UnifiedFuturesTrader:
                 'status': 'error',
                 'message': f'스팟 거래쌍 조회 오류: {str(e)}'
             }
+
+    def get_market_data(self, symbol, data_type='ticker'):
+        """시장 데이터 조회"""
+        try:
+            if self.exchange == 'xt':
+                if data_type == 'ticker':
+                    # XT 선물 시장 데이터 조회
+                    url = f"{self.base_url}/v1/public/ticker"
+                    if symbol:
+                        url += f"?symbol={symbol}"
+                    response = requests.get(url)
+                elif data_type == 'depth':
+                    # XT 선물 깊이 데이터 조회
+                    url = f"{self.base_url}/v1/public/depth"
+                    params = {'symbol': symbol, 'limit': 10}
+                    response = requests.get(url, params=params)
+                elif data_type == 'kline':
+                    # XT 선물 K라인 데이터 조회
+                    url = f"{self.base_url}/v1/public/kline"
+                    params = {'symbol': symbol, 'interval': '1m', 'limit': 10}
+                    response = requests.get(url, params=params)
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'지원하지 않는 데이터 타입: {data_type}'
+                    }
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # API 문서 링크 응답인지 확인
+                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
+                        return {
+                            'status': 'error',
+                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
+                        }
+                    else:
+                        return {
+                            'status': 'success',
+                            'data': data.get('result', {}),
+                            'message': f'XT {data_type} 데이터 조회 성공'
+                        }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT {data_type} 데이터 조회 실패: {response.status_code}'
+                    }
+            else:
+                return {
+                    'status': 'error',
+                    'message': f'{self.exchange.capitalize()}는 시장 데이터 조회를 지원하지 않습니다.'
+                }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'시장 데이터 조회 오류: {str(e)}'
+            }
+
+    def get_spot_market_data(self, symbol, data_type='ticker'):
+        """스팟 시장 데이터 조회"""
+        try:
+            if self.exchange == 'xt':
+                if data_type == 'ticker':
+                    # XT 스팟 시장 데이터 조회
+                    url = f"{self.spot_base_url}/v4/public/ticker"
+                    if symbol:
+                        url += f"?symbol={symbol}"
+                    response = requests.get(url)
+                elif data_type == 'depth':
+                    # XT 스팟 깊이 데이터 조회
+                    url = f"{self.spot_base_url}/v4/public/depth"
+                    params = {'symbol': symbol, 'limit': 10}
+                    response = requests.get(url, params=params)
+                elif data_type == 'kline':
+                    # XT 스팟 K라인 데이터 조회
+                    url = f"{self.spot_base_url}/v4/public/kline"
+                    params = {'symbol': symbol, 'interval': '1m', 'limit': 10}
+                    response = requests.get(url, params=params)
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'지원하지 않는 데이터 타입: {data_type}'
+                    }
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # API 문서 링크 응답인지 확인
+                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
+                        return {
+                            'status': 'error',
+                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
+                        }
+                    else:
+                        return {
+                            'status': 'success',
+                            'data': data.get('result', {}),
+                            'message': f'XT 스팟 {data_type} 데이터 조회 성공'
+                        }
+                else:
+                    return {
+                        'status': 'error',
+                        'message': f'XT 스팟 {data_type} 데이터 조회 실패: {response.status_code}'
+                    }
+            else:
+                return {
+                    'status': 'error',
+                    'message': f'{self.exchange.capitalize()}는 스팟 시장 데이터 조회를 지원하지 않습니다.'
+                }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'스팟 시장 데이터 조회 오류: {str(e)}'
+            }
+
+async def handle_market_data_command(telegram_app, chat_id, user_id, text):
+    """시장 데이터 조회 명령어 처리"""
+    parts = text.split()
+    if len(parts) < 3:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id, 
+            text="❌ 사용법:\n\n"
+                 "`/market [거래소] [심볼] [데이터타입]`\n\n"
+                 "**데이터 타입**:\n"
+                 "- `ticker`: 시장 가격 정보\n"
+                 "- `depth`: 호가창 데이터\n"
+                 "- `kline`: K라인 데이터\n\n"
+                 "**예시**:\n"
+                 "`/market xt BTC_USDT ticker`\n"
+                 "`/market xt BTC_USDT depth`\n"
+                 "`/market xt BTC_USDT kline`",
+            parse_mode='Markdown'
+        )
+        return
+    
+    exchange = parts[1].lower()
+    symbol = parts[2].upper()
+    data_type = parts[3].lower() if len(parts) > 3 else 'ticker'
+    
+    user_keys = get_user_api_keys(user_id)
+    
+    if not user_keys or not user_keys.get(f'{exchange}_api_key'):
+        await telegram_app.bot.send_message(
+            chat_id=chat_id, 
+            text=f"❌ **{exchange.upper()} API 키가 설정되지 않았습니다.**\n\n"
+                 f"먼저 API 키를 설정해주세요.\n\n"
+                 f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    try:
+        api_key = user_keys.get(f'{exchange}_api_key')
+        api_secret = user_keys.get(f'{exchange}_api_secret') or user_keys.get(f'{exchange}_private_key')
+        
+        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+        
+        # 시장 데이터 조회
+        result = trader.get_market_data(symbol, data_type)
+        
+        if result.get('status') == 'success':
+            data = result.get('data', {})
+            
+            if data_type == 'ticker':
+                # 티커 데이터 포맷팅
+                if isinstance(data, list) and len(data) > 0:
+                    ticker = data[0]
+                    message = f"📊 **{symbol} 시장 데이터**\n\n"
+                    message += f"거래소: {exchange.upper()}\n"
+                    message += f"심볼: {symbol}\n"
+                    message += f"최신가: {ticker.get('last', 'N/A')}\n"
+                    message += f"24h 변동: {ticker.get('change24h', 'N/A')}\n"
+                    message += f"거래량: {ticker.get('volume24h', 'N/A')}\n"
+                    message += f"고가: {ticker.get('high24h', 'N/A')}\n"
+                    message += f"저가: {ticker.get('low24h', 'N/A')}"
+                else:
+                    message = f"📊 **{symbol} 시장 데이터**\n\n데이터: {data}"
+            elif data_type == 'depth':
+                # 깊이 데이터 포맷팅
+                message = f"📊 **{symbol} 호가창 데이터**\n\n"
+                message += f"거래소: {exchange.upper()}\n"
+                message += f"심볼: {symbol}\n\n"
+                message += f"데이터: {data}"
+            elif data_type == 'kline':
+                # K라인 데이터 포맷팅
+                message = f"📊 **{symbol} K라인 데이터**\n\n"
+                message += f"거래소: {exchange.upper()}\n"
+                message += f"심볼: {symbol}\n\n"
+                message += f"데이터: {data}"
+            else:
+                message = f"📊 **{symbol} {data_type} 데이터**\n\n{data}"
+            
+            await telegram_app.bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode='Markdown'
+            )
+        else:
+            await telegram_app.bot.send_message(
+                chat_id=chat_id,
+                text=f"❌ **시장 데이터 조회 실패**\n\n{result.get('message', '알 수 없는 오류')}",
+                parse_mode='Markdown'
+            )
+    
+    except Exception as e:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text=f"❌ **오류 발생**\n\n{str(e)}",
+            parse_mode='Markdown'
+        )
+
+async def handle_spot_market_data_command(telegram_app, chat_id, user_id, text):
+    """스팟 시장 데이터 조회 명령어 처리"""
+    parts = text.split()
+    if len(parts) < 3:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id, 
+            text="❌ 사용법:\n\n"
+                 "`/spotmarket [거래소] [심볼] [데이터타입]`\n\n"
+                 "**데이터 타입**:\n"
+                 "- `ticker`: 시장 가격 정보\n"
+                 "- `depth`: 호가창 데이터\n"
+                 "- `kline`: K라인 데이터\n\n"
+                 "**예시**:\n"
+                 "`/spotmarket xt BTC_USDT ticker`\n"
+                 "`/spotmarket xt BTC_USDT depth`\n"
+                 "`/spotmarket xt BTC_USDT kline`",
+            parse_mode='Markdown'
+        )
+        return
+    
+    exchange = parts[1].lower()
+    symbol = parts[2].upper()
+    data_type = parts[3].lower() if len(parts) > 3 else 'ticker'
+    
+    user_keys = get_user_api_keys(user_id)
+    
+    if not user_keys or not user_keys.get(f'{exchange}_api_key'):
+        await telegram_app.bot.send_message(
+            chat_id=chat_id, 
+            text=f"❌ **{exchange.upper()} API 키가 설정되지 않았습니다.**\n\n"
+                 f"먼저 API 키를 설정해주세요.\n\n"
+                 f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    try:
+        api_key = user_keys.get(f'{exchange}_api_key')
+        api_secret = user_keys.get(f'{exchange}_api_secret') or user_keys.get(f'{exchange}_private_key')
+        
+        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+        
+        # 스팟 시장 데이터 조회
+        result = trader.get_spot_market_data(symbol, data_type)
+        
+        if result.get('status') == 'success':
+            data = result.get('data', {})
+            
+            if data_type == 'ticker':
+                # 티커 데이터 포맷팅
+                if isinstance(data, list) and len(data) > 0:
+                    ticker = data[0]
+                    message = f"📊 **{symbol} 스팟 시장 데이터**\n\n"
+                    message += f"거래소: {exchange.upper()}\n"
+                    message += f"심볼: {symbol}\n"
+                    message += f"최신가: {ticker.get('last', 'N/A')}\n"
+                    message += f"24h 변동: {ticker.get('change24h', 'N/A')}\n"
+                    message += f"거래량: {ticker.get('volume24h', 'N/A')}\n"
+                    message += f"고가: {ticker.get('high24h', 'N/A')}\n"
+                    message += f"저가: {ticker.get('low24h', 'N/A')}"
+                else:
+                    message = f"📊 **{symbol} 스팟 시장 데이터**\n\n데이터: {data}"
+            elif data_type == 'depth':
+                # 깊이 데이터 포맷팅
+                message = f"📊 **{symbol} 스팟 호가창 데이터**\n\n"
+                message += f"거래소: {exchange.upper()}\n"
+                message += f"심볼: {symbol}\n\n"
+                message += f"데이터: {data}"
+            elif data_type == 'kline':
+                # K라인 데이터 포맷팅
+                message = f"📊 **{symbol} 스팟 K라인 데이터**\n\n"
+                message += f"거래소: {exchange.upper()}\n"
+                message += f"심볼: {symbol}\n\n"
+                message += f"데이터: {data}"
+            else:
+                message = f"📊 **{symbol} 스팟 {data_type} 데이터**\n\n{data}"
+            
+            await telegram_app.bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode='Markdown'
+            )
+        else:
+            await telegram_app.bot.send_message(
+                chat_id=chat_id,
+                text=f"❌ **스팟 시장 데이터 조회 실패**\n\n{result.get('message', '알 수 없는 오류')}",
+                parse_mode='Markdown'
+            )
+    
+    except Exception as e:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text=f"❌ **오류 발생**\n\n{str(e)}",
+            parse_mode='Markdown'
+        )
 
 if __name__ == '__main__':
     try:
