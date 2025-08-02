@@ -332,7 +332,10 @@ async def handle_api_setup(telegram_app, chat_id, user_id, text):
     
     # API 연결 테스트
     try:
-        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
+        if exchange == 'backpack':
+            trader = UnifiedFuturesTrader(exchange, api_key=api_key, private_key=api_secret)
+        else:
+            trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
         test_result = trader.test_api_connection()
         
         if test_result.get('status') == 'success':
@@ -1189,12 +1192,12 @@ class UnifiedFuturesTrader:
             self.base_url = "https://sapi.xt.com"
         elif self.exchange == 'backpack':
             self.api_key = kwargs.get('api_key')
-            self.private_key = kwargs.get('private_key')
+            self.private_key = kwargs.get('private_key') or kwargs.get('api_secret')
             self.base_url = "https://api.backpack.exchange/api/v1"
-            if SigningKey:
+            if SigningKey and self.private_key:
                 self.signing_key = SigningKey(base64.b64decode(self.private_key))
             else:
-                raise ImportError("pynacl 패키지가 필요합니다.")
+                raise ImportError("pynacl 패키지가 필요하거나 private_key가 설정되지 않았습니다.")
         elif self.exchange == 'hyperliquid':
             if ccxt is None:
                 raise ImportError("ccxt 패키지가 필요합니다.")
