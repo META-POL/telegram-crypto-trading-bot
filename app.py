@@ -389,19 +389,19 @@ async def handle_callback_query(callback_query, telegram_app):
             await show_balance_menu(telegram_app, chat_id, user_id, callback_query)
             
         elif data == "symbols_menu":
-            await show_symbols_menu(telegram_app, chat_id, user_id)
+            await show_symbols_menu(telegram_app, chat_id, user_id, callback_query)
             
         elif data == "position_menu":
-            await show_position_menu(telegram_app, chat_id, user_id)
+            await show_position_menu(telegram_app, chat_id, user_id, callback_query)
             
         elif data == "trade_menu":
-            await show_trade_menu(telegram_app, chat_id, user_id)
+            await show_trade_menu(telegram_app, chat_id, user_id, callback_query)
             
         elif data == "settings_menu":
-            await show_settings_menu(telegram_app, chat_id, user_id)
+            await show_settings_menu(telegram_app, chat_id, user_id, callback_query)
             
         elif data == "help":
-            await show_help(telegram_app, chat_id)
+            await show_help(telegram_app, chat_id, callback_query)
             
         elif data == "main_menu":
             await show_main_menu(telegram_app, chat_id)
@@ -1060,7 +1060,7 @@ async def show_balance_menu(telegram_app, chat_id, user_id, callback_query=None)
             reply_markup=reply_markup
         )
             
-async def show_symbols_menu(telegram_app, chat_id, user_id):
+async def show_symbols_menu(telegram_app, chat_id, user_id, callback_query=None):
     """거래쌍 조회 메뉴 표시"""
     
     keyboard = [
@@ -1071,16 +1071,24 @@ async def show_symbols_menu(telegram_app, chat_id, user_id):
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-            
-    await telegram_app.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=callback_query.message.message_id,
-        text="📈 **거래쌍 조회**\n\n거래소를 선택하여 거래 가능한 심볼을 조회하세요.",
-        parse_mode='Markdown',
-        reply_markup=reply_markup
-    )
+    
+    if callback_query:
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text="📈 **거래쌍 조회**\n\n거래소를 선택하여 거래 가능한 심볼을 조회하세요.",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    else:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text="📈 **거래쌍 조회**\n\n거래소를 선택하여 거래 가능한 심볼을 조회하세요.",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
 
-async def show_position_menu(telegram_app, chat_id, user_id):
+async def show_position_menu(telegram_app, chat_id, user_id, callback_query=None):
     """포지션 관리 메뉴 표시"""
     
     keyboard = [
@@ -1089,16 +1097,24 @@ async def show_position_menu(telegram_app, chat_id, user_id):
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-            
-    await telegram_app.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=callback_query.message.message_id,
-        text="📊 **포지션 관리**\n\n포지션을 조회하고 관리할 수 있습니다.",
-        parse_mode='Markdown',
-        reply_markup=reply_markup
-    )
+    
+    if callback_query:
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text="📊 **포지션 관리**\n\n포지션을 조회하고 관리할 수 있습니다.",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    else:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text="📊 **포지션 관리**\n\n포지션을 조회하고 관리할 수 있습니다.",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
 
-async def show_trade_menu(telegram_app, chat_id, user_id):
+async def show_trade_menu(telegram_app, chat_id, user_id, callback_query=None):
     """거래 메뉴 표시"""
     
     keyboard = [
@@ -1107,16 +1123,24 @@ async def show_trade_menu(telegram_app, chat_id, user_id):
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-            
-    await telegram_app.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=callback_query.message.message_id,
-        text="🔄 **거래하기**\n\n포지션을 오픈할 수 있습니다.",
-        parse_mode='Markdown',
-        reply_markup=reply_markup
-    )
+    
+    if callback_query:
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text="🔄 **거래하기**\n\n포지션을 오픈할 수 있습니다.",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    else:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text="🔄 **거래하기**\n\n포지션을 오픈할 수 있습니다.",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
 
-async def show_settings_menu(telegram_app, chat_id, user_id):
+async def show_settings_menu(telegram_app, chat_id, user_id, callback_query=None):
     """설정 메뉴 표시"""
     
     keyboard = [
@@ -1125,16 +1149,24 @@ async def show_settings_menu(telegram_app, chat_id, user_id):
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    if callback_query:
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text="⚙️ **설정**\n\n봇의 설정을 관리할 수 있습니다.",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    else:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text="⚙️ **설정**\n\n봇의 설정을 관리할 수 있습니다.",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
             
-    await telegram_app.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=callback_query.message.message_id,
-        text="⚙️ **설정**\n\n봇의 설정을 관리할 수 있습니다.",
-        parse_mode='Markdown',
-        reply_markup=reply_markup
-    )
-            
-async def show_help(telegram_app, chat_id):
+async def show_help(telegram_app, chat_id, callback_query=None):
     """도움말 표시"""
     help_text = (
         "❓ **도움말**\n\n"
@@ -1160,14 +1192,22 @@ async def show_help(telegram_app, chat_id):
             
     keyboard = [[InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-            
-    await telegram_app.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=callback_query.message.message_id,
-        text=help_text,
-        parse_mode='Markdown',
-        reply_markup=reply_markup
-    )
+    
+    if callback_query:
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text=help_text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    else:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text=help_text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
         
 # UnifiedFuturesTrader 클래스는 기존 app.py와 동일하게 유지
 class UnifiedFuturesTrader:
