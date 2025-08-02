@@ -1095,9 +1095,9 @@ async def show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchan
                  f"거래 타입: {market_type_text}\n"
                  f"주문 타입: {order_type_text}{leverage_text}\n\n"
                  f"다음 형식으로 수량을 입력하세요:\n\n"
-                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량]`\n\n"
+                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량] {market_type}`\n\n"
                  f"예시:\n"
-                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001`",
+                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001 {market_type}`",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
@@ -1109,9 +1109,9 @@ async def show_quantity_input(telegram_app, chat_id, user_id, trade_type, exchan
                  f"거래 타입: {market_type_text}\n"
                  f"주문 타입: {order_type_text}{leverage_text}\n\n"
                  f"다음 형식으로 수량을 입력하세요:\n\n"
-                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량]`\n\n"
+                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} [수량] {market_type}`\n\n"
                  f"예시:\n"
-                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001`",
+                 f"`/trade {exchange} {symbol_display} {trade_type} {order_type} 0.001 {market_type}`",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
@@ -1301,9 +1301,9 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
     if len(parts) < 5:
         await telegram_app.bot.send_message(
             chat_id=chat_id, 
-            text="❌ 사용법: /trade [거래소] [심볼] [방향] [주문타입] [수량]\n\n"
-                 "예시: `/trade backpack BTC long limit 0.001`\n"
-                 "예시: `/trade backpack BTC long market 0.001`",
+            text="❌ 사용법: /trade [거래소] [심볼] [방향] [주문타입] [수량] [거래타입]\n\n"
+                 "예시: `/trade backpack BTC long limit 0.001 spot`\n"
+                 "예시: `/trade backpack BTC long market 0.001 futures`",
             parse_mode='Markdown'
         )
         return
@@ -1313,6 +1313,11 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
     direction = parts[3].lower()
     order_type = parts[4].lower()  # market 또는 limit
     size = float(parts[5])
+    
+    # 거래 타입 설정 (기본값: futures)
+    market_type = 'futures'  # 기본값
+    if len(parts) > 6:
+        market_type = parts[6].lower()  # spot 또는 futures
     
     # 기본 레버리지 설정 (선물 거래의 경우)
     leverage = 1  # 기본값
@@ -1336,9 +1341,9 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
         trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
         
         if direction == 'long':
-            result = trader.open_long_position(symbol, size, leverage, order_type)
+            result = trader.open_long_position(symbol, size, leverage, order_type, market_type)
         elif direction == 'short':
-            result = trader.open_short_position(symbol, size, leverage, order_type)
+            result = trader.open_short_position(symbol, size, leverage, order_type, market_type)
         else:
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
@@ -1945,7 +1950,7 @@ class UnifiedFuturesTrader:
                 'message': f'선물 거래쌍 조회 오류: {str(e)}'
             }
 
-    def open_long_position(self, symbol, size, leverage=1, order_type='market'):
+    def open_long_position(self, symbol, size, leverage=1, order_type='market', market_type='futures'):
         """롱 포지션 오픈"""
         try:
             if self.exchange == 'xt':
@@ -1985,12 +1990,16 @@ class UnifiedFuturesTrader:
                     backpack_order_type = 'Market'  # 기본값
                 
                 # Backpack Exchange API 문서에 따른 올바른 파라미터 구조
-                # Backpack Exchange 실제 심볼 형식: BTC_USDC_PERP, ETH_USDC_PERP, SOL_USDC_PERP
+                # 스팟 거래: BTC_USDC, 선물 거래: BTC_USDC_PERP
                 backpack_symbol = symbol
-                if not symbol.endswith('_PERP'):
-                    # 실제 심볼 형식으로 변환 (USDC 페어)
-                    # BTC -> BTC_USDC_PERP, ETH -> ETH_USDC_PERP, SOL -> SOL_USDC_PERP
-                    backpack_symbol = f"{symbol}_USDC_PERP"  # USDC 페어 (모든 선물 거래)
+                if market_type == 'spot':
+                    # 스팟 거래: BTC -> BTC_USDC
+                    if not symbol.endswith('_USDC'):
+                        backpack_symbol = f"{symbol}_USDC"
+                else:
+                    # 선물 거래: BTC -> BTC_USDC_PERP
+                    if not symbol.endswith('_PERP'):
+                        backpack_symbol = f"{symbol}_USDC_PERP"
                 
                 params = {
                     'symbol': backpack_symbol,
@@ -1999,8 +2008,8 @@ class UnifiedFuturesTrader:
                     'quantity': str(size)
                 }
                 
-                # 레버리지는 별도로 설정해야 함 (API 문서 참고)
-                if leverage > 1:
+                # 레버리지는 선물 거래에서만 설정
+                if market_type == 'futures' and leverage > 1:
                     params['leverage'] = str(leverage)
                 
                 headers = self._get_headers_backpack("orderExecute", params)  # instruction을 'orderExecute'로 변경
@@ -2039,7 +2048,7 @@ class UnifiedFuturesTrader:
                 'message': f'롱 포지션 오픈 오류: {str(e)}'
             }
 
-    def open_short_position(self, symbol, size, leverage=1, order_type='market'):
+    def open_short_position(self, symbol, size, leverage=1, order_type='market', market_type='futures'):
         """숏 포지션 오픈"""
         try:
             if self.exchange == 'xt':
@@ -2079,12 +2088,16 @@ class UnifiedFuturesTrader:
                     backpack_order_type = 'Market'  # 기본값
                 
                 # Backpack Exchange API 문서에 따른 올바른 파라미터 구조
-                # Backpack Exchange 실제 심볼 형식: BTC_USDC_PERP, ETH_USDC_PERP, SOL_USDC_PERP
+                # 스팟 거래: BTC_USDC, 선물 거래: BTC_USDC_PERP
                 backpack_symbol = symbol
-                if not symbol.endswith('_PERP'):
-                    # 실제 심볼 형식으로 변환 (USDC 페어)
-                    # BTC -> BTC_USDC_PERP, ETH -> ETH_USDC_PERP, SOL -> SOL_USDC_PERP
-                    backpack_symbol = f"{symbol}_USDC_PERP"  # USDC 페어 (모든 선물 거래)
+                if market_type == 'spot':
+                    # 스팟 거래: BTC -> BTC_USDC
+                    if not symbol.endswith('_USDC'):
+                        backpack_symbol = f"{symbol}_USDC"
+                else:
+                    # 선물 거래: BTC -> BTC_USDC_PERP
+                    if not symbol.endswith('_PERP'):
+                        backpack_symbol = f"{symbol}_USDC_PERP"
                 
                 params = {
                     'symbol': backpack_symbol,
@@ -2093,8 +2106,8 @@ class UnifiedFuturesTrader:
                     'quantity': str(size)
                 }
                 
-                # 레버리지는 별도로 설정해야 함 (API 문서 참고)
-                if leverage > 1:
+                # 레버리지는 선물 거래에서만 설정
+                if market_type == 'futures' and leverage > 1:
                     params['leverage'] = str(leverage)
                 
                 headers = self._get_headers_backpack("orderExecute", params)  # instruction을 'orderExecute'로 변경
