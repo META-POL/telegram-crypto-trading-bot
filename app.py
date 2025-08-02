@@ -1336,9 +1336,9 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
         trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
         
         if direction == 'long':
-            result = trader.open_long_position(symbol, size, leverage)
+            result = trader.open_long_position(symbol, size, leverage, order_type)
         elif direction == 'short':
-            result = trader.open_short_position(symbol, size, leverage)
+            result = trader.open_short_position(symbol, size, leverage, order_type)
         else:
             await telegram_app.bot.send_message(
                 chat_id=chat_id,
@@ -1945,10 +1945,19 @@ class UnifiedFuturesTrader:
             
             elif self.exchange == 'backpack':
                 url = f"{self.base_url}/order"
+                
+                # Backpack Exchange API에 맞는 주문 타입 변환
+                if order_type == 'market':
+                    backpack_order_type = 'MARKET'
+                elif order_type == 'limit':
+                    backpack_order_type = 'LIMIT'
+                else:
+                    backpack_order_type = 'MARKET'  # 기본값
+                
                 params = {
                     'symbol': symbol,
                     'side': 'buy',
-                    'type': order_type,
+                    'type': backpack_order_type,
                     'quantity': str(size),
                     'timeInForce': 'GTC'
                 }
@@ -2021,10 +2030,19 @@ class UnifiedFuturesTrader:
             
             elif self.exchange == 'backpack':
                 url = f"{self.base_url}/order"
+                
+                # Backpack Exchange API에 맞는 주문 타입 변환
+                if order_type == 'market':
+                    backpack_order_type = 'MARKET'
+                elif order_type == 'limit':
+                    backpack_order_type = 'LIMIT'
+                else:
+                    backpack_order_type = 'MARKET'  # 기본값
+                
                 params = {
                     'symbol': symbol,
                     'side': 'sell',
-                    'type': order_type,
+                    'type': backpack_order_type,
                     'quantity': str(size),
                     'timeInForce': 'GTC'
                 }
