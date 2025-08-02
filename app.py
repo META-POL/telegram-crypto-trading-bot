@@ -866,8 +866,7 @@ async def show_futures_direction_menu(telegram_app, chat_id, user_id, exchange, 
     exchange_names = {
         "xt": "XT Exchange",
         "backpack": "Backpack Exchange",
-        "hyperliquid": "Hyperliquid",
-        "flipster": "Flipster"
+        "hyperliquid": "Hyperliquid"
     }
     
     keyboard = [
@@ -894,8 +893,7 @@ async def show_futures_symbol_menu(telegram_app, chat_id, user_id, exchange, dir
     exchange_names = {
         "xt": "XT Exchange",
         "backpack": "Backpack Exchange",
-        "hyperliquid": "Hyperliquid",
-        "flipster": "Flipster"
+        "hyperliquid": "Hyperliquid"
     }
     
     # 일반적인 선물 거래 심볼들
@@ -938,8 +936,7 @@ async def show_futures_leverage_input(telegram_app, chat_id, user_id, exchange, 
     exchange_names = {
         "xt": "XT Exchange",
         "backpack": "Backpack Exchange",
-        "hyperliquid": "Hyperliquid",
-        "flipster": "Flipster"
+        "hyperliquid": "Hyperliquid"
     }
     
     keyboard = [
@@ -969,8 +966,7 @@ async def show_futures_quantity_input(telegram_app, chat_id, user_id, exchange, 
     exchange_names = {
         "xt": "XT Exchange",
         "backpack": "Backpack Exchange",
-        "hyperliquid": "Hyperliquid",
-        "flipster": "Flipster"
+        "hyperliquid": "Hyperliquid"
     }
     
     keyboard = [
@@ -1664,7 +1660,6 @@ async def show_trade_menu(telegram_app, chat_id, user_id, callback_query=None):
         [InlineKeyboardButton("XT Exchange", callback_data="trade_exchange_xt")],
         [InlineKeyboardButton("Backpack Exchange", callback_data="trade_exchange_backpack")],
         [InlineKeyboardButton("Hyperliquid", callback_data="trade_exchange_hyperliquid")],
-        [InlineKeyboardButton("Flipster", callback_data="trade_exchange_flipster")],
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1726,7 +1721,7 @@ async def show_help(telegram_app, chat_id, callback_query=None):
         "• XT Exchange (선물/스팟)\n"
         "• Backpack Exchange\n"
         "• Hyperliquid\n"
-        "• Flipster\n\n"
+
         "**명령어:**\n"
         "• `/setapi [거래소] [API_KEY] [SECRET_KEY]` - API 키 설정\n"
         "• `/balance [거래소]` - 잔고 조회\n"
@@ -2423,7 +2418,7 @@ class UnifiedFuturesTrader:
                         'message': f'Backpack 스팟 매수 실패: {response.status_code} - {response.text}'
                     }
             
-            elif self.exchange in ['hyperliquid', 'flipster']:
+            elif self.exchange == 'hyperliquid':
                 order = self.ccxt_client.create_order(
                     symbol=symbol,
                     type=order_type,
