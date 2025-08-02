@@ -941,7 +941,32 @@ async def show_symbol_selection_menu(telegram_app, chat_id, user_id, trade_type,
         "hyperliquid": "Hyperliquid"
     }
     
-    # 일반적인 거래 심볼들 (더 많은 심볼 추가)
+    # XT Exchange인 경우 직접 입력 안내
+    if exchange == "xt":
+        keyboard = [
+            [InlineKeyboardButton("📝 직접 입력", callback_data=f"trade_symbol_input_{trade_type}_{exchange}_{market_type}")],
+            [InlineKeyboardButton("🔙 거래 타입 선택", callback_data=f"trade_{trade_type}_{exchange}")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text=f"{trade_type_text} **심볼 입력**\n\n"
+                 f"거래소: {exchange_names.get(exchange, exchange.upper())}\n"
+                 f"거래 타입: {market_type_text}\n\n"
+                 f"XT Exchange는 거래 가능한 심볼이 많아서 직접 입력해주세요.\n\n"
+                 f"**입력 형식**:\n"
+                 f"`/trade {exchange} [심볼] {trade_type} [주문타입] [수량]`\n\n"
+                 f"**예시**:\n"
+                 f"`/trade xt BTCUSDT long market 0.001`\n"
+                 f"`/trade xt ETHUSDT short limit 0.01 2000`",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+        return
+    
+    # 다른 거래소들은 기존 심볼 목록 제공
     common_symbols = [
         ["BTC/USDT", "ETH/USDT", "BNB/USDT"],
         ["ADA/USDT", "DOT/USDT", "LINK/USDT"],
@@ -1030,7 +1055,32 @@ async def show_futures_symbol_menu(telegram_app, chat_id, user_id, exchange, dir
         "hyperliquid": "Hyperliquid"
     }
     
-    # 일반적인 선물 거래 심볼들
+    # XT Exchange인 경우 직접 입력 안내
+    if exchange == "xt":
+        keyboard = [
+            [InlineKeyboardButton("📝 직접 입력", callback_data=f"futures_symbol_input_{exchange}_{direction}")],
+            [InlineKeyboardButton("🔙 방향 선택", callback_data=f"futures_direction_{exchange}_{direction}")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text=f"{direction_text} **선물 심볼 입력**\n\n"
+                 f"거래소: {exchange_names.get(exchange, exchange.upper())}\n"
+                 f"거래 타입: 📊 선물\n\n"
+                 f"XT Exchange는 거래 가능한 심볼이 많아서 직접 입력해주세요.\n\n"
+                 f"**입력 형식**:\n"
+                 f"`/trade {exchange} [심볼] {direction} [주문타입] [수량] futures`\n\n"
+                 f"**예시**:\n"
+                 f"`/trade xt BTCUSDT long market 0.001 futures`\n"
+                 f"`/trade xt ETHUSDT short limit 0.01 2000 futures`",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+        return
+    
+    # 다른 거래소들은 기존 심볼 목록 제공
     futures_symbols = [
         ["BTC/USDT", "ETH/USDT", "BNB/USDT"],
         ["ADA/USDT", "DOT/USDT", "LINK/USDT"],
