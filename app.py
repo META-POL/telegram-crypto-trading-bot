@@ -373,10 +373,10 @@ async def handle_callback_query(callback_query, telegram_app):
         print(f"🔘 사용자 {user_id}가 버튼 클릭: {data}")
         
         if data == "api_management":
-            await show_api_management_menu(telegram_app, chat_id, user_id)
+            await show_api_management_menu(telegram_app, chat_id, user_id, callback_query)
             
         elif data == "balance_menu":
-            await show_balance_menu(telegram_app, chat_id, user_id)
+            await show_balance_menu(telegram_app, chat_id, user_id, callback_query)
             
         elif data == "symbols_menu":
             await show_symbols_menu(telegram_app, chat_id, user_id)
@@ -974,7 +974,7 @@ async def handle_close_command(telegram_app, chat_id, user_id, text):
             parse_mode='Markdown'
         )
 
-async def show_api_management_menu(telegram_app, chat_id, user_id):
+async def show_api_management_menu(telegram_app, chat_id, user_id, callback_query=None):
     """API 관리 메뉴 표시"""
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
@@ -998,22 +998,30 @@ async def show_api_management_menu(telegram_app, chat_id, user_id):
         keyboard.append([InlineKeyboardButton(f"{name} {status}", callback_data=f"api_{exchange}")])
     
     keyboard.extend([
-                [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
+        [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     text = "🔑 **API 키 관리**\n\n각 거래소의 API 키 상태를 확인하고 설정할 수 있습니다."
+    
+    if callback_query:
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text=text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    else:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
             
-    await telegram_app.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=callback_query.message.message_id,
-        text=text,
-        parse_mode='Markdown',
-        reply_markup=reply_markup
-    )
-            
-async def show_balance_menu(telegram_app, chat_id, user_id):
+async def show_balance_menu(telegram_app, chat_id, user_id, callback_query=None):
     """잔고 조회 메뉴 표시"""
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     
@@ -1025,14 +1033,24 @@ async def show_balance_menu(telegram_app, chat_id, user_id):
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-            
-    await telegram_app.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=callback_query.message.message_id,
-        text="💰 **잔고 조회**\n\n거래소를 선택하여 잔고를 조회하세요.",
-        parse_mode='Markdown',
-        reply_markup=reply_markup
-    )
+    
+    text = "💰 **잔고 조회**\n\n거래소를 선택하여 잔고를 조회하세요."
+    
+    if callback_query:
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text=text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    else:
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
             
 async def show_symbols_menu(telegram_app, chat_id, user_id):
     """거래쌍 조회 메뉴 표시"""
