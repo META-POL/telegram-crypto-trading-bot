@@ -1955,11 +1955,15 @@ class UnifiedFuturesTrader:
                     backpack_order_type = 'Market'  # 기본값
                 
                 # Backpack Exchange API 문서에 따른 올바른 파라미터 구조
-                # Backpack Exchange 심볼 형식: BTC_USDT_PERP (선물), BTC_USDT (스팟)
+                # Backpack Exchange 심볼 형식: SOL_USDC_PERP (선물), BTC_USDT (스팟)
                 backpack_symbol = symbol
                 if not symbol.endswith('_PERP'):
-                    # BTC -> BTC_USDT_PERP, ETH -> ETH_USDT_PERP 등으로 변환
-                    backpack_symbol = f"{symbol}_USDT_PERP"  # 선물 거래를 위해 _USDT_PERP 추가
+                    # 실제 지원되는 심볼로 변환 (SOL_USDC_PERP 형식)
+                    # BTC -> BTC_USDT_PERP, ETH -> ETH_USDT_PERP, SOL -> SOL_USDC_PERP
+                    if symbol in ['SOL', 'MATIC', 'AVAX']:
+                        backpack_symbol = f"{symbol}_USDC_PERP"  # USDC 페어
+                    else:
+                        backpack_symbol = f"{symbol}_USDT_PERP"  # USDT 페어
                 
                 params = {
                     'symbol': backpack_symbol,
@@ -2048,10 +2052,15 @@ class UnifiedFuturesTrader:
                     backpack_order_type = 'Market'  # 기본값
                 
                 # Backpack Exchange API 문서에 따른 올바른 파라미터 구조
-                # Backpack Exchange 심볼 형식: BTC_USDT_PERP (선물), BTC_USDT (스팟)
+                # Backpack Exchange 심볼 형식: SOL_USDC_PERP (선물), BTC_USDT (스팟)
                 backpack_symbol = symbol
                 if not symbol.endswith('_PERP'):
-                    backpack_symbol = f"{symbol}_USDT_PERP"  # 선물 거래를 위해 _USDT_PERP 추가
+                    # 실제 지원되는 심볼로 변환 (SOL_USDC_PERP 형식)
+                    # BTC -> BTC_USDT_PERP, ETH -> ETH_USDT_PERP, SOL -> SOL_USDC_PERP
+                    if symbol in ['SOL', 'MATIC', 'AVAX']:
+                        backpack_symbol = f"{symbol}_USDC_PERP"  # USDC 페어
+                    else:
+                        backpack_symbol = f"{symbol}_USDT_PERP"  # USDT 페어
                 
                 params = {
                     'symbol': backpack_symbol,
