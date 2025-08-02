@@ -2192,9 +2192,27 @@ class UnifiedFuturesTrader:
         timestamp = str(int(time.time() * 1000))
         params = params or {}
         
-        # XT API 서명 생성
-        sign_str = '&'.join([f"{k}={params[k]}" for k in sorted(params)]) + f"&timestamp={timestamp}"
-        signature = hmac.new(self.api_secret.encode(), sign_str.encode(), hashlib.sha256).hexdigest()
+        # XT API 서명 생성 - 올바른 방식
+        # 1. 파라미터를 알파벳 순으로 정렬
+        sorted_params = sorted(params.items())
+        
+        # 2. 쿼리 스트링 생성
+        query_string = '&'.join([f"{k}={v}" for k, v in sorted_params])
+        
+        # 3. 서명 문자열 생성 (timestamp 추가)
+        if query_string:
+            sign_string = f"{query_string}&timestamp={timestamp}"
+        else:
+            sign_string = f"timestamp={timestamp}"
+        
+        # 4. HMAC-SHA256 서명 생성
+        signature = hmac.new(
+            self.api_secret.encode('utf-8'), 
+            sign_string.encode('utf-8'), 
+            hashlib.sha256
+        ).hexdigest()
+        
+        print(f"XT 서명 디버그: sign_string={sign_string}, signature={signature}")  # 디버깅용
         
         return {
             "XT-API-KEY": self.api_key,
@@ -2753,6 +2771,20 @@ class UnifiedFuturesTrader:
                     data = response.json()
                     print(f"XT API 응답: {data}")  # 디버깅용 로그
                     
+                    # 인증 오류 확인
+                    if isinstance(data, dict) and data.get('rc') == 1:
+                        error_code = data.get('mc', 'UNKNOWN')
+                        if error_code == 'AUTH_001':
+                            return {
+                                'status': 'error',
+                                'message': f'XT API 인증 오류: API 키 또는 시크릿 키가 잘못되었습니다. (오류코드: {error_code})'
+                            }
+                        else:
+                            return {
+                                'status': 'error',
+                                'message': f'XT API 오류: {error_code} - {data.get("ma", [])}'
+                            }
+                    
                     # 다양한 응답 구조 시도
                     order_id = 'unknown'
                     if isinstance(data, dict):
@@ -2868,6 +2900,20 @@ class UnifiedFuturesTrader:
                 if response.status_code == 200:
                     data = response.json()
                     print(f"XT API 응답: {data}")  # 디버깅용 로그
+                    
+                    # 인증 오류 확인
+                    if isinstance(data, dict) and data.get('rc') == 1:
+                        error_code = data.get('mc', 'UNKNOWN')
+                        if error_code == 'AUTH_001':
+                            return {
+                                'status': 'error',
+                                'message': f'XT API 인증 오류: API 키 또는 시크릿 키가 잘못되었습니다. (오류코드: {error_code})'
+                            }
+                        else:
+                            return {
+                                'status': 'error',
+                                'message': f'XT API 오류: {error_code} - {data.get("ma", [])}'
+                            }
                     
                     # 다양한 응답 구조 시도
                     order_id = 'unknown'
