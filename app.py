@@ -2358,7 +2358,17 @@ class UnifiedFuturesTrader:
                     "/v2/account/assets",
                     "/v1/account/capital",  # v1 시도
                     "/v1/account/balance",
-                    "/v1/account/assets"
+                    "/v1/account/assets",
+                    "/v4/account/spot/balance",  # 스팟 잔고
+                    "/v4/account/futures/balance",  # 선물 잔고
+                    "/v4/account/spot/assets",  # 스팟 자산
+                    "/v4/account/futures/assets",  # 선물 자산
+                    "/v3/account/spot/balance",  # v3 스팟 잔고
+                    "/v3/account/futures/balance",  # v3 선물 잔고
+                    "/v2/account/spot/balance",  # v2 스팟 잔고
+                    "/v2/account/futures/balance",  # v2 선물 잔고
+                    "/v1/account/spot/balance",  # v1 스팟 잔고
+                    "/v1/account/futures/balance"  # v1 선물 잔고
                 ]
                 
                 for base_url in base_urls:
@@ -2413,7 +2423,7 @@ class UnifiedFuturesTrader:
                 # 모든 시도 실패 시
                 return {
                     'status': 'error',
-                    'message': f'XT 잔고 조회 실패: 모든 엔드포인트에서 API 문서 링크만 반환됨. 실제 잔고 엔드포인트 확인 필요.'
+                    'message': f'XT 잔고 조회 실패: 모든 엔드포인트에서 API 문서 링크만 반환됨. XT API 문서에서 실제 잔고 엔드포인트를 확인해야 합니다.'
                 }
             
             elif self.exchange == 'backpack':
@@ -3223,7 +3233,17 @@ class UnifiedFuturesTrader:
                     "/v2/account/capital",
                     "/v1/account/balance",  # v1 시도
                     "/v1/account/assets",
-                    "/v1/account/capital"
+                    "/v1/account/capital",
+                    "/v4/account/spot/balance",  # 스팟 잔고
+                    "/v4/account/futures/balance",  # 선물 잔고
+                    "/v4/account/spot/assets",  # 스팟 자산
+                    "/v4/account/futures/assets",  # 선물 자산
+                    "/v3/account/spot/balance",  # v3 스팟 잔고
+                    "/v3/account/futures/balance",  # v3 선물 잔고
+                    "/v2/account/spot/balance",  # v2 스팟 잔고
+                    "/v2/account/futures/balance",  # v2 선물 잔고
+                    "/v1/account/spot/balance",  # v1 스팟 잔고
+                    "/v1/account/futures/balance"  # v1 선물 잔고
                 ]
                 
                 for base_url in base_urls:
@@ -3278,7 +3298,7 @@ class UnifiedFuturesTrader:
                 # 모든 시도 실패 시
                 return {
                     'status': 'error',
-                    'message': f'XT 스팟 잔고 조회 실패: 모든 엔드포인트에서 API 문서 링크만 반환됨. 실제 잔고 엔드포인트 확인 필요.'
+                    'message': f'XT 스팟 잔고 조회 실패: 모든 엔드포인트에서 API 문서 링크만 반환됨. XT API 문서에서 실제 잔고 엔드포인트를 확인해야 합니다.'
                 }
             
             elif self.exchange == 'hyperliquid':
