@@ -30,6 +30,9 @@ try:
 except ImportError:
     print("⚠️ pyxt 라이브러리가 설치되지 않았습니다. pip install pyxt로 설치해주세요.")
     XT = None
+except Exception as e:
+    print(f"⚠️ pyxt 라이브러리 로드 중 오류: {e}")
+    XT = None
 print("📝 모든 라이브러리는 필요시 로드됩니다")
 
 # 로깅 설정
@@ -2350,49 +2353,20 @@ class UnifiedFuturesTrader:
                 ]
                 
                 endpoints = [
-                    "/v4/account/balance",  # pyxt 라이브러리 기본 엔드포인트
+                    "/v4/account/balance",  # v4 기본 엔드포인트
                     "/v4/account/assets",
                     "/v4/account/capital",
                     "/account/balance",  # v4 없이 시도
                     "/account/assets",
                     "/account/capital",
-                    "/v4/balance",  # pyxt balance() 함수
+                    "/v4/balance",  # v4 balance
                     "/v4/assets",
                     "/balance",  # 기본 balance
                     "/assets",   # 기본 assets
                     "/v4/account/spot/balance",  # 스팟 잔고
                     "/v4/account/futures/balance",  # 선물 잔고
                     "/v4/account/spot/assets",  # 스팟 자산
-                    "/v4/account/futures/assets",  # 선물 자산
-                    "/v3/account/balance",  # v3 시도
-                    "/v3/account/assets",
-                    "/v3/account/capital",
-                    "/v2/account/balance",  # v2 시도
-                    "/v2/account/assets",
-                    "/v2/account/capital",
-                    "/v1/account/balance",  # v1 시도
-                    "/v1/account/assets",
-                    "/v1/account/capital",
-                    "/v4/account/spot/balance",  # 스팟 잔고
-                    "/v4/account/futures/balance",  # 선물 잔고
-                    "/v4/account/spot/assets",  # 스팟 자산
-                    "/v4/account/futures/assets",  # 선물 자산
-                    "/v3/account/spot/balance",  # v3 스팟 잔고
-                    "/v3/account/futures/balance",  # v3 선물 잔고
-                    "/v2/account/spot/balance",  # v2 스팟 잔고
-                    "/v2/account/futures/balance",  # v2 선물 잔고
-                    "/v1/account/spot/balance",  # v1 스팟 잔고
-                    "/v1/account/futures/balance",  # v1 선물 잔고
-                    "/v4/account/spot/balance",  # 스팟 잔고
-                    "/v4/account/futures/balance",  # 선물 잔고
-                    "/v4/account/spot/assets",  # 스팟 자산
-                    "/v4/account/futures/assets",  # 선물 자산
-                    "/v3/account/spot/balance",  # v3 스팟 잔고
-                    "/v3/account/futures/balance",  # v3 선물 잔고
-                    "/v2/account/spot/balance",  # v2 스팟 잔고
-                    "/v2/account/futures/balance",  # v2 선물 잔고
-                    "/v1/account/spot/balance",  # v1 스팟 잔고
-                    "/v1/account/futures/balance"  # v1 선물 잔고
+                    "/v4/account/futures/assets"  # 선물 자산
                 ]
                 
                 for base_url in base_urls:
@@ -3253,27 +3227,18 @@ class UnifiedFuturesTrader:
                 ]
                 
                 endpoints = [
-                    "/v4/account/balance",  # pyxt 라이브러리 기본 엔드포인트
+                    "/v4/account/balance",  # v4 기본 엔드포인트
                     "/v4/account/assets",
                     "/v4/account/capital",
                     "/account/balance",  # v4 없이 시도
                     "/account/assets",
                     "/account/capital",
-                    "/v4/balance",  # pyxt balance() 함수
+                    "/v4/balance",  # v4 balance
                     "/v4/assets",
                     "/balance",  # 기본 balance
                     "/assets",   # 기본 assets
                     "/v4/account/spot/balance",  # 스팟 잔고
-                    "/v4/account/spot/assets",  # 스팟 자산
-                    "/v3/account/balance",  # v3 시도
-                    "/v3/account/assets",
-                    "/v3/account/capital",
-                    "/v2/account/balance",  # v2 시도
-                    "/v2/account/assets",
-                    "/v2/account/capital",
-                    "/v1/account/balance",  # v1 시도
-                    "/v1/account/assets",
-                    "/v1/account/capital"
+                    "/v4/account/spot/assets"  # 스팟 자산
                 ]
                 
                 for base_url in base_urls:
