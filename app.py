@@ -2321,7 +2321,9 @@ class UnifiedFuturesTrader:
                 # pyxt 라이브러리를 사용한 XT 잔고 조회
                 if XT is not None:
                     try:
+                        print(f"pyxt 라이브러리 사용 시도: API_KEY={self.api_key[:10]}...")
                         xt_client = XT(api_key=self.api_key, secret_key=self.api_secret)
+                        print(f"XT 클라이언트 생성 성공: {xt_client}")
                         balance = xt_client.balance()
                         print(f"pyxt 라이브러리 잔고 조회 성공: {balance}")
                         return {
@@ -2331,7 +2333,10 @@ class UnifiedFuturesTrader:
                         }
                     except Exception as e:
                         print(f"pyxt 라이브러리 잔고 조회 실패: {e}")
+                        print(f"pyxt 라이브러리 사용 불가능, 기존 방식으로 폴백")
                         # pyxt 실패 시 기존 방식으로 폴백
+                else:
+                    print("pyxt 라이브러리가 설치되지 않음, 기존 방식 사용")
                 
                 # 기존 방식 (pyxt 라이브러리 사용 불가능한 경우)
                 base_urls = [
@@ -2368,6 +2373,16 @@ class UnifiedFuturesTrader:
                     "/v1/account/balance",  # v1 시도
                     "/v1/account/assets",
                     "/v1/account/capital",
+                    "/v4/account/spot/balance",  # 스팟 잔고
+                    "/v4/account/futures/balance",  # 선물 잔고
+                    "/v4/account/spot/assets",  # 스팟 자산
+                    "/v4/account/futures/assets",  # 선물 자산
+                    "/v3/account/spot/balance",  # v3 스팟 잔고
+                    "/v3/account/futures/balance",  # v3 선물 잔고
+                    "/v2/account/spot/balance",  # v2 스팟 잔고
+                    "/v2/account/futures/balance",  # v2 선물 잔고
+                    "/v1/account/spot/balance",  # v1 스팟 잔고
+                    "/v1/account/futures/balance",  # v1 선물 잔고
                     "/v4/account/spot/balance",  # 스팟 잔고
                     "/v4/account/futures/balance",  # 선물 잔고
                     "/v4/account/spot/assets",  # 스팟 자산
