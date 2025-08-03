@@ -2115,8 +2115,8 @@ class UnifiedFuturesTrader:
             self.api_key = kwargs.get('api_key')
             self.api_secret = kwargs.get('api_secret')
             # XT API 베이스 URL (공식 문서 기반)
-            self.base_url = "https://api.xt.com"  # 공식 API
-            self.spot_base_url = "https://api.xt.com"  # 스팟 API
+            self.base_url = "https://sapi.xt.com"  # 공식 API
+            self.spot_base_url = "https://sapi.xt.com"  # 스팟 API
         elif self.exchange == 'backpack':
             self.api_key = kwargs.get('api_key')
             self.private_key = kwargs.get('private_key') or kwargs.get('api_secret')
@@ -2309,41 +2309,45 @@ class UnifiedFuturesTrader:
         """선물 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 잔고 조회 - 여러 엔드포인트 시도
-                endpoints = [
-                    "/v4/account/assets",
-                    "/v4/account/balance", 
-                    "/v4/account/futures/balance",
-                    "/v4/account/spot/balance",
-                    "/v3/account/assets",
-                    "/v3/account/balance",
-                    "/v2/account/assets",
-                    "/v2/account/balance",
-                    "/v1/account/assets",
-                    "/v1/account/balance",
-                    "/account/assets",
-                    "/account/balance"
+                # XT 잔고 조회 - 여러 베이스 URL과 엔드포인트 시도
+                base_urls = [
+                    "https://sapi.xt.com",
+                    "https://api.xt.com",
+                    "https://api.xt.com/v4",
+                    "https://api.xt.com/v3",
+                    "https://api.xt.com/v2",
+                    "https://api.xt.com/v1"
                 ]
                 
-                for endpoint in endpoints:
-                    url = f"{self.base_url}{endpoint}"
-                    headers = self._get_headers_xt()
-                    response = requests.get(url, headers=headers)
-                    
-                    print(f"XT 잔고 조회 시도 {endpoint}: {response.status_code} - {response.text}")  # 디버깅용
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        return {
-                            'status': 'success',
-                            'balance': data.get('result', {}),
-                            'message': f'XT 잔고 조회 성공 ({endpoint})'
-                        }
+                endpoints = [
+                    "/account/assets",
+                    "/account/balance", 
+                    "/account/futures/balance",
+                    "/account/spot/balance",
+                    "/assets",
+                    "/balance"
+                ]
                 
-                # 모든 엔드포인트 실패 시
+                for base_url in base_urls:
+                    for endpoint in endpoints:
+                        url = f"{base_url}{endpoint}"
+                        headers = self._get_headers_xt()
+                        response = requests.get(url, headers=headers)
+                        
+                        print(f"XT 잔고 조회 시도 {base_url}{endpoint}: {response.status_code} - {response.text}")  # 디버깅용
+                        
+                        if response.status_code == 200:
+                            data = response.json()
+                            return {
+                                'status': 'success',
+                                'balance': data.get('result', {}),
+                                'message': f'XT 잔고 조회 성공 ({base_url}{endpoint})'
+                            }
+                
+                # 모든 시도 실패 시
                 return {
                     'status': 'error',
-                    'message': f'XT 잔고 조회 실패: 모든 엔드포인트 시도 실패'
+                    'message': f'XT 잔고 조회 실패: 모든 베이스 URL과 엔드포인트 시도 실패'
                 }
             
             elif self.exchange == 'backpack':
@@ -3121,41 +3125,45 @@ class UnifiedFuturesTrader:
         """스팟 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 스팟 잔고 조회 - 여러 엔드포인트 시도
-                endpoints = [
-                    "/v4/account/assets",
-                    "/v4/account/balance",
-                    "/v4/account/spot/balance",
-                    "/v4/account/spot/assets",
-                    "/v3/account/assets",
-                    "/v3/account/balance",
-                    "/v2/account/assets",
-                    "/v2/account/balance",
-                    "/v1/account/assets",
-                    "/v1/account/balance",
-                    "/account/assets",
-                    "/account/balance"
+                # XT 스팟 잔고 조회 - 여러 베이스 URL과 엔드포인트 시도
+                base_urls = [
+                    "https://sapi.xt.com",
+                    "https://api.xt.com",
+                    "https://api.xt.com/v4",
+                    "https://api.xt.com/v3",
+                    "https://api.xt.com/v2",
+                    "https://api.xt.com/v1"
                 ]
                 
-                for endpoint in endpoints:
-                    url = f"{self.base_url}{endpoint}"
-                    headers = self._get_headers_xt()
-                    response = requests.get(url, headers=headers)
-                    
-                    print(f"XT 스팟 잔고 조회 시도 {endpoint}: {response.status_code} - {response.text}")  # 디버깅용
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        return {
-                            'status': 'success',
-                            'balance': data.get('result', {}),
-                            'message': f'XT 스팟 잔고 조회 성공 ({endpoint})'
-                        }
+                endpoints = [
+                    "/account/assets",
+                    "/account/balance",
+                    "/account/spot/balance",
+                    "/account/spot/assets",
+                    "/assets",
+                    "/balance"
+                ]
                 
-                # 모든 엔드포인트 실패 시
+                for base_url in base_urls:
+                    for endpoint in endpoints:
+                        url = f"{base_url}{endpoint}"
+                        headers = self._get_headers_xt()
+                        response = requests.get(url, headers=headers)
+                        
+                        print(f"XT 스팟 잔고 조회 시도 {base_url}{endpoint}: {response.status_code} - {response.text}")  # 디버깅용
+                        
+                        if response.status_code == 200:
+                            data = response.json()
+                            return {
+                                'status': 'success',
+                                'balance': data.get('result', {}),
+                                'message': f'XT 스팟 잔고 조회 성공 ({base_url}{endpoint})'
+                            }
+                
+                # 모든 시도 실패 시
                 return {
                     'status': 'error',
-                    'message': f'XT 스팟 잔고 조회 실패: 모든 엔드포인트 시도 실패'
+                    'message': f'XT 스팟 잔고 조회 실패: 모든 베이스 URL과 엔드포인트 시도 실패'
                 }
             
             elif self.exchange == 'hyperliquid':
