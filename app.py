@@ -2114,8 +2114,8 @@ class UnifiedFuturesTrader:
         if self.exchange == 'xt':
             self.api_key = kwargs.get('api_key')
             self.api_secret = kwargs.get('api_secret')
-            # XT API 베이스 URL (공식 문서 기반)
-            self.base_url = "https://sapi.xt.com"  # 공식 API
+            # XT API 베이스 URL (pyxt 라이브러리 기반)
+            self.base_url = "https://fapi.xt.com"  # 선물 API
             self.spot_base_url = "https://sapi.xt.com"  # 스팟 API
         elif self.exchange == 'backpack':
             self.api_key = kwargs.get('api_key')
@@ -2138,7 +2138,7 @@ class UnifiedFuturesTrader:
             if self.exchange == 'xt':
                 # XT API 연결 테스트 - 서버 시간 조회 (공개 엔드포인트)
                 time_endpoints = [
-                    "/v4/public/time"  # 공식 문서 엔드포인트
+                    "/v4/public/time"  # pyxt 라이브러리 엔드포인트
                 ]
                 
                 for time_endpoint in time_endpoints:
@@ -2244,11 +2244,11 @@ class UnifiedFuturesTrader:
         # 2. 쿼리 스트링 생성 (값을 문자열로 변환)
         query_string = '&'.join([f"{k}={str(v)}" for k, v in sorted_params])
         
-        # 3. 서명 문자열 생성 (XT 공식 문서 방식)
+        # 3. 서명 문자열 생성 (pyxt 라이브러리 방식)
         if query_string:
-            sign_string = f"{query_string}&timestamp={timestamp}"
+            sign_string = f"access_key={self.api_key}&{query_string}&timestamp={timestamp}"
         else:
-            sign_string = f"timestamp={timestamp}"
+            sign_string = f"access_key={self.api_key}&timestamp={timestamp}"
         
         # 4. HMAC-SHA256 서명 생성
         signature = hmac.new(
@@ -2266,21 +2266,13 @@ class UnifiedFuturesTrader:
         
         print(f"XT 서명 디버그: sign_string={sign_string}, signature={signature}")  # 디버깅용
         
-        # XT 공식 문서 방식 헤더
+        # pyxt 라이브러리 방식 헤더
         headers = {
-            "XT-API-KEY": self.api_key,
-            "XT-API-SIGN": signature,
-            "XT-API-TIMESTAMP": timestamp,
+            "access_key": self.api_key,
+            "signature": signature,
+            "timestamp": timestamp,
             "Content-Type": "application/json"
         }
-        
-        # 대안 헤더 형식 (필요시 사용)
-        # headers = {
-        #     "access_key": self.api_key,
-        #     "signature": signature,
-        #     "timestamp": timestamp,
-        #     "Content-Type": "application/json"
-        # }
         
         return headers
 
@@ -2320,16 +2312,15 @@ class UnifiedFuturesTrader:
         """선물 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 잔고 조회 - 공식 문서 기반 엔드포인트
+                # XT 잔고 조회 - pyxt 라이브러리 기반 엔드포인트
                 base_urls = [
-                    "https://sapi.xt.com"
+                    "https://fapi.xt.com"  # 선물 API
                 ]
                 
                 endpoints = [
-                    "/v4/account/assets",  # 공식 문서 엔드포인트
+                    "/v4/account/capital",  # pyxt 라이브러리 엔드포인트
                     "/v4/account/balance",
-                    "/v4/account/futures/balance",
-                    "/v4/account/spot/balance"
+                    "/v4/account/assets"
                 ]
                 
                 for base_url in base_urls:
@@ -2344,10 +2335,10 @@ class UnifiedFuturesTrader:
                             data = response.json()
                             # AUTH_001 오류 체크
                             if data.get('rc') == 1 and data.get('mc') == 'AUTH_001':
-                                print(f"AUTH_001 오류 발생, 대안 헤더 시도: {base_url}{endpoint}")
-                                # 대안 헤더로 재시도 (서명 재생성)
+                                print(f"AUTH_001 오류 발생, pyxt 방식으로 재시도: {base_url}{endpoint}")
+                                # pyxt 라이브러리 방식으로 재시도 (서명 재생성)
                                 alt_timestamp = str(int(time.time() * 1000))
-                                alt_sign_string = f"timestamp={alt_timestamp}"
+                                alt_sign_string = f"access_key={self.api_key}&timestamp={alt_timestamp}"
                                 alt_signature = hmac.new(
                                     self.api_secret.encode('utf-8'), 
                                     alt_sign_string.encode('utf-8'), 
@@ -2367,7 +2358,7 @@ class UnifiedFuturesTrader:
                                         return {
                                             'status': 'success',
                                             'balance': alt_data.get('result', {}),
-                                            'message': f'XT 잔고 조회 성공 ({base_url}{endpoint}) - 대안 헤더'
+                                            'message': f'XT 잔고 조회 성공 ({base_url}{endpoint}) - pyxt 방식'
                                         }
                             elif data.get('rc') == 0:  # 정상 응답
                                 return {
@@ -3157,16 +3148,15 @@ class UnifiedFuturesTrader:
         """스팟 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 스팟 잔고 조회 - 공식 문서 기반 엔드포인트
+                # XT 스팟 잔고 조회 - pyxt 라이브러리 기반 엔드포인트
                 base_urls = [
-                    "https://sapi.xt.com"
+                    "https://sapi.xt.com"  # 스팟 API
                 ]
                 
                 endpoints = [
-                    "/v4/account/assets",  # 공식 문서 엔드포인트
-                    "/v4/account/balance",
-                    "/v4/account/spot/balance",
-                    "/v4/account/spot/assets"
+                    "/v4/account/balance",  # pyxt 라이브러리 엔드포인트
+                    "/v4/account/assets",
+                    "/v4/account/spot/balance"
                 ]
                 
                 for base_url in base_urls:
@@ -3181,10 +3171,10 @@ class UnifiedFuturesTrader:
                             data = response.json()
                             # AUTH_001 오류 체크
                             if data.get('rc') == 1 and data.get('mc') == 'AUTH_001':
-                                print(f"AUTH_001 오류 발생, 대안 헤더 시도: {base_url}{endpoint}")
-                                # 대안 헤더로 재시도 (서명 재생성)
+                                print(f"AUTH_001 오류 발생, pyxt 방식으로 재시도: {base_url}{endpoint}")
+                                # pyxt 라이브러리 방식으로 재시도 (서명 재생성)
                                 alt_timestamp = str(int(time.time() * 1000))
-                                alt_sign_string = f"timestamp={alt_timestamp}"
+                                alt_sign_string = f"access_key={self.api_key}&timestamp={alt_timestamp}"
                                 alt_signature = hmac.new(
                                     self.api_secret.encode('utf-8'), 
                                     alt_sign_string.encode('utf-8'), 
@@ -3204,7 +3194,7 @@ class UnifiedFuturesTrader:
                                         return {
                                             'status': 'success',
                                             'balance': alt_data.get('result', {}),
-                                            'message': f'XT 스팟 잔고 조회 성공 ({base_url}{endpoint}) - 대안 헤더'
+                                            'message': f'XT 스팟 잔고 조회 성공 ({base_url}{endpoint}) - pyxt 방식'
                                         }
                             elif data.get('rc') == 0:  # 정상 응답
                                 return {
