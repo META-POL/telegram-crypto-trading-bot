@@ -2138,11 +2138,7 @@ class UnifiedFuturesTrader:
             if self.exchange == 'xt':
                 # XT API 연결 테스트 - 서버 시간 조회 (공개 엔드포인트)
                 time_endpoints = [
-                    "/public/time",
-                    "/v4/public/time",
-                    "/v3/public/time",
-                    "/v2/public/time",
-                    "/v1/public/time"
+                    "/v4/public/time"  # 공식 문서 엔드포인트
                 ]
                 
                 for time_endpoint in time_endpoints:
@@ -2324,22 +2320,16 @@ class UnifiedFuturesTrader:
         """선물 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 잔고 조회 - 여러 베이스 URL과 엔드포인트 시도
+                # XT 잔고 조회 - 공식 문서 기반 엔드포인트
                 base_urls = [
-                    "https://sapi.xt.com",
-                    "https://sapi.xt.com/v4",
-                    "https://sapi.xt.com/v3",
-                    "https://sapi.xt.com/v2",
-                    "https://sapi.xt.com/v1"
+                    "https://sapi.xt.com"
                 ]
                 
                 endpoints = [
-                    "/balance",  # 성공한 엔드포인트를 첫 번째로
-                    "/assets",
-                    "/account/balance",
-                    "/account/assets", 
-                    "/account/futures/balance",
-                    "/account/spot/balance"
+                    "/v4/account/assets",  # 공식 문서 엔드포인트
+                    "/v4/account/balance",
+                    "/v4/account/futures/balance",
+                    "/v4/account/spot/balance"
                 ]
                 
                 for base_url in base_urls:
@@ -3167,22 +3157,16 @@ class UnifiedFuturesTrader:
         """스팟 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 스팟 잔고 조회 - 여러 베이스 URL과 엔드포인트 시도
+                # XT 스팟 잔고 조회 - 공식 문서 기반 엔드포인트
                 base_urls = [
-                    "https://sapi.xt.com",
-                    "https://sapi.xt.com/v4",
-                    "https://sapi.xt.com/v3",
-                    "https://sapi.xt.com/v2",
-                    "https://sapi.xt.com/v1"
+                    "https://sapi.xt.com"
                 ]
                 
                 endpoints = [
-                    "/balance",  # 성공한 엔드포인트를 첫 번째로
-                    "/assets",
-                    "/account/balance",
-                    "/account/assets",
-                    "/account/spot/balance",
-                    "/account/spot/assets"
+                    "/v4/account/assets",  # 공식 문서 엔드포인트
+                    "/v4/account/balance",
+                    "/v4/account/spot/balance",
+                    "/v4/account/spot/assets"
                 ]
                 
                 for base_url in base_urls:
