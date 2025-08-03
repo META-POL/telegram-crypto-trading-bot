@@ -2138,11 +2138,11 @@ class UnifiedFuturesTrader:
             if self.exchange == 'xt':
                 # XT API 연결 테스트 - 서버 시간 조회 (공개 엔드포인트)
                 time_endpoints = [
+                    "/public/time",
                     "/v4/public/time",
                     "/v3/public/time",
                     "/v2/public/time",
-                    "/v1/public/time",
-                    "/public/time"
+                    "/v1/public/time"
                 ]
                 
                 for time_endpoint in time_endpoints:
@@ -2312,11 +2312,10 @@ class UnifiedFuturesTrader:
                 # XT 잔고 조회 - 여러 베이스 URL과 엔드포인트 시도
                 base_urls = [
                     "https://sapi.xt.com",
-                    "https://api.xt.com",
-                    "https://api.xt.com/v4",
-                    "https://api.xt.com/v3",
-                    "https://api.xt.com/v2",
-                    "https://api.xt.com/v1"
+                    "https://sapi.xt.com/v4",
+                    "https://sapi.xt.com/v3",
+                    "https://sapi.xt.com/v2",
+                    "https://sapi.xt.com/v1"
                 ]
                 
                 endpoints = [
@@ -3128,11 +3127,10 @@ class UnifiedFuturesTrader:
                 # XT 스팟 잔고 조회 - 여러 베이스 URL과 엔드포인트 시도
                 base_urls = [
                     "https://sapi.xt.com",
-                    "https://api.xt.com",
-                    "https://api.xt.com/v4",
-                    "https://api.xt.com/v3",
-                    "https://api.xt.com/v2",
-                    "https://api.xt.com/v1"
+                    "https://sapi.xt.com/v4",
+                    "https://sapi.xt.com/v3",
+                    "https://sapi.xt.com/v2",
+                    "https://sapi.xt.com/v1"
                 ]
                 
                 endpoints = [
