@@ -2315,7 +2315,9 @@ class UnifiedFuturesTrader:
                 # XT 잔고 조회 - pyxt 라이브러리 기반 엔드포인트
                 base_urls = [
                     "https://fapi.xt.com",  # 선물 API
-                    "https://sapi.xt.com"   # 스팟 API
+                    "https://sapi.xt.com",  # 스팟 API
+                    "https://api.xt.com",   # 기본 API
+                    "https://api.xt.com/v4" # v4 API
                 ]
                 
                 endpoints = [
@@ -2332,7 +2334,11 @@ class UnifiedFuturesTrader:
                     "/v4/balance",  # pyxt balance() 함수
                     "/v4/assets",
                     "/balance",  # 기본 balance
-                    "/assets"   # 기본 assets
+                    "/assets",   # 기본 assets
+                    "/v4/account/spot/balance",  # 스팟 전용
+                    "/v4/account/futures/balance",  # 선물 전용
+                    "/v4/account/spot/assets",  # 스팟 자산
+                    "/v4/account/futures/assets"  # 선물 자산
                 ]
                 
                 for base_url in base_urls:
@@ -2387,7 +2393,7 @@ class UnifiedFuturesTrader:
                 # 모든 시도 실패 시
                 return {
                     'status': 'error',
-                    'message': f'XT 잔고 조회 실패: 모든 베이스 URL과 엔드포인트 시도 실패'
+                    'message': f'XT 잔고 조회 실패: 모든 엔드포인트에서 API 문서 링크만 반환됨. 실제 잔고 엔드포인트 확인 필요.'
                 }
             
             elif self.exchange == 'backpack':
@@ -3168,7 +3174,9 @@ class UnifiedFuturesTrader:
                 # XT 스팟 잔고 조회 - pyxt 라이브러리 기반 엔드포인트
                 base_urls = [
                     "https://sapi.xt.com",  # 스팟 API
-                    "https://fapi.xt.com"   # 선물 API
+                    "https://fapi.xt.com",  # 선물 API
+                    "https://api.xt.com",   # 기본 API
+                    "https://api.xt.com/v4" # v4 API
                 ]
                 
                 endpoints = [
@@ -3238,7 +3246,7 @@ class UnifiedFuturesTrader:
                 # 모든 시도 실패 시
                 return {
                     'status': 'error',
-                    'message': f'XT 스팟 잔고 조회 실패: 모든 베이스 URL과 엔드포인트 시도 실패'
+                    'message': f'XT 스팟 잔고 조회 실패: 모든 엔드포인트에서 API 문서 링크만 반환됨. 실제 잔고 엔드포인트 확인 필요.'
                 }
             
             elif self.exchange == 'hyperliquid':
