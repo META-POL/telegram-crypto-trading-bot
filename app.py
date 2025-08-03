@@ -2355,11 +2355,19 @@ class UnifiedFuturesTrader:
                             # AUTH_001 오류 체크
                             if data.get('rc') == 1 and data.get('mc') == 'AUTH_001':
                                 print(f"AUTH_001 오류 발생, 대안 헤더 시도: {base_url}{endpoint}")
-                                # 대안 헤더로 재시도
+                                # 대안 헤더로 재시도 (서명 재생성)
+                                alt_timestamp = str(int(time.time() * 1000))
+                                alt_sign_string = f"timestamp={alt_timestamp}"
+                                alt_signature = hmac.new(
+                                    self.api_secret.encode('utf-8'), 
+                                    alt_sign_string.encode('utf-8'), 
+                                    hashlib.sha256
+                                ).digest().hex()
+                                
                                 alt_headers = {
                                     "access_key": self.api_key,
-                                    "signature": signature,
-                                    "timestamp": timestamp,
+                                    "signature": alt_signature,
+                                    "timestamp": alt_timestamp,
                                     "Content-Type": "application/json"
                                 }
                                 alt_response = requests.get(url, headers=alt_headers)
@@ -3190,11 +3198,19 @@ class UnifiedFuturesTrader:
                             # AUTH_001 오류 체크
                             if data.get('rc') == 1 and data.get('mc') == 'AUTH_001':
                                 print(f"AUTH_001 오류 발생, 대안 헤더 시도: {base_url}{endpoint}")
-                                # 대안 헤더로 재시도
+                                # 대안 헤더로 재시도 (서명 재생성)
+                                alt_timestamp = str(int(time.time() * 1000))
+                                alt_sign_string = f"timestamp={alt_timestamp}"
+                                alt_signature = hmac.new(
+                                    self.api_secret.encode('utf-8'), 
+                                    alt_sign_string.encode('utf-8'), 
+                                    hashlib.sha256
+                                ).digest().hex()
+                                
                                 alt_headers = {
                                     "access_key": self.api_key,
-                                    "signature": signature,
-                                    "timestamp": timestamp,
+                                    "signature": alt_signature,
+                                    "timestamp": alt_timestamp,
                                     "Content-Type": "application/json"
                                 }
                                 alt_response = requests.get(url, headers=alt_headers)
