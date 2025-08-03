@@ -24,6 +24,12 @@ SigningKey = None
 ccxt = None
 InlineKeyboardButton = None
 InlineKeyboardMarkup = None
+try:
+    from pyxt import XT
+    print("✅ pyxt 라이브러리 로드 성공")
+except ImportError:
+    print("⚠️ pyxt 라이브러리가 설치되지 않았습니다. pip install pyxt로 설치해주세요.")
+    XT = None
 print("📝 모든 라이브러리는 필요시 로드됩니다")
 
 # 로깅 설정
@@ -2312,7 +2318,22 @@ class UnifiedFuturesTrader:
         """선물 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 잔고 조회 - pyxt 라이브러리 기반 엔드포인트
+                # pyxt 라이브러리를 사용한 XT 잔고 조회
+                if XT is not None:
+                    try:
+                        xt_client = XT(api_key=self.api_key, secret_key=self.api_secret)
+                        balance = xt_client.balance()
+                        print(f"pyxt 라이브러리 잔고 조회 성공: {balance}")
+                        return {
+                            'status': 'success',
+                            'balance': balance,
+                            'message': 'XT 잔고 조회 성공 (pyxt 라이브러리)'
+                        }
+                    except Exception as e:
+                        print(f"pyxt 라이브러리 잔고 조회 실패: {e}")
+                        # pyxt 실패 시 기존 방식으로 폴백
+                
+                # 기존 방식 (pyxt 라이브러리 사용 불가능한 경우)
                 base_urls = [
                     "https://api.xt.com",   # 기본 API (pyxt 기본)
                     "https://sapi.xt.com",  # 스팟 API
@@ -2412,7 +2433,7 @@ class UnifiedFuturesTrader:
                 return {
                     'status': 'error',
                     'balance': {},  # 빈 딕셔너리 반환
-                    'message': f'XT 잔고 조회 실패: 모든 엔드포인트에서 API 문서 링크만 반환됨. XT API 문서에서 실제 잔고 엔드포인트를 확인해야 합니다.'
+                    'message': f'XT 잔고 조회 실패: pyxt 라이브러리와 모든 엔드포인트에서 실패. XT API 문서에서 실제 잔고 엔드포인트를 확인해야 합니다.'
                 }
             
             elif self.exchange == 'backpack':
@@ -3190,7 +3211,22 @@ class UnifiedFuturesTrader:
         """스팟 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 스팟 잔고 조회 - pyxt 라이브러리 기반 엔드포인트
+                # pyxt 라이브러리를 사용한 XT 스팟 잔고 조회
+                if XT is not None:
+                    try:
+                        xt_client = XT(api_key=self.api_key, secret_key=self.api_secret)
+                        balance = xt_client.balance()
+                        print(f"pyxt 라이브러리 스팟 잔고 조회 성공: {balance}")
+                        return {
+                            'status': 'success',
+                            'balance': balance,
+                            'message': 'XT 스팟 잔고 조회 성공 (pyxt 라이브러리)'
+                        }
+                    except Exception as e:
+                        print(f"pyxt 라이브러리 스팟 잔고 조회 실패: {e}")
+                        # pyxt 실패 시 기존 방식으로 폴백
+                
+                # 기존 방식 (pyxt 라이브러리 사용 불가능한 경우)
                 base_urls = [
                     "https://api.xt.com",   # 기본 API (pyxt 기본)
                     "https://sapi.xt.com",  # 스팟 API
@@ -3278,7 +3314,7 @@ class UnifiedFuturesTrader:
                 return {
                     'status': 'error',
                     'balance': {},  # 빈 딕셔너리 반환
-                    'message': f'XT 스팟 잔고 조회 실패: 모든 엔드포인트에서 API 문서 링크만 반환됨. XT API 문서에서 실제 잔고 엔드포인트를 확인해야 합니다.'
+                    'message': f'XT 스팟 잔고 조회 실패: pyxt 라이브러리와 모든 엔드포인트에서 실패. XT API 문서에서 실제 잔고 엔드포인트를 확인해야 합니다.'
                 }
             
             elif self.exchange == 'hyperliquid':
