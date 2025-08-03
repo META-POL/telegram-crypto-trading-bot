@@ -2314,13 +2314,9 @@ class UnifiedFuturesTrader:
             if self.exchange == 'xt':
                 # XT 잔고 조회 - pyxt 라이브러리 기반 엔드포인트
                 base_urls = [
-                    "https://fapi.xt.com",  # 선물 API
+                    "https://api.xt.com",   # 기본 API (pyxt 기본)
                     "https://sapi.xt.com",  # 스팟 API
-                    "https://api.xt.com",   # 기본 API
-                    "https://api.xt.com/v4", # v4 API
-                    "https://api.xt.com/v3", # v3 API
-                    "https://api.xt.com/v2", # v2 API
-                    "https://api.xt.com/v1", # v1 API
+                    "https://fapi.xt.com",  # 선물 API
                     "https://api.xt.com/v4", # v4 API
                     "https://api.xt.com/v3", # v3 API
                     "https://api.xt.com/v2", # v2 API
@@ -2328,41 +2324,29 @@ class UnifiedFuturesTrader:
                 ]
                 
                 endpoints = [
-                    "/v4/account/capital",  # pyxt 라이브러리 엔드포인트
-                    "/v4/account/balance",
+                    "/v4/account/balance",  # pyxt 라이브러리 기본 엔드포인트
                     "/v4/account/assets",
-                    "/v4/account/spot/balance",  # 스팟 잔고
-                    "/v4/account/futures/balance",  # 선물 잔고
-                    "/v4/account/spot/assets",
-                    "/v4/account/futures/assets",
-                    "/account/capital",  # v4 없이 시도
-                    "/account/balance",
+                    "/v4/account/capital",
+                    "/account/balance",  # v4 없이 시도
                     "/account/assets",
+                    "/account/capital",
                     "/v4/balance",  # pyxt balance() 함수
                     "/v4/assets",
                     "/balance",  # 기본 balance
                     "/assets",   # 기본 assets
-                    "/v4/account/spot/balance",  # 스팟 전용
-                    "/v4/account/futures/balance",  # 선물 전용
-                    "/v4/account/spot/assets",  # 스팟 자산
-                    "/v4/account/futures/assets",  # 선물 자산
                     "/v4/account/spot/balance",  # 스팟 잔고
                     "/v4/account/futures/balance",  # 선물 잔고
                     "/v4/account/spot/assets",  # 스팟 자산
                     "/v4/account/futures/assets",  # 선물 자산
-                    "/v4/account/spot/balance",  # 스팟 잔고
-                    "/v4/account/futures/balance",  # 선물 잔고
-                    "/v4/account/spot/assets",  # 스팟 자산
-                    "/v4/account/futures/assets",  # 선물 자산
-                    "/v3/account/capital",  # v3 시도
-                    "/v3/account/balance",
+                    "/v3/account/balance",  # v3 시도
                     "/v3/account/assets",
-                    "/v2/account/capital",  # v2 시도
-                    "/v2/account/balance",
+                    "/v3/account/capital",
+                    "/v2/account/balance",  # v2 시도
                     "/v2/account/assets",
-                    "/v1/account/capital",  # v1 시도
-                    "/v1/account/balance",
+                    "/v2/account/capital",
+                    "/v1/account/balance",  # v1 시도
                     "/v1/account/assets",
+                    "/v1/account/capital",
                     "/v4/account/spot/balance",  # 스팟 잔고
                     "/v4/account/futures/balance",  # 선물 잔고
                     "/v4/account/spot/assets",  # 스팟 자산
@@ -3208,9 +3192,9 @@ class UnifiedFuturesTrader:
             if self.exchange == 'xt':
                 # XT 스팟 잔고 조회 - pyxt 라이브러리 기반 엔드포인트
                 base_urls = [
+                    "https://api.xt.com",   # 기본 API (pyxt 기본)
                     "https://sapi.xt.com",  # 스팟 API
                     "https://fapi.xt.com",  # 선물 API
-                    "https://api.xt.com",   # 기본 API
                     "https://api.xt.com/v4", # v4 API
                     "https://api.xt.com/v3", # v3 API
                     "https://api.xt.com/v2", # v2 API
@@ -3218,10 +3202,8 @@ class UnifiedFuturesTrader:
                 ]
                 
                 endpoints = [
-                    "/v4/account/balance",  # pyxt 라이브러리 엔드포인트
+                    "/v4/account/balance",  # pyxt 라이브러리 기본 엔드포인트
                     "/v4/account/assets",
-                    "/v4/account/spot/balance",
-                    "/v4/account/spot/assets",
                     "/v4/account/capital",
                     "/account/balance",  # v4 없이 시도
                     "/account/assets",
@@ -3230,6 +3212,8 @@ class UnifiedFuturesTrader:
                     "/v4/assets",
                     "/balance",  # 기본 balance
                     "/assets",   # 기본 assets
+                    "/v4/account/spot/balance",  # 스팟 잔고
+                    "/v4/account/spot/assets",  # 스팟 자산
                     "/v3/account/balance",  # v3 시도
                     "/v3/account/assets",
                     "/v3/account/capital",
@@ -3238,17 +3222,7 @@ class UnifiedFuturesTrader:
                     "/v2/account/capital",
                     "/v1/account/balance",  # v1 시도
                     "/v1/account/assets",
-                    "/v1/account/capital",
-                    "/v4/account/spot/balance",  # 스팟 잔고
-                    "/v4/account/futures/balance",  # 선물 잔고
-                    "/v4/account/spot/assets",  # 스팟 자산
-                    "/v4/account/futures/assets",  # 선물 자산
-                    "/v3/account/spot/balance",  # v3 스팟 잔고
-                    "/v3/account/futures/balance",  # v3 선물 잔고
-                    "/v2/account/spot/balance",  # v2 스팟 잔고
-                    "/v2/account/futures/balance",  # v2 선물 잔고
-                    "/v1/account/spot/balance",  # v1 스팟 잔고
-                    "/v1/account/futures/balance"  # v1 선물 잔고
+                    "/v1/account/capital"
                 ]
                 
                 for base_url in base_urls:
