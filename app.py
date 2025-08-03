@@ -2115,8 +2115,8 @@ class UnifiedFuturesTrader:
             self.api_key = kwargs.get('api_key')
             self.api_secret = kwargs.get('api_secret')
             # XT API 베이스 URL (공식 문서 기반)
-            self.base_url = "https://sapi.xt.com"  # 공식 API
-            self.spot_base_url = "https://sapi.xt.com"  # 스팟 API
+            self.base_url = "https://api.xt.com"  # 공식 API
+            self.spot_base_url = "https://api.xt.com"  # 스팟 API
         elif self.exchange == 'backpack':
             self.api_key = kwargs.get('api_key')
             self.private_key = kwargs.get('private_key') or kwargs.get('api_secret')
@@ -2137,8 +2137,26 @@ class UnifiedFuturesTrader:
         try:
             if self.exchange == 'xt':
                 # XT API 연결 테스트 - 서버 시간 조회 (공개 엔드포인트)
-                url = f"{self.base_url}/v4/public/time"
-                response = requests.get(url)
+                time_endpoints = [
+                    "/v4/public/time",
+                    "/v3/public/time",
+                    "/v2/public/time",
+                    "/v1/public/time",
+                    "/public/time"
+                ]
+                
+                for time_endpoint in time_endpoints:
+                    url = f"{self.base_url}{time_endpoint}"
+                    response = requests.get(url)
+                    
+                    print(f"XT API 연결 테스트 {time_endpoint}: {response.status_code}")  # 디버깅용
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        return {
+                            'status': 'success',
+                            'message': f'XT API 연결 성공 ({time_endpoint})'
+                        }
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -2296,7 +2314,15 @@ class UnifiedFuturesTrader:
                     "/v4/account/assets",
                     "/v4/account/balance", 
                     "/v4/account/futures/balance",
-                    "/v4/account/spot/balance"
+                    "/v4/account/spot/balance",
+                    "/v3/account/assets",
+                    "/v3/account/balance",
+                    "/v2/account/assets",
+                    "/v2/account/balance",
+                    "/v1/account/assets",
+                    "/v1/account/balance",
+                    "/account/assets",
+                    "/account/balance"
                 ]
                 
                 for endpoint in endpoints:
@@ -3100,7 +3126,15 @@ class UnifiedFuturesTrader:
                     "/v4/account/assets",
                     "/v4/account/balance",
                     "/v4/account/spot/balance",
-                    "/v4/account/spot/assets"
+                    "/v4/account/spot/assets",
+                    "/v3/account/assets",
+                    "/v3/account/balance",
+                    "/v2/account/assets",
+                    "/v2/account/balance",
+                    "/v1/account/assets",
+                    "/v1/account/balance",
+                    "/account/assets",
+                    "/account/balance"
                 ]
                 
                 for endpoint in endpoints:
