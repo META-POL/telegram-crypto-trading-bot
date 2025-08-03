@@ -2320,6 +2320,10 @@ class UnifiedFuturesTrader:
                     "https://api.xt.com/v4", # v4 API
                     "https://api.xt.com/v3", # v3 API
                     "https://api.xt.com/v2", # v2 API
+                    "https://api.xt.com/v1", # v1 API
+                    "https://api.xt.com/v4", # v4 API
+                    "https://api.xt.com/v3", # v3 API
+                    "https://api.xt.com/v2", # v2 API
                     "https://api.xt.com/v1"  # v1 API
                 ]
                 
@@ -2423,6 +2427,7 @@ class UnifiedFuturesTrader:
                 # 모든 시도 실패 시
                 return {
                     'status': 'error',
+                    'balance': {},  # 빈 딕셔너리 반환
                     'message': f'XT 잔고 조회 실패: 모든 엔드포인트에서 API 문서 링크만 반환됨. XT API 문서에서 실제 잔고 엔드포인트를 확인해야 합니다.'
                 }
             
@@ -3298,6 +3303,7 @@ class UnifiedFuturesTrader:
                 # 모든 시도 실패 시
                 return {
                     'status': 'error',
+                    'balance': {},  # 빈 딕셔너리 반환
                     'message': f'XT 스팟 잔고 조회 실패: 모든 엔드포인트에서 API 문서 링크만 반환됨. XT API 문서에서 실제 잔고 엔드포인트를 확인해야 합니다.'
                 }
             
