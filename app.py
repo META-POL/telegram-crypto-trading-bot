@@ -2261,6 +2261,13 @@ class UnifiedFuturesTrader:
             hashlib.sha256
         ).digest().hex()
         
+        # 대안 서명 방식 (필요시 사용)
+        # signature = base64.b64encode(hmac.new(
+        #     self.api_secret.encode('utf-8'), 
+        #     sign_string.encode('utf-8'), 
+        #     hashlib.sha256
+        # ).digest()).decode('utf-8')
+        
         print(f"XT 서명 디버그: sign_string={sign_string}, signature={signature}")  # 디버깅용
         
         # XT 공식 문서 방식 헤더
@@ -2270,6 +2277,14 @@ class UnifiedFuturesTrader:
             "XT-API-TIMESTAMP": timestamp,
             "Content-Type": "application/json"
         }
+        
+        # 대안 헤더 형식 (필요시 사용)
+        # headers = {
+        #     "access_key": self.api_key,
+        #     "signature": signature,
+        #     "timestamp": timestamp,
+        #     "Content-Type": "application/json"
+        # }
         
         return headers
 
@@ -2319,12 +2334,12 @@ class UnifiedFuturesTrader:
                 ]
                 
                 endpoints = [
-                    "/account/assets",
-                    "/account/balance", 
-                    "/account/futures/balance",
-                    "/account/spot/balance",
+                    "/balance",  # 성공한 엔드포인트를 첫 번째로
                     "/assets",
-                    "/balance"
+                    "/account/balance",
+                    "/account/assets", 
+                    "/account/futures/balance",
+                    "/account/spot/balance"
                 ]
                 
                 for base_url in base_urls:
@@ -2337,11 +2352,31 @@ class UnifiedFuturesTrader:
                         
                         if response.status_code == 200:
                             data = response.json()
-                            return {
-                                'status': 'success',
-                                'balance': data.get('result', {}),
-                                'message': f'XT 잔고 조회 성공 ({base_url}{endpoint})'
-                            }
+                            # AUTH_001 오류 체크
+                            if data.get('rc') == 1 and data.get('mc') == 'AUTH_001':
+                                print(f"AUTH_001 오류 발생, 대안 헤더 시도: {base_url}{endpoint}")
+                                # 대안 헤더로 재시도
+                                alt_headers = {
+                                    "access_key": self.api_key,
+                                    "signature": signature,
+                                    "timestamp": timestamp,
+                                    "Content-Type": "application/json"
+                                }
+                                alt_response = requests.get(url, headers=alt_headers)
+                                if alt_response.status_code == 200:
+                                    alt_data = alt_response.json()
+                                    if alt_data.get('rc') == 0:  # 성공 응답
+                                        return {
+                                            'status': 'success',
+                                            'balance': alt_data.get('result', {}),
+                                            'message': f'XT 잔고 조회 성공 ({base_url}{endpoint}) - 대안 헤더'
+                                        }
+                            elif data.get('rc') == 0:  # 정상 응답
+                                return {
+                                    'status': 'success',
+                                    'balance': data.get('result', {}),
+                                    'message': f'XT 잔고 조회 성공 ({base_url}{endpoint})'
+                                }
                 
                 # 모든 시도 실패 시
                 return {
@@ -3134,12 +3169,12 @@ class UnifiedFuturesTrader:
                 ]
                 
                 endpoints = [
-                    "/account/assets",
-                    "/account/balance",
-                    "/account/spot/balance",
-                    "/account/spot/assets",
+                    "/balance",  # 성공한 엔드포인트를 첫 번째로
                     "/assets",
-                    "/balance"
+                    "/account/balance",
+                    "/account/assets",
+                    "/account/spot/balance",
+                    "/account/spot/assets"
                 ]
                 
                 for base_url in base_urls:
@@ -3152,11 +3187,31 @@ class UnifiedFuturesTrader:
                         
                         if response.status_code == 200:
                             data = response.json()
-                            return {
-                                'status': 'success',
-                                'balance': data.get('result', {}),
-                                'message': f'XT 스팟 잔고 조회 성공 ({base_url}{endpoint})'
-                            }
+                            # AUTH_001 오류 체크
+                            if data.get('rc') == 1 and data.get('mc') == 'AUTH_001':
+                                print(f"AUTH_001 오류 발생, 대안 헤더 시도: {base_url}{endpoint}")
+                                # 대안 헤더로 재시도
+                                alt_headers = {
+                                    "access_key": self.api_key,
+                                    "signature": signature,
+                                    "timestamp": timestamp,
+                                    "Content-Type": "application/json"
+                                }
+                                alt_response = requests.get(url, headers=alt_headers)
+                                if alt_response.status_code == 200:
+                                    alt_data = alt_response.json()
+                                    if alt_data.get('rc') == 0:  # 성공 응답
+                                        return {
+                                            'status': 'success',
+                                            'balance': alt_data.get('result', {}),
+                                            'message': f'XT 스팟 잔고 조회 성공 ({base_url}{endpoint}) - 대안 헤더'
+                                        }
+                            elif data.get('rc') == 0:  # 정상 응답
+                                return {
+                                    'status': 'success',
+                                    'balance': data.get('result', {}),
+                                    'message': f'XT 스팟 잔고 조회 성공 ({base_url}{endpoint})'
+                                }
                 
                 # 모든 시도 실패 시
                 return {
