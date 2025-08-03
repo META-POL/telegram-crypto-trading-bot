@@ -2317,7 +2317,10 @@ class UnifiedFuturesTrader:
                     "https://fapi.xt.com",  # 선물 API
                     "https://sapi.xt.com",  # 스팟 API
                     "https://api.xt.com",   # 기본 API
-                    "https://api.xt.com/v4" # v4 API
+                    "https://api.xt.com/v4", # v4 API
+                    "https://api.xt.com/v3", # v3 API
+                    "https://api.xt.com/v2", # v2 API
+                    "https://api.xt.com/v1"  # v1 API
                 ]
                 
                 endpoints = [
@@ -2338,7 +2341,24 @@ class UnifiedFuturesTrader:
                     "/v4/account/spot/balance",  # 스팟 전용
                     "/v4/account/futures/balance",  # 선물 전용
                     "/v4/account/spot/assets",  # 스팟 자산
-                    "/v4/account/futures/assets"  # 선물 자산
+                    "/v4/account/futures/assets",  # 선물 자산
+                    "/v4/account/spot/balance",  # 스팟 잔고
+                    "/v4/account/futures/balance",  # 선물 잔고
+                    "/v4/account/spot/assets",  # 스팟 자산
+                    "/v4/account/futures/assets",  # 선물 자산
+                    "/v4/account/spot/balance",  # 스팟 잔고
+                    "/v4/account/futures/balance",  # 선물 잔고
+                    "/v4/account/spot/assets",  # 스팟 자산
+                    "/v4/account/futures/assets",  # 선물 자산
+                    "/v3/account/capital",  # v3 시도
+                    "/v3/account/balance",
+                    "/v3/account/assets",
+                    "/v2/account/capital",  # v2 시도
+                    "/v2/account/balance",
+                    "/v2/account/assets",
+                    "/v1/account/capital",  # v1 시도
+                    "/v1/account/balance",
+                    "/v1/account/assets"
                 ]
                 
                 for base_url in base_urls:
@@ -3176,7 +3196,10 @@ class UnifiedFuturesTrader:
                     "https://sapi.xt.com",  # 스팟 API
                     "https://fapi.xt.com",  # 선물 API
                     "https://api.xt.com",   # 기본 API
-                    "https://api.xt.com/v4" # v4 API
+                    "https://api.xt.com/v4", # v4 API
+                    "https://api.xt.com/v3", # v3 API
+                    "https://api.xt.com/v2", # v2 API
+                    "https://api.xt.com/v1"  # v1 API
                 ]
                 
                 endpoints = [
@@ -3191,7 +3214,16 @@ class UnifiedFuturesTrader:
                     "/v4/balance",  # pyxt balance() 함수
                     "/v4/assets",
                     "/balance",  # 기본 balance
-                    "/assets"   # 기본 assets
+                    "/assets",   # 기본 assets
+                    "/v3/account/balance",  # v3 시도
+                    "/v3/account/assets",
+                    "/v3/account/capital",
+                    "/v2/account/balance",  # v2 시도
+                    "/v2/account/assets",
+                    "/v2/account/capital",
+                    "/v1/account/balance",  # v1 시도
+                    "/v1/account/assets",
+                    "/v1/account/capital"
                 ]
                 
                 for base_url in base_urls:
