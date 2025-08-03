@@ -2147,10 +2147,34 @@ class UnifiedFuturesTrader:
                         'message': 'XT API 연결 성공'
                     }
                 else:
-                    return {
-                        'status': 'error',
-                        'message': f'XT API 연결 실패: {response.status_code}'
-                    }
+                    # API 키가 있는 경우 인증 테스트도 시도
+                    if self.api_key and self.api_secret:
+                        try:
+                            # 인증이 필요한 엔드포인트로 테스트
+                            test_url = f"{self.base_url}/v4/account/assets"
+                            headers = self._get_headers_xt()
+                            auth_response = requests.get(test_url, headers=headers)
+                            
+                            if auth_response.status_code == 200:
+                                return {
+                                    'status': 'success',
+                                    'message': 'XT API 인증 성공'
+                                }
+                            else:
+                                return {
+                                    'status': 'error',
+                                    'message': f'XT API 인증 실패: {auth_response.status_code} - {auth_response.text}'
+                                }
+                        except Exception as auth_e:
+                            return {
+                                'status': 'error',
+                                'message': f'XT API 인증 테스트 오류: {str(auth_e)}'
+                            }
+                    else:
+                        return {
+                            'status': 'error',
+                            'message': f'XT API 연결 실패: {response.status_code}'
+                        }
             
             elif self.exchange == 'backpack':
                 # Backpack Exchange API 연결 테스트 - 계좌 정보 조회
@@ -2206,57 +2230,28 @@ class UnifiedFuturesTrader:
         # 2. 쿼리 스트링 생성 (값을 문자열로 변환)
         query_string = '&'.join([f"{k}={str(v)}" for k, v in sorted_params])
         
-        # 3. 서명 문자열 생성 (PyXT 라이브러리 방식)
+        # 3. 서명 문자열 생성 (XT 공식 문서 방식)
         if query_string:
-            sign_string = f"access_key={self.api_key}&{query_string}&timestamp={timestamp}"
+            sign_string = f"{query_string}&timestamp={timestamp}"
         else:
-            sign_string = f"access_key={self.api_key}&timestamp={timestamp}"
+            sign_string = f"timestamp={timestamp}"
         
-        # 공식 문서 방식 대안
-        # if query_string:
-        #     sign_string = f"{query_string}&timestamp={timestamp}"
-        # else:
-        #     sign_string = f"timestamp={timestamp}"
-        
-        # 4. HMAC-SHA256 서명 생성 (PyXT 라이브러리 방식)
-        # PyXT 라이브러리 방식: digest().hex() 사용
+        # 4. HMAC-SHA256 서명 생성
         signature = hmac.new(
             self.api_secret.encode('utf-8'), 
             sign_string.encode('utf-8'), 
             hashlib.sha256
         ).digest().hex()
         
-        # PyXT 라이브러리 대안: Base64 인코딩 방식
-        # signature = base64.b64encode(hmac.new(
-        #     self.api_secret.encode('utf-8'), 
-        #     sign_string.encode('utf-8'), 
-        #     hashlib.sha256
-        # ).digest()).decode('utf-8')
-        
-        # PyXT 라이브러리 대안: 다른 서명 방식
-        # signature = hmac.new(
-        #     self.api_secret.encode('utf-8'), 
-        #     sign_string.encode('utf-8'), 
-        #     hashlib.sha256
-        # ).digest().hex()
-        
         print(f"XT 서명 디버그: sign_string={sign_string}, signature={signature}")  # 디버깅용
         
-        # PyXT 라이브러리 방식과 공식 문서 방식 모두 시도
+        # XT 공식 문서 방식 헤더
         headers = {
-            "access_key": self.api_key,  # PyXT 라이브러리 방식
-            "signature": signature,       # PyXT 라이브러리 방식
-            "timestamp": timestamp,       # PyXT 라이브러리 방식
+            "XT-API-KEY": self.api_key,
+            "XT-API-SIGN": signature,
+            "XT-API-TIMESTAMP": timestamp,
             "Content-Type": "application/json"
         }
-        
-        # 공식 문서 방식 대안 (필요시 사용)
-        # headers = {
-        #     "XT-API-KEY": self.api_key,
-        #     "XT-API-SIGN": signature,
-        #     "XT-API-TIMESTAMP": timestamp,
-        #     "Content-Type": "application/json"
-        # }
         
         return headers
 
@@ -2296,8 +2291,8 @@ class UnifiedFuturesTrader:
         """선물 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 잔고 조회 - 올바른 엔드포인트
-                url = f"{self.base_url}/v4/account/balance"
+                # XT 잔고 조회 - 공식 문서 기반 올바른 엔드포인트
+                url = f"{self.base_url}/v4/account/assets"
                 headers = self._get_headers_xt()
                 response = requests.get(url, headers=headers)
                 
@@ -2311,24 +2306,10 @@ class UnifiedFuturesTrader:
                         'message': 'XT 잔고 조회 성공'
                     }
                 else:
-                    # 다른 엔드포인트 시도
-                    url2 = f"{self.base_url}/v4/account/assets"
-                    response2 = requests.get(url2, headers=headers)
-                    
-                    print(f"XT 잔고 조회 대체 응답: {response2.status_code} - {response2.text}")  # 디버깅용
-                    
-                    if response2.status_code == 200:
-                        data2 = response2.json()
-                        return {
-                            'status': 'success',
-                            'balance': data2.get('result', {}),
-                            'message': 'XT 잔고 조회 성공 (대체 엔드포인트)'
-                        }
-                    else:
-                        return {
-                            'status': 'error',
-                            'message': f'XT 잔고 조회 실패: {response.status_code} - {response.text}'
-                        }
+                    return {
+                        'status': 'error',
+                        'message': f'XT 잔고 조회 실패: {response.status_code} - {response.text}'
+                    }
             
             elif self.exchange == 'backpack':
                 # Backpack Exchange 잔고 조회 - /capital 엔드포인트 사용
@@ -2395,9 +2376,12 @@ class UnifiedFuturesTrader:
         """선물 거래쌍 조회"""
         try:
             if self.exchange == 'xt':
-                # XT 거래쌍 조회 - 공식 문서 기반 엔드포인트
+                # XT 선물 거래쌍 조회 - 공식 문서 기반 엔드포인트
+                # 먼저 일반 거래쌍 조회 시도
                 url = f"{self.base_url}/v4/public/symbols"
                 response = requests.get(url)
+                
+                print(f"XT 선물 거래쌍 조회 응답: {response.status_code} - {response.text}")  # 디버깅용
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -2406,18 +2390,45 @@ class UnifiedFuturesTrader:
                     symbols = []
                     for symbol_info in symbols_data:
                         if isinstance(symbol_info, dict) and 'symbol' in symbol_info:
-                            symbols.append(symbol_info['symbol'])
+                            # 선물 거래쌍만 필터링 (PERP, SWAP 등 포함)
+                            symbol = symbol_info['symbol']
+                            if any(keyword in symbol.upper() for keyword in ['PERP', 'SWAP', 'FUTURES']):
+                                symbols.append(symbol)
+                    
+                    # 선물 거래쌍이 없으면 모든 거래쌍 반환
+                    if not symbols:
+                        symbols = [symbol_info['symbol'] for symbol_info in symbols_data if isinstance(symbol_info, dict) and 'symbol' in symbol_info]
                     
                     return {
                         'status': 'success',
                         'symbols': symbols,
-                        'message': f'XT 거래쌍 {len(symbols)}개 조회 성공'
+                        'message': f'XT 선물 거래쌍 {len(symbols)}개 조회 성공'
                     }
                 else:
-                    return {
-                        'status': 'error',
-                        'message': f'XT 거래쌍 조회 실패: {response.status_code}'
-                    }
+                    # 대체 엔드포인트 시도
+                    url2 = f"{self.base_url}/v4/public/futures/symbols"
+                    response2 = requests.get(url2)
+                    
+                    print(f"XT 선물 거래쌍 대체 조회 응답: {response2.status_code} - {response2.text}")  # 디버깅용
+                    
+                    if response2.status_code == 200:
+                        data2 = response2.json()
+                        symbols_data2 = data2.get('result', [])
+                        symbols2 = []
+                        for symbol_info in symbols_data2:
+                            if isinstance(symbol_info, dict) and 'symbol' in symbol_info:
+                                symbols2.append(symbol_info['symbol'])
+                        
+                        return {
+                            'status': 'success',
+                            'symbols': symbols2,
+                            'message': f'XT 선물 거래쌍 {len(symbols2)}개 조회 성공 (대체 엔드포인트)'
+                        }
+                    else:
+                        return {
+                            'status': 'error',
+                            'message': f'XT 선물 거래쌍 조회 실패: {response.status_code} - {response.text}'
+                        }
             
             elif self.exchange == 'backpack':
                 # Backpack Exchange 실제 지원 심볼들 (API 기반)
@@ -3076,9 +3087,11 @@ class UnifiedFuturesTrader:
         try:
             if self.exchange == 'xt':
                 # XT 스팟 잔고 조회 - 공식 문서 기반 엔드포인트
-                url = f"{self.base_url}/v4/account/balance"
+                url = f"{self.base_url}/v4/account/assets"
                 headers = self._get_headers_xt()
                 response = requests.get(url, headers=headers)
+                
+                print(f"XT 스팟 잔고 조회 응답: {response.status_code} - {response.text}")  # 디버깅용
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -3090,7 +3103,7 @@ class UnifiedFuturesTrader:
                 else:
                     return {
                         'status': 'error',
-                        'message': f'XT 스팟 잔고 조회 실패: {response.status_code}'
+                        'message': f'XT 스팟 잔고 조회 실패: {response.status_code} - {response.text}'
                     }
             
             elif self.exchange == 'hyperliquid':
@@ -3145,31 +3158,26 @@ class UnifiedFuturesTrader:
                 url = f"{self.spot_base_url}/v4/public/symbols"
                 response = requests.get(url)
                 
+                print(f"XT 스팟 거래쌍 조회 응답: {response.status_code} - {response.text}")  # 디버깅용
+                
                 if response.status_code == 200:
                     data = response.json()
-                    # API 문서 링크 응답인지 확인
-                    if 'result' in data and isinstance(data['result'], dict) and 'openapiDocs' in data['result']:
-                        return {
-                            'status': 'error',
-                            'message': 'XT API 문서 링크 응답 - 실제 엔드포인트 확인 필요'
-                        }
-                    else:
-                        # 실제 데이터에서 심볼 추출
-                        symbols_data = data.get('result', [])
-                        symbols = []
-                        for symbol_data in symbols_data:
-                            if isinstance(symbol_data, dict) and 'symbol' in symbol_data:
-                                symbols.append(symbol_data['symbol'])
-                        
-                        return {
-                            'status': 'success',
-                            'symbols': symbols,
-                            'message': f'XT 스팟 거래쌍 {len(symbols)}개 조회 성공'
-                        }
+                    # 실제 데이터에서 심볼 추출
+                    symbols_data = data.get('result', [])
+                    symbols = []
+                    for symbol_data in symbols_data:
+                        if isinstance(symbol_data, dict) and 'symbol' in symbol_data:
+                            symbols.append(symbol_data['symbol'])
+                    
+                    return {
+                        'status': 'success',
+                        'symbols': symbols,
+                        'message': f'XT 스팟 거래쌍 {len(symbols)}개 조회 성공'
+                    }
                 else:
                     return {
                         'status': 'error',
-                        'message': f'XT 스팟 거래쌍 조회 실패: {response.status_code}'
+                        'message': f'XT 스팟 거래쌍 조회 실패: {response.status_code} - {response.text}'
                     }
             
             elif self.exchange == 'hyperliquid':
