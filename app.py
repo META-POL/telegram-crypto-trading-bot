@@ -2320,7 +2320,11 @@ class UnifiedFuturesTrader:
                 endpoints = [
                     "/v4/account/capital",  # pyxt 라이브러리 엔드포인트
                     "/v4/account/balance",
-                    "/v4/account/assets"
+                    "/v4/account/assets",
+                    "/v4/account/spot/balance",  # 스팟 잔고
+                    "/v4/account/futures/balance",  # 선물 잔고
+                    "/v4/account/spot/assets",
+                    "/v4/account/futures/assets"
                 ]
                 
                 for base_url in base_urls:
@@ -2333,6 +2337,11 @@ class UnifiedFuturesTrader:
                         
                         if response.status_code == 200:
                             data = response.json()
+                            # API 문서 링크 응답 체크
+                            if data.get('result', {}).get('openapiDocs'):
+                                print(f"API 문서 링크 응답, 다른 엔드포인트 시도: {base_url}{endpoint}")
+                                continue  # 다음 엔드포인트 시도
+                            
                             # AUTH_001 오류 체크
                             if data.get('rc') == 1 and data.get('mc') == 'AUTH_001':
                                 print(f"AUTH_001 오류 발생, pyxt 방식으로 재시도: {base_url}{endpoint}")
@@ -3156,7 +3165,9 @@ class UnifiedFuturesTrader:
                 endpoints = [
                     "/v4/account/balance",  # pyxt 라이브러리 엔드포인트
                     "/v4/account/assets",
-                    "/v4/account/spot/balance"
+                    "/v4/account/spot/balance",
+                    "/v4/account/spot/assets",
+                    "/v4/account/capital"
                 ]
                 
                 for base_url in base_urls:
@@ -3169,6 +3180,11 @@ class UnifiedFuturesTrader:
                         
                         if response.status_code == 200:
                             data = response.json()
+                            # API 문서 링크 응답 체크
+                            if data.get('result', {}).get('openapiDocs'):
+                                print(f"API 문서 링크 응답, 다른 엔드포인트 시도: {base_url}{endpoint}")
+                                continue  # 다음 엔드포인트 시도
+                            
                             # AUTH_001 오류 체크
                             if data.get('rc') == 1 and data.get('mc') == 'AUTH_001':
                                 print(f"AUTH_001 오류 발생, pyxt 방식으로 재시도: {base_url}{endpoint}")
