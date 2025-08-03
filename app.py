@@ -2314,7 +2314,8 @@ class UnifiedFuturesTrader:
             if self.exchange == 'xt':
                 # XT 잔고 조회 - pyxt 라이브러리 기반 엔드포인트
                 base_urls = [
-                    "https://fapi.xt.com"  # 선물 API
+                    "https://fapi.xt.com",  # 선물 API
+                    "https://sapi.xt.com"   # 스팟 API
                 ]
                 
                 endpoints = [
@@ -2324,7 +2325,14 @@ class UnifiedFuturesTrader:
                     "/v4/account/spot/balance",  # 스팟 잔고
                     "/v4/account/futures/balance",  # 선물 잔고
                     "/v4/account/spot/assets",
-                    "/v4/account/futures/assets"
+                    "/v4/account/futures/assets",
+                    "/account/capital",  # v4 없이 시도
+                    "/account/balance",
+                    "/account/assets",
+                    "/v4/balance",  # pyxt balance() 함수
+                    "/v4/assets",
+                    "/balance",  # 기본 balance
+                    "/assets"   # 기본 assets
                 ]
                 
                 for base_url in base_urls:
@@ -3159,7 +3167,8 @@ class UnifiedFuturesTrader:
             if self.exchange == 'xt':
                 # XT 스팟 잔고 조회 - pyxt 라이브러리 기반 엔드포인트
                 base_urls = [
-                    "https://sapi.xt.com"  # 스팟 API
+                    "https://sapi.xt.com",  # 스팟 API
+                    "https://fapi.xt.com"   # 선물 API
                 ]
                 
                 endpoints = [
@@ -3167,7 +3176,14 @@ class UnifiedFuturesTrader:
                     "/v4/account/assets",
                     "/v4/account/spot/balance",
                     "/v4/account/spot/assets",
-                    "/v4/account/capital"
+                    "/v4/account/capital",
+                    "/account/balance",  # v4 없이 시도
+                    "/account/assets",
+                    "/account/capital",
+                    "/v4/balance",  # pyxt balance() 함수
+                    "/v4/assets",
+                    "/balance",  # 기본 balance
+                    "/assets"   # 기본 assets
                 ]
                 
                 for base_url in base_urls:
