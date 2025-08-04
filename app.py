@@ -2465,34 +2465,42 @@ class UnifiedFuturesTrader:
 
     def _get_headers_backpack(self, instruction, params=None):
         from nacl.signing import SigningKey
-        # 키 초기화
+
+        # 1) private_key → signing_key 초기화
         if self.signing_key is None and self.private_key:
             self.signing_key = SigningKey(base64.b64decode(self.private_key))
 
-        # 1) timestamp, window
+        # 2) timestamp, window
         timestamp = str(int(time.time() * 1000))
         window = "5000"
 
-        # 2) 정렬된 파라미터 문자열
+        # 3) 정렬된 파라미터 문자열 생성
         params = params or {}
         sorted_items = sorted(params.items())
+        # 예: "orderType=Limit&price=42&quantity=0.001"
         query_str = "&".join(f"{k}={v}" for k, v in sorted_items)
-        if query_str:
-            query_str += "&"
 
-        # 3) 서명 대상 문자열 결합
-        sign_str = (
-            f"instruction={instruction}&"
-            f"{query_str}"
-            f"timestamp={timestamp}&"
-            f"window={window}"
-        )
+        # 4) 서명 대상 문자열(sign_str) 결합
+        # instruction → (파라미터 문자열 있을 때만 &) → timestamp → & → window
+        if query_str:
+            sign_str = (
+                f"instruction={instruction}&"
+                f"{query_str}&"
+                f"timestamp={timestamp}&"
+                f"window={window}"
+            )
+        else:
+            sign_str = (
+                f"instruction={instruction}&"
+                f"timestamp={timestamp}&"
+                f"window={window}"
+            )
 
         print(f"🔍 Backpack 서명 문자열: {sign_str}")
 
-        # 4) ED25519 서명 및 Base64 인코딩
-        signature = self.signing_key.sign(sign_str.encode("utf-8")).signature
-        signature_b64 = base64.b64encode(signature).decode("utf-8")
+        # 5) ED25519 서명 및 Base64 인코딩
+        signature_bytes = self.signing_key.sign(sign_str.encode("utf-8")).signature
+        signature_b64 = base64.b64encode(signature_bytes).decode("utf-8")
 
         return {
             "X-API-Key": self.api_key,
