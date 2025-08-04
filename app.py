@@ -2505,6 +2505,14 @@ class UnifiedFuturesTrader:
             print(f"🔍 Backpack Private Key 길이: {len(self.private_key)}")
             print(f"🔍 서명할 메시지 길이: {len(sign_str)}")
             
+            # 개인키 디코딩 확인
+            try:
+                private_key_bytes = base64.b64decode(self.private_key)
+                print(f"🔍 개인키 디코딩 성공, 길이: {len(private_key_bytes)}")
+                print(f"🔍 개인키 (hex): {private_key_bytes.hex()}")
+            except Exception as e:
+                print(f"⚠️ 개인키 디코딩 실패: {e}")
+            
             # ED25519 서명 생성
             message_bytes = sign_str.encode('utf-8')
             signature = self.signing_key.sign(message_bytes)
@@ -2513,6 +2521,10 @@ class UnifiedFuturesTrader:
             print(f"🔍 서명 길이: {len(signature.signature)}")
             print(f"🔍 Base64 서명 길이: {len(signature_b64)}")
             print(f"🔍 서명 시작: {signature_b64[:20]}...")
+            
+            # 서명 검증을 위한 디버깅
+            print(f"🔍 서명할 메시지 바이트 길이: {len(message_bytes)}")
+            print(f"🔍 서명할 메시지 (hex): {message_bytes.hex()}")
             
             headers = {
                 "X-API-Key": self.api_key,
