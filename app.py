@@ -2443,22 +2443,31 @@ class UnifiedFuturesTrader:
             params = params or {}
             
             # Backpack API 공식 문서에 따른 서명 생성
-            # 가장 간단하고 확실한 방법: 모든 파라미터를 딕셔너리에 넣고 정렬
+            # Backpack API는 매우 엄격한 서명 검증을 사용
+            # 1. instruction을 첫 번째로
+            # 2. 나머지 파라미터들을 알파벳 순서로 정렬
+            # 3. timestamp와 window를 마지막에
             
-            # 서명용 파라미터 딕셔너리 생성
-            sign_dict = {
-                'instruction': instruction,
-                'timestamp': timestamp,
-                'window': window
-            }
+            # 서명용 파라미터 구성
+            sign_parts = []
             
-            # 주문 파라미터들을 문자열로 변환하여 추가
+            # 1. instruction을 첫 번째로 추가
+            sign_parts.append(f"instruction={instruction}")
+            
+            # 2. 주문 파라미터들을 알파벳 순서로 정렬하여 추가
+            order_params = {}
             for key, value in params.items():
-                sign_dict[key] = str(value)
+                order_params[key] = str(value)
             
-            # 모든 파라미터를 알파벳 순서로 정렬하여 서명 문자열 생성
-            sorted_items = sorted(sign_dict.items())
-            sign_str = '&'.join([f"{key}={value}" for key, value in sorted_items])
+            for key in sorted(order_params.keys()):
+                sign_parts.append(f"{key}={order_params[key]}")
+            
+            # 3. timestamp와 window를 마지막에 추가
+            sign_parts.append(f"timestamp={timestamp}")
+            sign_parts.append(f"window={window}")
+            
+            # 서명 문자열 생성
+            sign_str = '&'.join(sign_parts)
             
             print(f"🔍 Backpack 서명 문자열: {sign_str}")
             
