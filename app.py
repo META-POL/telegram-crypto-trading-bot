@@ -2467,7 +2467,7 @@ class UnifiedFuturesTrader:
         from nacl.signing import SigningKey
         from nacl.encoding import RawEncoder
 
-        # 1) private_key → signing_key 초기화 (RawEncoder 사용)
+        # 1) private_key → signing_key 초기화
         if self.signing_key is None and self.private_key:
             self.signing_key = SigningKey(base64.b64decode(self.private_key), encoder=RawEncoder)
 
@@ -2475,12 +2475,12 @@ class UnifiedFuturesTrader:
         timestamp = int(time.time() * 1000)
         window = 5000
 
-        # 3) 정렬된 파라미터 문자열 생성 (정상 작동 코드와 동일한 방식)
+        # 3) 정렬된 파라미터 문자열 생성
         params = params or {}
         items = sorted(params.items())
         parts = [f"{k}={str(v).lower() if isinstance(v, bool) else v}" for k, v in items]
         
-        # 4) 서명 대상 문자열(sign_str) 결합 (정상 작동 코드와 동일한 방식)
+        # 4) 서명 대상 문자열(sign_str) 결합
         sign_str = f"instruction={instruction}"
         if parts:
             sign_str += "&" + "&".join(parts)
@@ -2488,7 +2488,7 @@ class UnifiedFuturesTrader:
 
         print(f"🔍 Backpack 서명 문자열: {sign_str}")
 
-        # 5) ED25519 서명 및 Base64 인코딩 (정상 작동 코드와 동일한 방식)
+        # 5) ED25519 서명 및 Base64 인코딩
         sig = self.signing_key.sign(sign_str.encode()).signature
         signature_b64 = base64.b64encode(sig).decode()
 
@@ -2815,22 +2815,37 @@ class UnifiedFuturesTrader:
                     if not symbol.endswith('_PERP'):
                         backpack_symbol = f"{symbol}_USDC_PERP"
                 
-                params = {
-                    'symbol': backpack_symbol,
-                    'side': 'Bid',  # Backpack에서는 'Bid' (매수) 또는 'Ask' (매도)
-                    'orderType': backpack_order_type,  # 'type' 대신 'orderType' 사용
-                    'quantity': str(size)
+                # 정상 작동하는 코드와 동일한 파라미터 구조
+                body = {
+                    "side": "Bid",
+                    "symbol": backpack_symbol,
+                    "orderType": backpack_order_type,
+                    "autoBorrow": False,
+                    "autoBorrowRepay": False,
+                    "autoLend": False,
+                    "autoLendRedeem": False,
+                    "selfTradePrevention": "RejectTaker"
                 }
+                
+                if backpack_order_type == "Market":
+                    body["quantity"] = float(size)
+                else:
+                    body.update({
+                        "quantity": float(size),
+                        "timeInForce": "GTC",
+                        "postOnly": False
+                    })
                 
                 # 레버리지는 선물 거래에서만 설정
                 if market_type == 'futures' and leverage > 1:
-                    params['leverage'] = str(leverage)
+                    body['leverage'] = leverage
                     print(f"🔍 Backpack 롱 포지션 레버리지 설정: {leverage}x")
                 else:
                     print(f"🔍 Backpack 롱 포지션 레버리지 미설정 (기본값 1x 사용)")
                 
-                headers = self._get_headers_backpack("orderExecute", params)  # instruction을 'orderExecute'로 변경
-                response = requests.post(url, headers=headers, json=params)
+                headers = self._get_headers_backpack("orderExecute", body)
+                print(f"Placing {backpack_order_type} Bid: {body}")
+                response = requests.post(url, headers=headers, json=body)
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -2960,19 +2975,34 @@ class UnifiedFuturesTrader:
                     if not symbol.endswith('_PERP'):
                         backpack_symbol = f"{symbol}_USDC_PERP"
                 
-                params = {
-                    'symbol': backpack_symbol,
-                    'side': 'Ask',  # Backpack에서는 'Bid' (매수) 또는 'Ask' (매도)
-                    'orderType': backpack_order_type,  # 'type' 대신 'orderType' 사용
-                    'quantity': str(size)
+                # 정상 작동하는 코드와 동일한 파라미터 구조
+                body = {
+                    "side": "Ask",
+                    "symbol": backpack_symbol,
+                    "orderType": backpack_order_type,
+                    "autoBorrow": False,
+                    "autoBorrowRepay": False,
+                    "autoLend": False,
+                    "autoLendRedeem": False,
+                    "selfTradePrevention": "RejectTaker"
                 }
+                
+                if backpack_order_type == "Market":
+                    body["quantity"] = float(size)
+                else:
+                    body.update({
+                        "quantity": float(size),
+                        "timeInForce": "GTC",
+                        "postOnly": False
+                    })
                 
                 # 레버리지는 선물 거래에서만 설정
                 if market_type == 'futures' and leverage > 1:
-                    params['leverage'] = str(leverage)
+                    body['leverage'] = leverage
                 
-                headers = self._get_headers_backpack("orderExecute", params)  # instruction을 'orderExecute'로 변경
-                response = requests.post(url, headers=headers, json=params)
+                headers = self._get_headers_backpack("orderExecute", body)
+                print(f"Placing {backpack_order_type} Ask: {body}")
+                response = requests.post(url, headers=headers, json=body)
                 
                 if response.status_code == 200:
                     data = response.json()
