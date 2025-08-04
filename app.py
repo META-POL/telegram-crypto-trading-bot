@@ -2445,8 +2445,12 @@ class UnifiedFuturesTrader:
                     print(f"⚠️ 개인키 디코딩 실패: {e}")
                     raise Exception(f"개인키 디코딩 오류: {str(e)}")
             
+            # 타임스탬프를 정수로 생성하고 문자열로 변환
             timestamp = str(int(time.time() * 1000))
             window = "5000"
+            
+            print(f"🔍 현재 타임스탬프: {timestamp}")
+            print(f"🔍 현재 시간: {datetime.now().isoformat()}")
             params = params or {}
             
             # Backpack API 공식 문서에 따른 서명 생성
@@ -2474,6 +2478,10 @@ class UnifiedFuturesTrader:
             # instruction을 맨 앞에 prefix로 추가 (문서에 따름)
             sign_str = f"instruction={instruction}&{params_str}"
             
+            # 서명 문자열 디버깅
+            print(f"🔍 파라미터 문자열: {params_str}")
+            print(f"🔍 최종 서명 문자열: {sign_str}")
+            
             print(f"🔍 Backpack 서명 문자열: {sign_str}")
             
             # API 키와 개인키 디버깅 정보 출력
@@ -2499,6 +2507,12 @@ class UnifiedFuturesTrader:
                 "X-Window": window,
                 "Content-Type": "application/json"
             }
+            
+            # 헤더 디버깅 정보 출력
+            print(f"🔍 X-API-Key: {headers['X-API-Key']}")
+            print(f"🔍 X-Timestamp: {headers['X-Timestamp']}")
+            print(f"🔍 X-Window: {headers['X-Window']}")
+            print(f"🔍 X-Signature: {headers['X-Signature'][:20]}...")
             
             print(f"🔍 Backpack 헤더 생성 완료: {headers}")
             return headers
