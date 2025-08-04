@@ -2600,10 +2600,15 @@ class UnifiedFuturesTrader:
         try:
             # Backpack 공개 API로 가격 정보 가져오기
             url = "https://api.backpack.exchange/api/v1/tickers"
+            print(f"🔍 Backpack 가격 조회 URL: {url}")
+            
             response = requests.get(url)
+            print(f"🔍 Backpack 가격 조회 응답: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
+                print(f"🔍 Backpack 전체 티커 데이터 개수: {len(data)}")
+                
                 prices = {}
                 
                 # USDT 페어 가격 추출
@@ -2615,14 +2620,16 @@ class UnifiedFuturesTrader:
                     if symbol.endswith('_USDT'):
                         base_asset = symbol.replace('_USDT', '')
                         try:
-                            prices[base_asset] = float(last_price)
+                            price = float(last_price)
+                            prices[base_asset] = price
+                            print(f"🔍 {base_asset}_USDT: ${price}")
                         except:
-                            pass
+                            print(f"❌ {base_asset} 가격 변환 실패: {last_price}")
                 
                 print(f"🔍 Backpack 가격 데이터: {prices}")
                 return prices
             else:
-                print(f"❌ Backpack 가격 조회 실패: {response.status_code}")
+                print(f"❌ Backpack 가격 조회 실패: {response.status_code} - {response.text}")
                 return {}
                 
         except Exception as e:
