@@ -722,53 +722,56 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
         api_secret = user_keys.get(f'{exchange}_api_secret') or user_keys.get(f'{exchange}_private_key')
         
         trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-        result = trader.get_futures_balance()
         
-        if result.get('status') == 'success':
-            balance_data = result.get('balance', {})
-            
-            # 잔고 데이터를 보기 좋게 포맷팅
-            if isinstance(balance_data, dict):
-                formatted_balance = ""
-                total_balance = 0
-                
-                for currency, amount in balance_data.items():
-                    if isinstance(amount, dict) and 'available' in amount:
-                        available = float(amount.get('available', 0))
-                        if available > 0:
-                            formatted_balance += f"💰 **{currency}**: {available:,.8f}\n"
-                            total_balance += 1
-                    elif isinstance(amount, (int, float)) and float(amount) > 0:
-                        formatted_balance += f"💰 **{currency}**: {float(amount):,.8f}\n"
-                        total_balance += 1
-                
-                if not formatted_balance:
-                    formatted_balance = "💡 사용 가능한 잔고가 없습니다."
+        # 선물 잔고 조회
+        futures_result = trader.get_futures_balance()
+        
+        # 스팟 잔고 조회
+        spot_result = trader.get_spot_balance()
+        
+        # 결과 조합
+        formatted_balance = ""
+        
+        # 선물 잔고 처리
+        if futures_result.get('status') == 'success':
+            futures_data = futures_result.get('balance', {})
+            if isinstance(futures_data, tuple) and len(futures_data) >= 2:
+                # pyxt 응답 형식: (status_code, data, None)
+                futures_info = futures_data[1]
+                if isinstance(futures_info, dict) and futures_info.get('result') == []:
+                    formatted_balance += "📊 **선물 잔고**: 0 USDT (거래 없음)\n\n"
                 else:
-                    formatted_balance = f"📊 **총 {total_balance}개 자산**\n\n{formatted_balance}"
+                    formatted_balance += f"📊 **선물 잔고**: {futures_info}\n\n"
             else:
-                formatted_balance = f"📊 **잔고 정보**\n\n{str(balance_data)}"
-            
-            keyboard = [
-                [InlineKeyboardButton("🔄 새로고침", callback_data=data)],
-                [InlineKeyboardButton("🔙 잔고 메뉴", callback_data="balance_menu")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await telegram_app.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=callback_query.message.message_id,
-                text=f"💰 **{exchange.upper()} 잔고**\n\n{formatted_balance}",
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
+                formatted_balance += f"📊 **선물 잔고**: {futures_data}\n\n"
         else:
-            await telegram_app.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=callback_query.message.message_id,
-                text=f"❌ **잔고 조회 실패**\n\n오류: {result.get('message', '알 수 없는 오류')}",
-                parse_mode='Markdown'
-            )
+            formatted_balance += f"📊 **선물 잔고**: 조회 실패 - {futures_result.get('message', '알 수 없는 오류')}\n\n"
+        
+        # 스팟 잔고 처리
+        if spot_result.get('status') == 'success':
+            spot_data = spot_result.get('balance', {})
+            if isinstance(spot_data, dict) and 'availableAmount' in spot_data:
+                available = float(spot_data.get('availableAmount', 0))
+                currency = spot_data.get('currency', 'USDT')
+                formatted_balance += f"💰 **스팟 잔고**: {available} {currency.upper()}\n"
+            else:
+                formatted_balance += f"💰 **스팟 잔고**: {spot_data}\n"
+        else:
+            formatted_balance += f"💰 **스팟 잔고**: 조회 실패 - {spot_result.get('message', '알 수 없는 오류')}\n"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 새로고침", callback_data=data)],
+            [InlineKeyboardButton("🔙 잔고 메뉴", callback_data="balance_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text=f"💰 **{exchange.upper()} 잔고**\n\n{formatted_balance}",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
     except Exception as e:
         await telegram_app.bot.edit_message_text(
             chat_id=chat_id,
