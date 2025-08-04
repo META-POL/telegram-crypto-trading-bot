@@ -19,42 +19,26 @@ import asyncio
 from datetime import datetime
 from flask import Flask, jsonify, request
 
-# 라이브러리 import (지연 로딩으로 변경)
+# 라이브러리 import (지연 로딩)
 SigningKey = None
 ccxt = None
 
 # Telegram 라이브러리 import
 try:
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    print("✅ Telegram 라이브러리 로드 성공")
-except ImportError as e:
-    print(f"⚠️ Telegram 라이브러리 로드 실패: {e}")
-    InlineKeyboardButton = None
-    InlineKeyboardMarkup = None
-except Exception as e:
-    print(f"⚠️ Telegram 라이브러리 로드 중 오류: {e}")
+except ImportError:
     InlineKeyboardButton = None
     InlineKeyboardMarkup = None
 
-# pyxt 라이브러리 임포트 시도
+# pyxt 라이브러리 import
 try:
-    from pyxt.spot import Spot          # 현물
-    from pyxt.perp import Perp          # 선물
+    from pyxt.spot import Spot
+    from pyxt.perp import Perp
     PYXTLIB_AVAILABLE = True
-    print("✅ pyxt 라이브러리 로드 성공")
-except ImportError as e:
-    print(f"⚠️ pyxt 라이브러리 로드 실패: {e}")
-    print("pip install pyxt로 설치해주세요.")
+except ImportError:
     PYXTLIB_AVAILABLE = False
     Spot = None
     Perp = None
-except Exception as e:
-    print(f"⚠️ pyxt 라이브러리 로드 중 오류: {e}")
-    PYXTLIB_AVAILABLE = False
-    Spot = None
-    Perp = None
-
-print("📝 모든 라이브러리는 필요시 로드됩니다")
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -76,13 +60,10 @@ class XTClient:
                     access_key=api_key,
                     secret_key=secret_key
                 )
-                print(f"✅ XTClient 초기화 성공 - Spot: {type(self.spot)}, Futures: {type(self.futures)}")
             else:
-                print("❌ pyxt 라이브러리를 사용할 수 없습니다.")
                 self.spot = None
                 self.futures = None
-        except Exception as e:
-            print(f"❌ XTClient 초기화 실패: {e}")
+        except Exception:
             self.spot = None
             self.futures = None
 
@@ -201,23 +182,10 @@ class XTClient:
         except Exception as e:
             return {'status': 'error', 'message': str(e)}
 
-# ---------- 메서드 확인 유틸리티 ----------
-def check_available_methods(obj, name="Object"):
-    """객체의 사용 가능한 메서드 확인"""
-    methods = [method for method in dir(obj) 
-               if callable(getattr(obj, method)) and not method.startswith('_')]
-    print(f"\n=== {name} 사용 가능한 메서드 ===")
-    for method in methods:
-        print(f"- {method}")
-    return methods
+
 
 # Flask 앱 생성
-try:
-    app = Flask(__name__)
-    print("✅ Flask 앱 생성 성공")
-except Exception as e:
-    print(f"❌ Flask 앱 생성 실패: {e}")
-    raise
+app = Flask(__name__)
 
 # 데이터베이스 초기화
 def init_database():
@@ -255,9 +223,8 @@ def init_database():
         
         conn.commit()
         conn.close()
-        print("✅ 데이터베이스 초기화 완료")
-    except Exception as e:
-        print(f"⚠️ 데이터베이스 초기화 오류 (무시됨): {e}")
+    except Exception:
+        pass
 
 # 데이터베이스 초기화 실행
 init_database()
@@ -281,8 +248,7 @@ def get_user_api_keys(user_id):
                 'hyperliquid_api_secret': result[6]
             }
         return None
-    except Exception as e:
-        print(f"⚠️ API 키 조회 오류: {e}")
+    except Exception:
         return None
 
 def save_user_api_keys(user_id, exchange, api_key, api_secret):
@@ -355,9 +321,8 @@ def save_user_leverage_setting(user_id, exchange, symbol, direction, leverage):
         
         conn.commit()
         conn.close()
-        print(f"✅ 레버리지 설정 저장 완료: {exchange} {symbol} {direction} {leverage}x for user {user_id}")
-    except Exception as e:
-        print(f"⚠️ 레버리지 설정 저장 오류: {e}")
+    except Exception:
+        pass
 
 def get_user_leverage_setting(user_id, exchange, symbol, direction):
     """사용자 레버리지 설정 조회"""
@@ -372,10 +337,9 @@ def get_user_leverage_setting(user_id, exchange, symbol, direction):
         conn.close()
         
         if result:
-            return result[0]
-        return 1  # 기본값
-    except Exception as e:
-        print(f"⚠️ 레버리지 설정 조회 오류: {e}")
+                    return result[0]
+    return 1  # 기본값
+    except Exception:
         return 1  # 기본값
 
 @app.route('/')
@@ -410,29 +374,23 @@ def health():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """텔레그램 웹훅 처리"""
-    print("📨 웹훅 요청 수신")
     try:
         # 텔레그램 라이브러리 지연 로딩
         try:
             from telegram import Update
             from telegram.ext import ApplicationBuilder
             import asyncio
-        except ImportError as e:
-            print(f"❌ 텔레그램 라이브러리 로드 실패: {e}")
+        except ImportError:
             return jsonify({"status": "error", "message": "텔레그램 라이브러리 로드 실패"}), 500
         
-        # 텔레그램 봇 토큰 (강제로 새로운 토큰 사용)
+        # 텔레그램 봇 토큰
         token = "8356129181:AAEVDzO9MrFe150TmviHFrt_B19hyBc-Xuo"
-        print(f"🔍 사용 중인 봇 토큰: {token}")
-        print(f"🔍 토큰 길이: {len(token)}")
-        print(f"🔍 토큰 시작: {token[:20]}...")
         
         # 봇 애플리케이션 생성
         telegram_app = ApplicationBuilder().token(token).build()
         
         # 요청 데이터 확인
         data = request.get_json()
-        print(f"📨 받은 데이터: {data}")
         
         # 업데이트 처리
         update = Update.de_json(data, telegram_app.bot)
@@ -445,8 +403,8 @@ def webhook():
                 asyncio.set_event_loop(loop)
                 loop.run_until_complete(handle_callback_query(update.callback_query, telegram_app))
                 loop.close()
-            except Exception as e:
-                print(f"❌ 콜백 쿼리 처리 오류: {e}")
+            except Exception:
+                pass
             return jsonify({"status": "success"})
         
         # 명령어 처리
@@ -454,7 +412,6 @@ def webhook():
             text = update.message.text
             user_id = update.effective_user.id
             chat_id = update.effective_chat.id
-            print(f"📨 사용자 {user_id}: {text}")
             
             async def send_response():
                 try:
@@ -503,7 +460,6 @@ def webhook():
                         )
                         
                 except Exception as e:
-                    print(f"❌ 응답 전송 오류: {e}")
                     await telegram_app.bot.send_message(chat_id=chat_id, text=f"❌ 오류가 발생했습니다: {str(e)}")
             
             # 비동기 함수 실행
@@ -512,24 +468,18 @@ def webhook():
                 asyncio.set_event_loop(loop)
                 loop.run_until_complete(send_response())
                 loop.close()
-            except Exception as e:
-                print(f"❌ 비동기 실행 오류: {e}")
+            except Exception:
+                pass
         
-        print("✅ 웹훅 처리 완료")
         return jsonify({"status": "success"})
         
     except Exception as e:
-        print(f"❌ 웹훅 오류: {e}")
-        import traceback
-        print(f"❌ 웹훅 스택 트레이스: {traceback.format_exc()}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 async def show_main_menu(telegram_app, chat_id):
     """메인 메뉴 표시"""
     try:
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        
-        print(f"🔍 메인 메뉴 표시 시작: chat_id={chat_id}")
         
         keyboard = [
             [InlineKeyboardButton("🔑 API 키 관리", callback_data="api_management")],
@@ -2486,8 +2436,6 @@ class UnifiedFuturesTrader:
             sign_str += "&" + "&".join(parts)
         sign_str += f"&timestamp={timestamp}&window={window}"
 
-        print(f"🔍 Backpack 서명 문자열: {sign_str}")
-
         # 5) ED25519 서명 및 Base64 인코딩
         sig = self.signing_key.sign(sign_str.encode()).signature
         signature_b64 = base64.b64encode(sig).decode()
@@ -2839,12 +2787,8 @@ class UnifiedFuturesTrader:
                 # 레버리지는 선물 거래에서만 설정
                 if market_type == 'futures' and leverage > 1:
                     body['leverage'] = leverage
-                    print(f"🔍 Backpack 롱 포지션 레버리지 설정: {leverage}x")
-                else:
-                    print(f"🔍 Backpack 롱 포지션 레버리지 미설정 (기본값 1x 사용)")
                 
                 headers = self._get_headers_backpack("orderExecute", body)
-                print(f"Placing {backpack_order_type} Bid: {body}")
                 response = requests.post(url, headers=headers, json=body)
                 
                 if response.status_code == 200:
@@ -3001,7 +2945,6 @@ class UnifiedFuturesTrader:
                     body['leverage'] = leverage
                 
                 headers = self._get_headers_backpack("orderExecute", body)
-                print(f"Placing {backpack_order_type} Ask: {body}")
                 response = requests.post(url, headers=headers, json=body)
                 
                 if response.status_code == 200:
