@@ -423,6 +423,9 @@ def webhook():
         
         # 텔레그램 봇 토큰 (환경변수에서 가져오기)
         token = os.environ.get('TELEGRAM_BOT_TOKEN', "8356129181:AAEVDzO9MrFe150TmviHFrt_B19hyBc-Xuo")
+        print(f"🔍 사용 중인 봇 토큰: {token}")
+        print(f"🔍 토큰 길이: {len(token)}")
+        print(f"🔍 토큰 시작: {token[:20]}...")
         
         # 봇 애플리케이션 생성
         telegram_app = ApplicationBuilder().token(token).build()
