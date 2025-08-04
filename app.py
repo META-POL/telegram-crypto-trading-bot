@@ -807,7 +807,7 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
                     formatted_balance += "📊 **Backpack 잔고**\n\n"
                     
                     # 실제 Backpack 가격 가져오기
-                    prices = self._get_backpack_prices()
+                    prices = trader._get_backpack_prices()
                     
                     # 주요 자산만 필터링 (0이 아닌 잔고만)
                     significant_assets = []
