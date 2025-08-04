@@ -2464,51 +2464,43 @@ class UnifiedFuturesTrader:
         return headers
 
     def _get_headers_backpack(self, instruction, params=None):
-        """Backpack API 헤더 생성 (ED25519 서명) - 정확한 사양"""
-        try:
-            from nacl.signing import SigningKey
-            global SigningKey
-            # 키 초기화
-            if SigningKey is None:
-                SigningKey = SigningKey
-            if self.signing_key is None and self.private_key:
-                self.signing_key = SigningKey(base64.b64decode(self.private_key))
+        from nacl.signing import SigningKey
+        # 키 초기화
+        if self.signing_key is None and self.private_key:
+            self.signing_key = SigningKey(base64.b64decode(self.private_key))
 
-            # 1) timestamp, window
-            timestamp = str(int(time.time() * 1000))
-            window = "5000"
+        # 1) timestamp, window
+        timestamp = str(int(time.time() * 1000))
+        window = "5000"
 
-            # 2) 정렬된 주문 파라미터 문자열
-            params = params or {}
-            sorted_items = sorted(params.items())
-            order_str = "&".join(f"{k}={v}" for k, v in sorted_items)
+        # 2) 정렬된 파라미터 문자열
+        params = params or {}
+        sorted_items = sorted(params.items())
+        query_str = "&".join(f"{k}={v}" for k, v in sorted_items)
+        if query_str:
+            query_str += "&"
 
-            # 3) 서명 대상 문자열
-            parts = [f"instruction={instruction}"]
-            if order_str:
-                parts.append(order_str)
-            parts.append(f"timestamp={timestamp}")
-            parts.append(f"window={window}")
-            sign_str = "&".join(parts)  # HTML escape 제거, 실제 앰퍼샌드 사용
+        # 3) 서명 대상 문자열 결합
+        sign_str = (
+            f"instruction={instruction}&"
+            f"{query_str}"
+            f"timestamp={timestamp}&"
+            f"window={window}"
+        )
 
-            print(f"🔍 Backpack 서명 문자열: {sign_str}")
+        print(f"🔍 Backpack 서명 문자열: {sign_str}")
 
-            # 4) ED25519 서명
-            signature = self.signing_key.sign(sign_str.encode("utf-8")).signature
-            signature_b64 = base64.b64encode(signature).decode("utf-8")
+        # 4) ED25519 서명 및 Base64 인코딩
+        signature = self.signing_key.sign(sign_str.encode("utf-8")).signature
+        signature_b64 = base64.b64encode(signature).decode("utf-8")
 
-            return {
-                "X-API-Key": self.api_key,
-                "X-Signature": signature_b64,
-                "X-Timestamp": timestamp,
-                "X-Window": window,
-                "Content-Type": "application/json"
-            }
-
-        except ImportError:
-            raise ImportError("pynacl 패키지가 필요합니다. pip install pynacl로 설치해주세요.")
-        except Exception as e:
-            raise Exception(f"Backpack 헤더 생성 오류: {str(e)}")
+        return {
+            "X-API-Key": self.api_key,
+            "X-Signature": signature_b64,
+            "X-Timestamp": timestamp,
+            "X-Window": window,
+            "Content-Type": "application/json"
+        }
 
     def _get_backpack_prices(self):
         """Backpack에서 실제 거래 가격 가져오기"""
