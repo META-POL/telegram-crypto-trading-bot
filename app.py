@@ -804,10 +804,29 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
         # 스팟 잔고 처리
         if spot_result.get('status') == 'success':
             spot_data = spot_result.get('balance', {})
-            if isinstance(spot_data, dict) and 'availableAmount' in spot_data:
-                available = float(spot_data.get('availableAmount', 0))
-                currency = spot_data.get('currency', 'USDT')
-                formatted_balance += f"💰 **스팟 잔고**: {available} {currency.upper()}\n"
+            print(f"🔍 스팟 데이터 타입: {type(spot_data)}")
+            print(f"🔍 스팟 데이터: {spot_data}")
+            
+            if isinstance(spot_data, dict):
+                if 'availableAmount' in spot_data:
+                    # 단일 통화 응답
+                    available = float(spot_data.get('availableAmount', 0))
+                    currency = spot_data.get('currency', 'USDT')
+                    formatted_balance += f"💰 **스팟 잔고**: {available} {currency.upper()}\n"
+                elif 'assets' in spot_data:
+                    # 전체 잔고 응답 (balances() 메서드)
+                    total_usdt = spot_data.get('totalUsdtAmount', '0')
+                    assets = spot_data.get('assets', [])
+                    formatted_balance += f"💰 **스팟 잔고**: {total_usdt} USDT\n"
+                    
+                    # 주요 자산만 표시 (USDT, USDC, BTC 등)
+                    for asset in assets:
+                        currency = asset.get('currency', '').upper()
+                        available = float(asset.get('availableAmount', 0))
+                        if available > 0 and currency in ['USDT', 'USDC', 'BTC', 'ETH', 'SOL']:
+                            formatted_balance += f"  - {currency}: {available}\n"
+                else:
+                    formatted_balance += f"💰 **스팟 잔고**: {spot_data}\n"
             else:
                 formatted_balance += f"💰 **스팟 잔고**: {spot_data}\n"
         else:
@@ -827,10 +846,15 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
             reply_markup=reply_markup
         )
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ 잔고 조회 오류: {e}")
+        print(f"❌ 오류 상세: {error_details}")
+        
         await telegram_app.bot.edit_message_text(
             chat_id=chat_id,
             message_id=callback_query.message.message_id,
-            text=f"❌ **오류 발생**\n\n{str(e)}",
+            text=f"❌ **오류 발생**\n\n오류: {str(e)}\n\n관리자에게 문의해주세요.",
             parse_mode='Markdown'
         )
 
