@@ -3335,19 +3335,23 @@ class UnifiedFuturesTrader:
                         print(f"pyxt 라이브러리 사용 시도: API_KEY={self.api_key[:10]}...")
                         
                         try:
+                            print("🔍 스팟 잔고 조회 시작...")
                             # XTClient 클래스 생성 (xt.py에서 성공한 방식)
                             xt_client = XTClient(self.api_key, self.api_secret)
+                            print(f"🔍 XTClient 생성 완료: {xt_client}")
                             
                             # XTClient가 제대로 초기화되었는지 확인
+                            print(f"🔍 XTClient spot 속성: {xt_client.spot}")
                             if xt_client.spot is None:
-                                print("XTClient 스팟 클라이언트 초기화 실패")
+                                print("❌ XTClient 스팟 클라이언트 초기화 실패")
                                 raise Exception("XTClient spot client initialization failed")
                             
+                            print("🔍 spot_balance() 메서드 호출 시작...")
                             balance = xt_client.spot_balance()
-                            print(f"pyxt 라이브러리 스팟 잔고 조회 성공: {balance}")
+                            print(f"✅ pyxt 라이브러리 스팟 잔고 조회 성공: {balance}")
                             
                             if isinstance(balance, dict) and 'error' in balance:
-                                print(f"pyxt 라이브러리 오류: {balance['error']}")
+                                print(f"❌ pyxt 라이브러리 오류: {balance['error']}")
                                 raise Exception(f"pyxt error: {balance['error']}")
                             
                             return {
@@ -3356,7 +3360,10 @@ class UnifiedFuturesTrader:
                                 'message': 'XT 스팟 잔고 조회 성공 (pyxt 라이브러리)'
                             }
                         except Exception as e:
-                            print(f"pyxt 라이브러리 스팟 잔고 조회 실패: {e}")
+                            print(f"❌ pyxt 라이브러리 스팟 잔고 조회 실패: {e}")
+                            print(f"❌ 오류 타입: {type(e)}")
+                            import traceback
+                            print(f"❌ 오류 상세: {traceback.format_exc()}")
                             # 기존 방식으로 폴백
                     except Exception as e:
                         print(f"pyxt 라이브러리 스팟 잔고 조회 실패: {e}")
