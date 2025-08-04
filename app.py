@@ -51,157 +51,155 @@ logger = logging.getLogger(__name__)
 
 # XTClient 클래스 (수정된 버전)
 class XTClient:
-    """현물·선물 통합 래퍼 (수정된 버전)"""
-    def __init__(self, api_key, api_secret):
-        self.spot = None
-        self.futures = None
-        self.api_key = api_key
-        self.api_secret = api_secret
-        
-        if not PYXTLIB_AVAILABLE:
-            print("❌ pyxt 라이브러리가 설치되지 않아 XTClient를 사용할 수 없습니다.")
-            return
-            
+    """현물·선물 통합 래퍼 (오류 수정 포함)"""
+    def __init__(self, api_key, secret_key):
         try:
-            self.spot = Spot(
-                host="https://sapi.xt.com",
-                access_key=api_key,
-                secret_key=api_secret
-            )
-            self.futures = Perp(
-                host="https://fapi.xt.com",
-                access_key=api_key,
-                secret_key=api_secret
-            )
-            print("✅ XTClient 초기화 성공")
+            if PYXTLIB_AVAILABLE:
+                self.spot = Spot(
+                    host="https://sapi.xt.com",
+                    access_key=api_key,
+                    secret_key=secret_key
+                )
+                self.futures = Perp(
+                    host="https://fapi.xt.com",
+                    access_key=api_key,
+                    secret_key=secret_key
+                )
+                print(f"✅ XTClient 초기화 성공 - Spot: {type(self.spot)}, Futures: {type(self.futures)}")
+            else:
+                print("❌ pyxt 라이브러리를 사용할 수 없습니다.")
+                self.spot = None
+                self.futures = None
         except Exception as e:
             print(f"❌ XTClient 초기화 실패: {e}")
             self.spot = None
             self.futures = None
 
-    # --------- 잔고 (수정됨) ---------
-    def spot_balance(self, currency=None):
-        """현물 잔고 조회"""
-        if not self.spot:
-            print("❌ Spot client is None")
-            return {"error": "Spot client not available"}
-        
+    def get_spot_balance(self, currency=None):
+        """현물 잔고 조회: currency 지정 시 단일 자산, 미지정 시 전체"""
         try:
-            print(f"🔍 Spot client type: {type(self.spot)}")
+            if self.spot is None:
+                raise Exception("Spot 클라이언트가 초기화되지 않았습니다.")
             
             if currency:
-                # 특정 통화 잔고
                 result = self.spot.balance(currency)
-                print(f"✅ Spot balance ({currency}) result: {result}")
-                return result
+                return {'status': 'success', 'balance': result}
             else:
-                # 전체 현물 잔고 - 올바른 메서드 사용
                 try:
-                    # pyxt에서 실제 사용 가능한 메서드 확인 후 사용
-                    # 가능한 메서드들: balances, get_balances, fetch_balance 등
-                    result = self.spot.balances()  # 또는 다른 올바른 메서드명
-                    print(f"✅ Spot balances() result: {result}")
-                    return result
+                    result = self.spot.balances()
+                    return {'status': 'success', 'balance': result}
                 except AttributeError:
-                    print("⚠️ balances() 메서드가 없습니다. REST API 직접 호출")
-                    # 메서드가 없는 경우 REST API 직접 호출
-                    return self._get_all_spot_balances()
+                    print("⚠️ Spot.balances() 메서드 없음, REST API로 대체 호출")
+                    return self._fetch_all_spot_balances()
+                    
         except Exception as e:
             print(f"❌ Spot balance error: {e}")
-            return {"error": f"Spot balance error: {e}"}
+            return {'status': 'error', 'message': str(e)}
 
-    def _get_all_spot_balances(self):
-        """REST API로 직접 전체 현물 잔고 조회"""
-        import requests
-        import hmac
-        import hashlib
-        import time
-        
+    def _fetch_all_spot_balances(self):
+        """REST API 직접 호출: /v4/balances"""
         try:
+            import requests
+            import hmac
+            import hashlib
+            import time
+            
             timestamp = str(int(time.time() * 1000))
             path = "/v4/balances"
             
-            # 서명 생성
-            header_string = f"validate-algorithms=HmacSHA256&validate-appkey={self.api_key}&validate-recvwindow=60000&validate-timestamp={timestamp}"
-            message = f"{header_string}#GET#{path}"
+            # 헤더 문자열 생성
+            header_string = (
+                f"validate-algorithms=HmacSHA256"
+                f"&validate-appkey={self.spot.access_key}"
+                f"&validate-recvwindow=60000"
+                f"&validate-timestamp={timestamp}"
+            )
             
+            # 서명 생성
+            message = f"{header_string}#GET#{path}"
             signature = hmac.new(
-                self.api_secret.encode('utf-8'),
-                message.encode('utf-8'),
+                self.spot.secret_key.encode(), 
+                message.encode(), 
                 hashlib.sha256
             ).hexdigest()
             
+            # 헤더 설정
             headers = {
-                'validate-algorithms': 'HmacSHA256',
-                'validate-appkey': self.api_key,
-                'validate-recvwindow': '60000',
-                'validate-timestamp': timestamp,
-                'validate-signature': signature,
-                'Content-Type': 'application/json'
+                "validate-algorithms": "HmacSHA256",
+                "validate-appkey": self.spot.access_key,
+                "validate-recvwindow": "60000",
+                "validate-timestamp": timestamp,
+                "validate-signature": signature,
+                "Content-Type": "application/json"
             }
             
+            # API 호출
             response = requests.get(f"https://sapi.xt.com{path}", headers=headers)
-            print(f"🔍 REST API response: {response.status_code} - {response.text}")
-            return response.json()
-        except Exception as e:
-            print(f"❌ REST API error: {e}")
-            return {"error": f"REST API error: {e}"}
-
-    def futures_balance(self):
-        """선물 지갑 자산 반환"""
-        if not self.futures:
-            print("❌ Futures client is None")
-            return {"error": "Futures client not available"}
-        
-        try:
-            print(f"🔍 Futures client type: {type(self.futures)}")
-            print(f"🔍 Futures get_account_capital method: {self.futures.get_account_capital}")
+            result = response.json()
             
-            result = self.futures.get_account_capital()
-            print(f"✅ Futures balance result: {result}")
-            return result
+            return {'status': 'success', 'balance': result}
+            
+        except Exception as e:
+            print(f"❌ REST API spot balance error: {e}")
+            return {'status': 'error', 'message': str(e)}
+
+    def get_futures_balance(self):
+        """선물 잔고 조회"""
+        try:
+            if self.futures is None:
+                raise Exception("Futures 클라이언트가 초기화되지 않았습니다.")
+            
+            code, data, error = self.futures.get_account_capital()
+            if code == 200 and data and data.get("returnCode") == 0:
+                return {'status': 'success', 'balance': data.get("result", [])}
+            
+            print(f"❌ 선물 잔고 조회 실패: {error or data}")
+            return {'status': 'error', 'message': f"선물 잔고 조회 실패: {error or data}"}
+            
         except Exception as e:
             print(f"❌ Futures balance error: {e}")
-            return {"error": f"Futures balance error: {e}"}
+            return {'status': 'error', 'message': str(e)}
 
-    def all_balances(self):
-        """현물·선물 잔고 요약"""
-        if not PYXTLIB_AVAILABLE:
-            return {"error": "pyxt library not available"}
-        try:
-            spot_bal = self.spot_balance()  # 전체 현물 잔고
-            perp_bal = self.futures_balance()
-            return {"spot": spot_bal, "futures": perp_bal}
-        except Exception as e:
-            return {"error": f"All balances error: {e}"}
+    def get_all_balances(self):
+        """현물+선물 통합 잔고 요약"""
+        spot = self.get_spot_balance()
+        futures = self.get_futures_balance()
+        return {"spot": spot, "futures": futures}
 
-    # --------- 주문 (기존과 동일) ---------
-    def spot_order(self, symbol, side, qty, order_type="MARKET", price=None):
-        if not self.spot:
-            return {"error": "Spot client not available"}
+    def place_spot_order(self, symbol, side, qty, order_type="MARKET", price=None):
+        """현물 주문"""
         try:
-            params = dict(symbol=symbol, side=side,
-                          type=order_type, bizType="SPOT")
+            if self.spot is None:
+                raise Exception("Spot 클라이언트가 초기화되지 않았습니다.")
+            
+            params = {"symbol": symbol, "side": side, "type": order_type, "bizType": "SPOT"}
             if order_type == "MARKET":
                 key = "quoteQty" if side.upper() == "BUY" else "quantity"
                 params[key] = qty
             else:
                 params.update(quantity=qty, price=price, timeInForce="GTC")
-            return self.spot.place_order(**params)
+            
+            result = self.spot.place_order(**params)
+            return {'status': 'success', 'order': result}
+            
         except Exception as e:
-            return {"error": f"Spot order error: {e}"}
+            return {'status': 'error', 'message': str(e)}
 
-    def futures_order(self, symbol, side, qty, order_type="MARKET", price=None):
-        if not self.futures:
-            return {"error": "Futures client not available"}
+    def place_futures_order(self, symbol, side, qty, order_type="MARKET", price=None):
+        """선물 주문"""
         try:
-            params = dict(symbol=symbol, side=side,
-                          type=order_type, quantity=qty)
+            if self.futures is None:
+                raise Exception("Futures 클라이언트가 초기화되지 않았습니다.")
+            
+            params = {"symbol": symbol, "side": side, "type": order_type, "quantity": qty}
             if price:
                 params["price"] = price
-            return self.futures.place_order(**params)
+            
+            result = self.futures.place_order(**params)
+            return {'status': 'success', 'order': result}
+            
         except Exception as e:
-            return {"error": f"Futures order error: {e}"}
+            return {'status': 'error', 'message': str(e)}
 
 # ---------- 메서드 확인 유틸리티 ----------
 def check_available_methods(obj, name="Object"):
@@ -2536,18 +2534,18 @@ class UnifiedFuturesTrader:
                                 print("XTClient 선물 클라이언트 초기화 실패")
                                 raise Exception("XTClient futures client initialization failed")
                             
-                            balance = xt_client.futures_balance()
-                            print(f"pyxt 라이브러리 선물 잔고 조회 성공: {balance}")
+                            balance_result = xt_client.get_futures_balance()
+                            print(f"pyxt 라이브러리 선물 잔고 조회 성공: {balance_result}")
                             
-                            if isinstance(balance, dict) and 'error' in balance:
-                                print(f"pyxt 라이브러리 오류: {balance['error']}")
-                                raise Exception(f"pyxt error: {balance['error']}")
-                            
-                            return {
-                                'status': 'success',
-                                'balance': balance,
-                                'message': 'XT 선물 잔고 조회 성공 (pyxt 라이브러리)'
-                            }
+                            if balance_result.get('status') == 'success':
+                                return {
+                                    'status': 'success',
+                                    'balance': balance_result.get('balance'),
+                                    'message': 'XT 선물 잔고 조회 성공 (pyxt 라이브러리)'
+                                }
+                            else:
+                                print(f"pyxt 라이브러리 오류: {balance_result.get('message')}")
+                                raise Exception(f"pyxt error: {balance_result.get('message')}")
                         except Exception as e:
                             print(f"pyxt 라이브러리 선물 잔고 조회 실패: {e}")
                             # 기존 방식으로 폴백
@@ -3427,19 +3425,19 @@ class UnifiedFuturesTrader:
                                 print("❌ XTClient 스팟 클라이언트 초기화 실패")
                                 raise Exception("XTClient spot client initialization failed")
                             
-                            print("🔍 spot_balance() 메서드 호출 시작...")
-                            balance = xt_client.spot_balance()
-                            print(f"✅ pyxt 라이브러리 스팟 잔고 조회 성공: {balance}")
+                            print("🔍 get_spot_balance() 메서드 호출 시작...")
+                            balance_result = xt_client.get_spot_balance()
+                            print(f"✅ pyxt 라이브러리 스팟 잔고 조회 성공: {balance_result}")
                             
-                            if isinstance(balance, dict) and 'error' in balance:
-                                print(f"❌ pyxt 라이브러리 오류: {balance['error']}")
-                                raise Exception(f"pyxt error: {balance['error']}")
-                            
-                            return {
-                                'status': 'success',
-                                'balance': balance,
-                                'message': 'XT 스팟 잔고 조회 성공 (pyxt 라이브러리)'
-                            }
+                            if balance_result.get('status') == 'success':
+                                return {
+                                    'status': 'success',
+                                    'balance': balance_result.get('balance'),
+                                    'message': 'XT 스팟 잔고 조회 성공 (pyxt 라이브러리)'
+                                }
+                            else:
+                                print(f"❌ pyxt 라이브러리 오류: {balance_result.get('message')}")
+                                raise Exception(f"pyxt error: {balance_result.get('message')}")
                         except Exception as e:
                             print(f"❌ pyxt 라이브러리 스팟 잔고 조회 실패: {e}")
                             print(f"❌ 오류 타입: {type(e)}")
