@@ -2443,11 +2443,20 @@ class UnifiedFuturesTrader:
             params = params or {}
             
             # Backpack API 문서에 따른 서명 생성
-            param_str = '&'.join([f"{k}={params[k]}" for k in sorted(params)])
-            sign_str = f"instruction={instruction}"
-            if param_str:
-                sign_str += f"&{param_str}"
-            sign_str += f"&timestamp={timestamp}&window={window}"
+            # 모든 파라미터를 정렬하여 서명 문자열 생성
+            all_params = {
+                'instruction': instruction,
+                'timestamp': timestamp,
+                'window': window
+            }
+            all_params.update(params)
+            
+            # 알파벳 순서로 정렬된 파라미터 문자열 생성
+            param_pairs = []
+            for key in sorted(all_params.keys()):
+                param_pairs.append(f"{key}={all_params[key]}")
+            
+            sign_str = '&'.join(param_pairs)
             
             print(f"🔍 Backpack 서명 문자열: {sign_str}")
             
