@@ -806,6 +806,9 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
                 if isinstance(futures_data, dict):
                     formatted_balance += "📊 **Backpack 잔고**\n\n"
                     
+                    # 실제 Backpack 가격 가져오기
+                    prices = self._get_backpack_prices()
+                    
                     # 주요 자산만 필터링 (0이 아닌 잔고만)
                     significant_assets = []
                     total_usd_value = 0
@@ -814,26 +817,15 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
                         if isinstance(balance_info, dict):
                             available = float(balance_info.get('available', 0))
                             if available > 0:
-                                # USD 가치 계산 (대략적인 가치)
+                                # 실제 가격으로 USD 가치 계산
                                 usd_value = 0
                                 if currency == 'USDT' or currency == 'USDC':
                                     usd_value = available
-                                elif currency == 'BTC':
-                                    usd_value = available * 65000  # 대략적인 BTC 가격
-                                elif currency == 'ETH':
-                                    usd_value = available * 3500   # 대략적인 ETH 가격
-                                elif currency == 'SOL':
-                                    usd_value = available * 100    # 대략적인 SOL 가격
-                                elif currency == 'SUI':
-                                    usd_value = available * 1.5    # 대략적인 SUI 가격
-                                elif currency == 'SEI':
-                                    usd_value = available * 0.5    # 대략적인 SEI 가격
-                                elif currency == 'PUMP':
-                                    usd_value = available * 0.01   # 대략적인 PUMP 가격
-                                elif currency == 'POINTS':
-                                    usd_value = available * 0.001  # 대략적인 POINTS 가격
-                                elif currency == 'FRAG':
-                                    usd_value = available * 0.1    # 대략적인 FRAG 가격
+                                elif currency in prices:
+                                    usd_value = available * prices[currency]
+                                else:
+                                    # 가격 정보가 없는 경우 0으로 표시
+                                    usd_value = 0
                                 
                                 significant_assets.append((currency, available, usd_value))
                                 total_usd_value += usd_value
@@ -2602,6 +2594,40 @@ class UnifiedFuturesTrader:
             raise ImportError("pynacl 패키지가 필요합니다. pip install pynacl로 설치해주세요.")
         except Exception as e:
             raise Exception(f"Backpack 헤더 생성 오류: {str(e)}")
+
+    def _get_backpack_prices(self):
+        """Backpack에서 실제 거래 가격 가져오기"""
+        try:
+            # Backpack 공개 API로 가격 정보 가져오기
+            url = "https://api.backpack.exchange/api/v1/tickers"
+            response = requests.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                prices = {}
+                
+                # USDT 페어 가격 추출
+                for ticker in data:
+                    symbol = ticker.get('symbol', '')
+                    last_price = ticker.get('last', '0')
+                    
+                    # USDT 페어에서 기본 자산 추출
+                    if symbol.endswith('_USDT'):
+                        base_asset = symbol.replace('_USDT', '')
+                        try:
+                            prices[base_asset] = float(last_price)
+                        except:
+                            pass
+                
+                print(f"🔍 Backpack 가격 데이터: {prices}")
+                return prices
+            else:
+                print(f"❌ Backpack 가격 조회 실패: {response.status_code}")
+                return {}
+                
+        except Exception as e:
+            print(f"❌ Backpack 가격 조회 오류: {e}")
+            return {}
 
     def get_futures_balance(self):
         """선물 계좌 잔고 조회"""
