@@ -1385,7 +1385,8 @@ async def show_futures_leverage_input(telegram_app, chat_id, user_id, exchange, 
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     except ImportError:
         print("❌ Telegram 라이브러리 import 실패")
-        await callback_query.answer("❌ 오류가 발생했습니다.")
+        if callback_query:
+            await callback_query.answer("❌ 오류가 발생했습니다.")
         return
     
     direction_text = "📈 롱" if direction == "long" else "📉 숏"
@@ -1396,25 +1397,34 @@ async def show_futures_leverage_input(telegram_app, chat_id, user_id, exchange, 
         "hyperliquid": "Hyperliquid"
     }
     
-    keyboard = [
-        [InlineKeyboardButton("🔙 심볼 선택", callback_data=f"futures_symbol_{exchange}_{direction}_{symbol}")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await telegram_app.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=callback_query.message.message_id,
-        text=f"{direction_text} **레버리지 입력**\n\n"
-             f"거래소: {exchange_names.get(exchange, exchange.upper())}\n"
-             f"심볼: {symbol_display}\n"
-             f"거래 타입: 📊 선물\n\n"
-             f"다음 형식으로 레버리지를 입력하세요:\n\n"
-             f"`/leverage {exchange} {symbol_display} {direction} [레버리지]`\n\n"
-             f"예시:\n"
-             f"`/leverage {exchange} {symbol_display} {direction} 10`",
-        parse_mode='Markdown',
-        reply_markup=reply_markup
+    text = (
+        f"{direction_text} **레버리지 입력**\n\n"
+        f"거래소: {exchange_names[exchange]}\n"
+        f"심볼: {symbol_display}\n"
+        f"거래 타입: 📊 선물\n\n"
+        f"다음 형식으로 레버리지를 입력하세요:\n\n"
+        f"`/leverage {exchange} {symbol_display} {direction} [레버리지]`\n\n"
+        f"예시:\n"
+        f"`/leverage {exchange} {symbol_display} {direction} 10`"
     )
+    
+    if callback_query:
+        # 버튼 콜백일 때는 메시지 수정
+        await telegram_app.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=callback_query.message.message_id,
+            text=text,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 심볼 선택", callback_data=f"futures_symbol_{exchange}_{direction}_{symbol}")]]),
+            parse_mode='Markdown'
+        )
+    else:
+        # 직접 텍스트 명령일 때는 새 메시지로 안내
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 심볼 선택", callback_data=f"futures_symbol_{exchange}_{direction}_{symbol}")]]),
+            parse_mode='Markdown'
+        )
 
 async def show_futures_quantity_input(telegram_app, chat_id, user_id, exchange, direction, symbol, leverage, callback_query):
     """선물 거래 수량 입력 안내"""
@@ -2473,45 +2483,31 @@ class UnifiedFuturesTrader:
             import math
             timestamp = f"{math.floor(time.time() * 1000)}"  # 문자열로 직접 변환
             window = "5000"
-            
             params = params or {}
-
-            # 🔧 FIX: 공식 Backpack API 문서에 따른 올바른 서명 생성
-            # 1단계: 주문 파라미터만 알파벳 순으로 정렬
-            sorted_order_params = sorted(params.items())
             
-            # 2단계: 주문 파라미터 쿼리 문자열 생성
-            if sorted_order_params:
-                order_params_string = '&'.join([f"{key}={value}" for key, value in sorted_order_params])
-            else:
-                order_params_string = ""
+            # 1) 주문 파라미터만 알파벳 순 정렬
+            sorted_order = sorted(params.items())
+            order_str = '&'.join(f"{k}={v}" for k,v in sorted_order) if sorted_order else ""
             
-            # 3단계: 헤더 파라미터 문자열 생성 (timestamp, window)
-            header_params_string = f"timestamp={timestamp}&window={window}"
+            # 2) 헤더 파라미터 생성
+            hdr_str = f"timestamp={timestamp}&window={window}"
             
-            # 4단계: 공식 형식에 따라 결합
-            # 형식: "instruction=" + instruction + "&" + (order_params ? order_params + "&" : "") + header_params
-            if order_params_string:
-                sign_str = f"instruction={instruction}&{order_params_string}&{header_params_string}"
-            else:
-                sign_str = f"instruction={instruction}&{header_params_string}"
-
+            # 3) 최종 서명 문자열: instruction + order_str + hdr_str
+            sign_str = f"instruction={instruction}" + (f"&{order_str}" if order_str else "") + f"&{hdr_str}"
+            
             print(f"🔍 수정된 서명 문자열: {sign_str}")
 
             # ED25519 서명 생성
-            message_bytes = sign_str.encode('utf-8')
-            signature = self.signing_key.sign(message_bytes)
-            signature_b64 = base64.b64encode(signature.signature).decode('utf-8')
+            signature = self.signing_key.sign(sign_str.encode('utf-8')).signature
+            signature_b64 = base64.b64encode(signature).decode('utf-8')
 
-            headers = {
+            return {
                 "X-API-Key": self.api_key,
                 "X-Signature": signature_b64,
-                "X-Timestamp": timestamp,  # 이미 문자열
-                "X-Window": window,        # 이미 문자열
+                "X-Timestamp": timestamp,
+                "X-Window": window,
                 "Content-Type": "application/json"
             }
-
-            return headers
 
         except ImportError:
             raise ImportError("pynacl 패키지가 필요합니다. pip install pynacl로 설치해주세요.")
