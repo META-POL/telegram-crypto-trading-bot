@@ -800,15 +800,41 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
         # 선물 잔고 처리
         if futures_result.get('status') == 'success':
             futures_data = futures_result.get('balance', {})
-            if isinstance(futures_data, tuple) and len(futures_data) >= 2:
-                # pyxt 응답 형식: (status_code, data, None)
-                futures_info = futures_data[1]
-                if isinstance(futures_info, dict) and futures_info.get('result') == []:
-                    formatted_balance += "📊 **선물 잔고**: 0 USDT (거래 없음)\n\n"
+            
+            if exchange == 'backpack':
+                # Backpack 잔고 포맷팅
+                if isinstance(futures_data, dict):
+                    formatted_balance += "📊 **Backpack 잔고**\n\n"
+                    
+                    # 주요 자산만 필터링 (0이 아닌 잔고만)
+                    significant_assets = []
+                    for currency, balance_info in futures_data.items():
+                        if isinstance(balance_info, dict):
+                            available = float(balance_info.get('available', 0))
+                            if available > 0:
+                                significant_assets.append((currency, available))
+                    
+                    # 잔고가 많은 순으로 정렬
+                    significant_assets.sort(key=lambda x: x[1], reverse=True)
+                    
+                    if significant_assets:
+                        for currency, available in significant_assets:
+                            formatted_balance += f"• **{currency}**: {available:,.8f}\n"
+                    else:
+                        formatted_balance += "• 잔고가 없습니다.\n"
                 else:
-                    formatted_balance += f"📊 **선물 잔고**: {futures_info}\n\n"
+                    formatted_balance += f"📊 **선물 잔고**: {futures_data}\n\n"
             else:
-                formatted_balance += f"📊 **선물 잔고**: {futures_data}\n\n"
+                # XT 등 다른 거래소 처리
+                if isinstance(futures_data, tuple) and len(futures_data) >= 2:
+                    # pyxt 응답 형식: (status_code, data, None)
+                    futures_info = futures_data[1]
+                    if isinstance(futures_info, dict) and futures_info.get('result') == []:
+                        formatted_balance += "📊 **선물 잔고**: 0 USDT (거래 없음)\n\n"
+                    else:
+                        formatted_balance += f"📊 **선물 잔고**: {futures_info}\n\n"
+                else:
+                    formatted_balance += f"📊 **선물 잔고**: {futures_data}\n\n"
         else:
             formatted_balance += f"📊 **선물 잔고**: 조회 실패 - {futures_result.get('message', '알 수 없는 오류')}\n\n"
         
