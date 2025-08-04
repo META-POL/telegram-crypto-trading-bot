@@ -2500,9 +2500,10 @@ class UnifiedFuturesTrader:
         return headers
 
     def _get_headers_backpack(self, instruction, params=None):
-        """Backpack API 헤더 생성"""
+        """Backpack API 헤더 생성 (ED25519 서명)"""
         try:
             # pynacl 지연 로딩
+            global SigningKey
             if SigningKey is None:
                 from nacl.signing import SigningKey
             
@@ -2512,22 +2513,32 @@ class UnifiedFuturesTrader:
             timestamp = str(int(time.time() * 1000))
             window = "5000"
             params = params or {}
+            
+            # Backpack API 문서에 따른 서명 생성
             param_str = '&'.join([f"{k}={params[k]}" for k in sorted(params)])
             sign_str = f"instruction={instruction}"
             if param_str:
                 sign_str += f"&{param_str}"
             sign_str += f"&timestamp={timestamp}&window={window}"
+            
+            print(f"🔍 Backpack 서명 문자열: {sign_str}")
+            
             signature = self.signing_key.sign(sign_str.encode())
             signature_b64 = base64.b64encode(signature.signature).decode()
-            return {
+            
+            headers = {
                 "X-API-Key": self.api_key,
                 "X-Signature": signature_b64,
                 "X-Timestamp": timestamp,
                 "X-Window": window,
                 "Content-Type": "application/json"
             }
+            
+            print(f"🔍 Backpack 헤더 생성 완료: {headers}")
+            return headers
+            
         except ImportError:
-            raise ImportError("pynacl 패키지가 필요합니다")
+            raise ImportError("pynacl 패키지가 필요합니다. pip install pynacl로 설치해주세요.")
         except Exception as e:
             raise Exception(f"Backpack 헤더 생성 오류: {str(e)}")
 
@@ -2649,22 +2660,40 @@ class UnifiedFuturesTrader:
                 }
             
             elif self.exchange == 'backpack':
-                # Backpack Exchange 잔고 조회 - /capital 엔드포인트 사용
-                url = f"{self.base_url}/capital"
-                headers = self._get_headers_backpack("balanceQuery")
-                response = requests.get(url, headers=headers)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    return {
-                        'status': 'success',
-                        'balance': data,
-                        'message': 'Backpack 선물 잔고 조회 성공'
-                    }
-                else:
+                # Backpack Exchange 잔고 조회 - API 문서 기반
+                try:
+                    print(f"🔍 Backpack 잔고 조회 시작...")
+                    
+                    # Backpack API 문서에 따른 잔고 조회
+                    url = "https://api.backpack.exchange/api/v1/capital"
+                    headers = self._get_headers_backpack("balanceQuery")
+                    
+                    print(f"🔍 Backpack API 호출: {url}")
+                    print(f"🔍 Backpack 헤더: {headers}")
+                    
+                    response = requests.get(url, headers=headers)
+                    print(f"🔍 Backpack 응답: {response.status_code} - {response.text}")
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        print(f"🔍 Backpack 잔고 데이터: {data}")
+                        
+                        return {
+                            'status': 'success',
+                            'balance': data,
+                            'message': 'Backpack 잔고 조회 성공'
+                        }
+                    else:
+                        return {
+                            'status': 'error',
+                            'message': f'Backpack 잔고 조회 실패: {response.status_code} - {response.text}'
+                        }
+                        
+                except Exception as e:
+                    print(f"❌ Backpack 잔고 조회 오류: {e}")
                     return {
                         'status': 'error',
-                        'message': f'Backpack 선물 잔고 조회 실패: {response.status_code}'
+                        'message': f'Backpack 잔고 조회 오류: {str(e)}'
                     }
             
             elif self.exchange == 'hyperliquid':
