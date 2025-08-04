@@ -2471,61 +2471,25 @@ class UnifiedFuturesTrader:
             params = params or {}
             
             # Backpack API 공식 문서에 따른 서명 생성
-            # 모든 파라미터를 딕셔너리에 넣고 알파벳 순서로 정렬
+            # 1. body/query 파라미터들을 알파벳 순서로 정렬
+            sorted_params = sorted(params.items())
             
-            # 서명용 파라미터 딕셔너리 생성
-            sign_params = {}
+            # 2. 파라미터를 쿼리 스트링 형태로 변환
+            param_string = '&'.join([f"{key}={value}" for key, value in sorted_params])
             
-            # instruction 추가
-            sign_params['instruction'] = instruction
-            
-            # 주문 파라미터들을 문자열로 변환하여 추가
-            for key, value in params.items():
-                sign_params[key] = str(value)
-            
-            # timestamp와 window 추가
-            sign_params['timestamp'] = timestamp
-            sign_params['window'] = window
-            
-            # 모든 파라미터를 알파벳 순서로 정렬하여 서명 문자열 생성
-            sorted_params = sorted(sign_params.items())
-            sign_str = '&'.join([f"{key}={value}" for key, value in sorted_params])
-            
-            # 서명 문자열 디버깅
-            print(f"🔍 서명용 파라미터: {sign_params}")
-            print(f"🔍 정렬된 파라미터: {sorted_params}")
-            print(f"🔍 최종 서명 문자열: {sign_str}")
-            
-            print(f"🔍 Backpack 서명 문자열: {sign_str}")
-            
-            # API 키와 개인키 디버깅 정보 출력
-            print(f"🔍 Backpack API Key: {self.api_key[:20]}...")
-            print(f"🔍 Backpack Private Key: {self.private_key[:20]}...")
-            print(f"🔍 Backpack API Key 길이: {len(self.api_key)}")
-            print(f"🔍 Backpack Private Key 길이: {len(self.private_key)}")
-            print(f"🔍 서명할 메시지 길이: {len(sign_str)}")
-            
-            # 개인키 디코딩 확인
-            try:
-                private_key_bytes = base64.b64decode(self.private_key)
-                print(f"🔍 개인키 디코딩 성공, 길이: {len(private_key_bytes)}")
-                print(f"🔍 개인키 (hex): {private_key_bytes.hex()}")
-            except Exception as e:
-                print(f"⚠️ 개인키 디코딩 실패: {e}")
-            
+            # 3. 서명 문자열 구성: instruction + params + timestamp + window
+            if param_string:
+                sign_str = f"instruction={instruction}&{param_string}&timestamp={timestamp}&window={window}"
+            else:
+                sign_str = f"instruction={instruction}&timestamp={timestamp}&window={window}"
+
+            print(f"🔍 서명 문자열: {sign_str}")
+
             # ED25519 서명 생성
             message_bytes = sign_str.encode('utf-8')
             signature = self.signing_key.sign(message_bytes)
             signature_b64 = base64.b64encode(signature.signature).decode('utf-8')
-            
-            print(f"🔍 서명 길이: {len(signature.signature)}")
-            print(f"🔍 Base64 서명 길이: {len(signature_b64)}")
-            print(f"🔍 서명 시작: {signature_b64[:20]}...")
-            
-            # 서명 검증을 위한 디버깅
-            print(f"🔍 서명할 메시지 바이트 길이: {len(message_bytes)}")
-            print(f"🔍 서명할 메시지 (hex): {message_bytes.hex()}")
-            
+
             headers = {
                 "X-API-Key": self.api_key,
                 "X-Signature": signature_b64,
@@ -2533,14 +2497,7 @@ class UnifiedFuturesTrader:
                 "X-Window": window,
                 "Content-Type": "application/json"
             }
-            
-            # 헤더 디버깅 정보 출력
-            print(f"🔍 X-API-Key: {headers['X-API-Key']}")
-            print(f"🔍 X-Timestamp: {headers['X-Timestamp']}")
-            print(f"🔍 X-Window: {headers['X-Window']}")
-            print(f"🔍 X-Signature: {headers['X-Signature'][:20]}...")
-            
-            print(f"🔍 Backpack 헤더 생성 완료: {headers}")
+
             return headers
             
         except ImportError:
