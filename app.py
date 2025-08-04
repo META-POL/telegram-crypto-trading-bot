@@ -24,20 +24,117 @@ SigningKey = None
 ccxt = None
 InlineKeyboardButton = None
 InlineKeyboardMarkup = None
+
+# pyxt 라이브러리 임포트 시도
 try:
-    from pyxt import XT
+    from pyxt.spot import Spot          # 현물
+    from pyxt.perp import Perp          # 선물
+    PYXTLIB_AVAILABLE = True
     print("✅ pyxt 라이브러리 로드 성공")
-except ImportError:
-    print("⚠️ pyxt 라이브러리가 설치되지 않았습니다. pip install pyxt로 설치해주세요.")
-    XT = None
+except ImportError as e:
+    print(f"⚠️ pyxt 라이브러리 로드 실패: {e}")
+    print("pip install pyxt로 설치해주세요.")
+    PYXTLIB_AVAILABLE = False
+    Spot = None
+    Perp = None
 except Exception as e:
     print(f"⚠️ pyxt 라이브러리 로드 중 오류: {e}")
-    XT = None
+    PYXTLIB_AVAILABLE = False
+    Spot = None
+    Perp = None
+
 print("📝 모든 라이브러리는 필요시 로드됩니다")
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# XTClient 클래스 (xt.py에서 성공한 코드)
+class XTClient:
+    """현물·선물 통합 래퍼"""
+    def __init__(self, api_key, api_secret):
+        if not PYXTLIB_AVAILABLE:
+            print("❌ pyxt 라이브러리가 설치되지 않아 XTClient를 사용할 수 없습니다.")
+            return
+            
+        try:
+            self.spot = Spot(
+                host="https://sapi.xt.com",       # 현물 REST 엔드포인트
+                access_key=api_key,
+                secret_key=api_secret
+            )
+            self.futures = Perp(
+                host="https://fapi.xt.com",       # USDT-M 선물 REST 엔드포인트
+                access_key=api_key,
+                secret_key=api_secret
+            )
+            print("✅ XTClient 초기화 성공")
+        except Exception as e:
+            print(f"❌ XTClient 초기화 실패: {e}")
+            self.spot = None
+            self.futures = None
+
+    # --------- 잔고 ---------
+    def spot_balance(self, currency="usdt"):
+        """현물 특정 자산 또는 전체 잔고 반환"""
+        if not self.spot:
+            return {"error": "Spot client not available"}
+        try:
+            return (self.spot.balance(currency) if currency
+                    else self.spot.balanceList())
+        except Exception as e:
+            return {"error": f"Spot balance error: {e}"}
+
+    def futures_balance(self):
+        """선물 지갑 자산(계정 자본) 반환"""
+        if not self.futures:
+            return {"error": "Futures client not available"}
+        try:
+            return self.futures.get_account_capital()   # USDT, U-마진 등 포함
+        except Exception as e:
+            return {"error": f"Futures balance error: {e}"}
+
+    def all_balances(self):
+        """현물·선물 잔고 요약"""
+        if not PYXTLIB_AVAILABLE:
+            return {"error": "pyxt library not available"}
+        try:
+            spot_bal = self.spot_balance()
+            perp_bal = self.futures_balance()
+            return {"spot": spot_bal, "futures": perp_bal}
+        except Exception as e:
+            return {"error": f"All balances error: {e}"}
+
+    # --------- 주문 ---------
+    # 현물: 시장가·지정가
+    def spot_order(self, symbol, side, qty, order_type="MARKET", price=None):
+        if not self.spot:
+            return {"error": "Spot client not available"}
+        try:
+            params = dict(symbol=symbol, side=side,
+                          type=order_type, bizType="SPOT")
+            if order_type == "MARKET":
+                # BUY: quoteQty(USDT) / SELL: quantity(COIN)
+                key = "quoteQty" if side.upper() == "BUY" else "quantity"
+                params[key] = qty
+            else:                                # LIMIT
+                params.update(quantity=qty, price=price, timeInForce="GTC")
+            return self.spot.place_order(**params)
+        except Exception as e:
+            return {"error": f"Spot order error: {e}"}
+
+    # 선물: 시장가·지정가
+    def futures_order(self, symbol, side, qty, order_type="MARKET", price=None):
+        if not self.futures:
+            return {"error": "Futures client not available"}
+        try:
+            params = dict(symbol=symbol, side=side,
+                          type=order_type, quantity=qty)
+            if price:                             # LIMIT
+                params["price"] = price
+            return self.futures.place_order(**params)
+        except Exception as e:
+            return {"error": f"Futures order error: {e}"}
 
 # Flask 앱 생성
 try:
@@ -2321,35 +2418,37 @@ class UnifiedFuturesTrader:
         """선물 계좌 잔고 조회"""
         try:
             if self.exchange == 'xt':
-                # pyxt 라이브러리를 사용한 XT 잔고 조회
-                if XT is not None:
+                # pyxt 라이브러리를 사용한 XT 선물 잔고 조회
+                if PYXTLIB_AVAILABLE:
                     try:
                         print(f"pyxt 라이브러리 사용 시도: API_KEY={self.api_key[:10]}...")
-                        xt_client = XT(api_key=self.api_key, secret_key=self.api_secret)
-                        print(f"XT 클라이언트 생성 성공: {xt_client}")
-                        balance = xt_client.balance()
-                        print(f"pyxt 라이브러리 잔고 조회 성공: {balance}")
-                        return {
-                            'status': 'success',
-                            'balance': balance,
-                            'message': 'XT 잔고 조회 성공 (pyxt 라이브러리)'
-                        }
+                        
+                        # XTClient 클래스 생성 (xt.py에서 성공한 방식)
+                        xt_client = XTClient(self.api_key, self.api_secret)
+                        balance = xt_client.futures_balance()
+                        
+                        print(f"pyxt 라이브러리 선물 잔고 조회 성공: {balance}")
+                        
+                        if 'error' in balance:
+                            print(f"pyxt 라이브러리 오류: {balance['error']}")
+                            # 오류 발생 시 기존 방식으로 폴백
+                        else:
+                            return {
+                                'status': 'success',
+                                'balance': balance,
+                                'message': 'XT 선물 잔고 조회 성공 (pyxt 라이브러리)'
+                            }
                     except Exception as e:
-                        print(f"pyxt 라이브러리 잔고 조회 실패: {e}")
+                        print(f"pyxt 라이브러리 선물 잔고 조회 실패: {e}")
                         print(f"pyxt 라이브러리 사용 불가능, 기존 방식으로 폴백")
-                        # pyxt 실패 시 기존 방식으로 폴백
                 else:
                     print("pyxt 라이브러리가 설치되지 않음, 기존 방식 사용")
                 
                 # 기존 방식 (pyxt 라이브러리 사용 불가능한 경우)
                 base_urls = [
-                    "https://api.xt.com",   # 기본 API (pyxt 기본)
-                    "https://sapi.xt.com",  # 스팟 API
                     "https://fapi.xt.com",  # 선물 API
-                    "https://api.xt.com/v4", # v4 API
-                    "https://api.xt.com/v3", # v3 API
-                    "https://api.xt.com/v2", # v2 API
-                    "https://api.xt.com/v1"  # v1 API
+                    "https://api.xt.com",   # 기본 API
+                    "https://sapi.xt.com"   # 스팟 API
                 ]
                 
                 endpoints = [
@@ -2363,9 +2462,7 @@ class UnifiedFuturesTrader:
                     "/v4/assets",
                     "/balance",  # 기본 balance
                     "/assets",   # 기본 assets
-                    "/v4/account/spot/balance",  # 스팟 잔고
                     "/v4/account/futures/balance",  # 선물 잔고
-                    "/v4/account/spot/assets",  # 스팟 자산
                     "/v4/account/futures/assets"  # 선물 자산
                 ]
                 
@@ -2375,7 +2472,7 @@ class UnifiedFuturesTrader:
                         headers = self._get_headers_xt()
                         response = requests.get(url, headers=headers)
                         
-                        print(f"XT 잔고 조회 시도 {base_url}{endpoint}: {response.status_code} - {response.text}")  # 디버깅용
+                        print(f"XT 선물 잔고 조회 시도 {base_url}{endpoint}: {response.status_code} - {response.text}")  # 디버깅용
                         
                         if response.status_code == 200:
                             data = response.json()
@@ -2409,20 +2506,20 @@ class UnifiedFuturesTrader:
                                         return {
                                             'status': 'success',
                                             'balance': alt_data.get('result', {}),
-                                            'message': f'XT 잔고 조회 성공 ({base_url}{endpoint}) - pyxt 방식'
+                                            'message': f'XT 선물 잔고 조회 성공 ({base_url}{endpoint}) - pyxt 방식'
                                         }
                             elif data.get('rc') == 0:  # 정상 응답
                                 return {
                                     'status': 'success',
                                     'balance': data.get('result', {}),
-                                    'message': f'XT 잔고 조회 성공 ({base_url}{endpoint})'
+                                    'message': f'XT 선물 잔고 조회 성공 ({base_url}{endpoint})'
                                 }
                 
                 # 모든 시도 실패 시
                 return {
                     'status': 'error',
                     'balance': {},  # 빈 딕셔너리 반환
-                    'message': f'XT 잔고 조회 실패: pyxt 라이브러리와 모든 엔드포인트에서 실패. XT API 문서에서 실제 잔고 엔드포인트를 확인해야 합니다.'
+                    'message': f'XT 선물 잔고 조회 실패: pyxt 라이브러리와 모든 엔드포인트에서 실패. XT API 문서에서 실제 잔고 엔드포인트를 확인해야 합니다.'
                 }
             
             elif self.exchange == 'backpack':
@@ -3201,29 +3298,36 @@ class UnifiedFuturesTrader:
         try:
             if self.exchange == 'xt':
                 # pyxt 라이브러리를 사용한 XT 스팟 잔고 조회
-                if XT is not None:
+                if PYXTLIB_AVAILABLE:
                     try:
-                        xt_client = XT(api_key=self.api_key, secret_key=self.api_secret)
-                        balance = xt_client.balance()
+                        print(f"pyxt 라이브러리 사용 시도: API_KEY={self.api_key[:10]}...")
+                        
+                        # XTClient 클래스 생성 (xt.py에서 성공한 방식)
+                        xt_client = XTClient(self.api_key, self.api_secret)
+                        balance = xt_client.spot_balance()
+                        
                         print(f"pyxt 라이브러리 스팟 잔고 조회 성공: {balance}")
-                        return {
-                            'status': 'success',
-                            'balance': balance,
-                            'message': 'XT 스팟 잔고 조회 성공 (pyxt 라이브러리)'
-                        }
+                        
+                        if 'error' in balance:
+                            print(f"pyxt 라이브러리 오류: {balance['error']}")
+                            # 오류 발생 시 기존 방식으로 폴백
+                        else:
+                            return {
+                                'status': 'success',
+                                'balance': balance,
+                                'message': 'XT 스팟 잔고 조회 성공 (pyxt 라이브러리)'
+                            }
                     except Exception as e:
                         print(f"pyxt 라이브러리 스팟 잔고 조회 실패: {e}")
                         # pyxt 실패 시 기존 방식으로 폴백
+                else:
+                    print("pyxt 라이브러리가 설치되지 않음, 기존 방식 사용")
                 
                 # 기존 방식 (pyxt 라이브러리 사용 불가능한 경우)
                 base_urls = [
-                    "https://api.xt.com",   # 기본 API (pyxt 기본)
                     "https://sapi.xt.com",  # 스팟 API
-                    "https://fapi.xt.com",  # 선물 API
-                    "https://api.xt.com/v4", # v4 API
-                    "https://api.xt.com/v3", # v3 API
-                    "https://api.xt.com/v2", # v2 API
-                    "https://api.xt.com/v1"  # v1 API
+                    "https://api.xt.com",   # 기본 API
+                    "https://fapi.xt.com"   # 선물 API
                 ]
                 
                 endpoints = [
