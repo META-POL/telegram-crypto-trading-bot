@@ -2464,42 +2464,40 @@ class UnifiedFuturesTrader:
         return headers
 
     def _get_headers_backpack(self, instruction, params=None):
-        """Backpack API 헤더 생성 (ED25519 서명) - 수정된 버전"""
+        """Backpack API 헤더 생성 (ED25519 서명) - 정확한 사양"""
         try:
-            # pynacl 지연 로딩
+            # ED25519 서명 준비
             global SigningKey
             if SigningKey is None:
                 from nacl.signing import SigningKey
 
             if self.signing_key is None and self.private_key:
-                try:
-                    # 개인키를 base64 디코딩
-                    private_key_bytes = base64.b64decode(self.private_key)
-                    self.signing_key = SigningKey(private_key_bytes)
-                except Exception as e:
-                    raise Exception(f"개인키 디코딩 오류: {str(e)}")
+                private_key_bytes = base64.b64decode(self.private_key)
+                self.signing_key = SigningKey(private_key_bytes)
 
-            # 🔧 CRITICAL FIX: 타임스탬프 과학적 표기법 완전 방지
-            import math
-            timestamp = f"{math.floor(time.time() * 1000)}"  # 문자열로 직접 변환
+            # 1) timestamp, window
+            timestamp = str(int(time.time() * 1000))
             window = "5000"
-            params = params or {}
-            
-            # 1) 주문 파라미터만 알파벳 순 정렬
-            sorted_order = sorted(params.items())
-            order_str = '&'.join(f"{k}={v}" for k,v in sorted_order) if sorted_order else ""
-            
-            # 2) 헤더 파라미터 생성
-            hdr_str = f"timestamp={timestamp}&window={window}"
-            
-            # 3) 최종 서명 문자열: instruction + order_str + hdr_str
-            sign_str = f"instruction={instruction}" + (f"&{order_str}" if order_str else "") + f"&{hdr_str}"
-            
-            print(f"🔍 수정된 서명 문자열: {sign_str}")
 
-            # ED25519 서명 생성
-            signature = self.signing_key.sign(sign_str.encode('utf-8')).signature
-            signature_b64 = base64.b64encode(signature).decode('utf-8')
+            # 2) 정렬된 주문 파라미터 문자열
+            params = params or {}
+            sorted_params = sorted(params.items())
+            order_str = "&".join(f"{k}={v}" for k, v in sorted_params)
+
+            # 3) 서명할 문자열: instruction + order_str + header_params
+            #    반드시 '&' 구분자로만 결합하고, HTML escape(&amp;) 제거
+            sign_parts = [f"instruction={instruction}"]
+            if order_str:
+                sign_parts.append(order_str)
+            sign_parts.append(f"timestamp={timestamp}")
+            sign_parts.append(f"window={window}")
+            sign_str = "&".join(sign_parts)
+
+            print(f"🔍 Backpack 서명 문자열: {sign_str}")
+
+            # 4) ED25519 서명 생성
+            signature = self.signing_key.sign(sign_str.encode("utf-8")).signature
+            signature_b64 = base64.b64encode(signature).decode("utf-8")
 
             return {
                 "X-API-Key": self.api_key,
