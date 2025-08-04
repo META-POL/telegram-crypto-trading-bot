@@ -421,8 +421,8 @@ def webhook():
             print(f"❌ 텔레그램 라이브러리 로드 실패: {e}")
             return jsonify({"status": "error", "message": "텔레그램 라이브러리 로드 실패"}), 500
         
-        # 텔레그램 봇 토큰
-        token = "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I"
+        # 텔레그램 봇 토큰 (환경변수에서 가져오기)
+        token = os.environ.get('TELEGRAM_BOT_TOKEN', "8356129181:AAF5bWX6z6HSAF2MeTtUIjx76jOW2i0Xj1I")
         
         # 봇 애플리케이션 생성
         telegram_app = ApplicationBuilder().token(token).build()
@@ -526,6 +526,8 @@ async def show_main_menu(telegram_app, chat_id):
     try:
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         
+        print(f"🔍 메인 메뉴 표시 시작: chat_id={chat_id}")
+        
         keyboard = [
             [InlineKeyboardButton("🔑 API 키 관리", callback_data="api_management")],
             [InlineKeyboardButton("💰 잔고 조회", callback_data="balance_menu")],
@@ -546,17 +548,29 @@ async def show_main_menu(telegram_app, chat_id):
             "먼저 API 키를 설정해주세요!"
         )
 
-        await telegram_app.bot.send_message(
+        print(f"🔍 메인 메뉴 메시지 전송: {response_text[:50]}...")
+        
+        result = await telegram_app.bot.send_message(
             chat_id=chat_id, 
             text=response_text, 
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
+        
+        print(f"🔍 메인 메뉴 전송 완료: message_id={result.message_id}")
+        
     except ImportError:
+        print(f"⚠️ 텔레그램 라이브러리 ImportError")
         await telegram_app.bot.send_message(
             chat_id=chat_id,
             text="🤖 **암호화폐 선물 거래 봇**\n\n봇이 정상 작동 중입니다!",
             parse_mode='Markdown'
+        )
+    except Exception as e:
+        print(f"❌ 메인 메뉴 표시 오류: {e}")
+        await telegram_app.bot.send_message(
+            chat_id=chat_id,
+            text=f"❌ 메뉴 표시 중 오류가 발생했습니다: {str(e)}"
         )
 
 async def handle_api_setup(telegram_app, chat_id, user_id, text):
