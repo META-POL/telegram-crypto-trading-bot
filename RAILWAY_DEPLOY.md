@@ -31,7 +31,6 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 텔레그램에서 다음 명령어들로 봇을 테스트하세요:
 - `/start` - 봇 시작
 - `/balance` - 잔고 조회
-- `/symbols` - 심볼 조회
 - `/testapi` - API 테스트
 
 ### 5. 문제 해결
@@ -53,7 +52,6 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 ### 6. 현재 지원 기능
 
 - ✅ **잔고 조회**: Backpack 거래소
-- ✅ **심볼 조회**: Backpack 거래소
 - ✅ **API 테스트**: Backpack 거래소
 - ✅ **도움말**: 사용법 안내
 

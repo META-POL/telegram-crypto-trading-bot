@@ -238,6 +238,21 @@ def init_database():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # 레버리지 설정 테이블 추가
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_leverage_settings (
+                user_id INTEGER,
+                exchange TEXT,
+                symbol TEXT,
+                direction TEXT,
+                leverage INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, exchange, symbol, direction)
+            )
+        ''')
+        
         conn.commit()
         conn.close()
         print("✅ 데이터베이스 초기화 완료")
@@ -325,6 +340,43 @@ def save_user_api_keys(user_id, exchange, api_key, api_secret):
         print(f"✅ API 키 저장 완료: {exchange} for user {user_id}")
     except Exception as e:
         print(f"⚠️ API 키 저장 오류: {e}")
+
+def save_user_leverage_setting(user_id, exchange, symbol, direction, leverage):
+    """사용자 레버리지 설정 저장"""
+    try:
+        conn = sqlite3.connect('user_apis.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT OR REPLACE INTO user_leverage_settings 
+            (user_id, exchange, symbol, direction, leverage, updated_at) 
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (user_id, exchange, symbol, direction, leverage))
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ 레버리지 설정 저장 완료: {exchange} {symbol} {direction} {leverage}x for user {user_id}")
+    except Exception as e:
+        print(f"⚠️ 레버리지 설정 저장 오류: {e}")
+
+def get_user_leverage_setting(user_id, exchange, symbol, direction):
+    """사용자 레버리지 설정 조회"""
+    try:
+        conn = sqlite3.connect('user_apis.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT leverage FROM user_leverage_settings 
+            WHERE user_id = ? AND exchange = ? AND symbol = ? AND direction = ?
+        ''', (user_id, exchange, symbol, direction))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            return result[0]
+        return 1  # 기본값
+    except Exception as e:
+        print(f"⚠️ 레버리지 설정 조회 오류: {e}")
+        return 1  # 기본값
 
 @app.route('/')
 def health_check():
@@ -418,8 +470,7 @@ def webhook():
                     elif text.startswith('/balance'):
                         await handle_balance_command(telegram_app, chat_id, user_id, text)
                         
-                    elif text.startswith('/symbols'):
-                        await handle_symbols_command(telegram_app, chat_id, user_id, text)
+                    
                         
                     elif text.startswith('/positions'):
                         await handle_positions_command(telegram_app, chat_id, user_id, text)
@@ -478,7 +529,6 @@ async def show_main_menu(telegram_app, chat_id):
         keyboard = [
             [InlineKeyboardButton("🔑 API 키 관리", callback_data="api_management")],
             [InlineKeyboardButton("💰 잔고 조회", callback_data="balance_menu")],
-            [InlineKeyboardButton("📈 거래쌍 조회", callback_data="symbols_menu")],
             [InlineKeyboardButton("📊 포지션 관리", callback_data="position_menu")],
             [InlineKeyboardButton("🔄 거래하기", callback_data="trade_menu")],
             [InlineKeyboardButton("⚙️ 설정", callback_data="settings_menu")],
@@ -579,8 +629,7 @@ async def handle_callback_query(callback_query, telegram_app):
         elif data == "balance_menu":
             await show_balance_menu(telegram_app, chat_id, user_id, callback_query)
             
-        elif data == "symbols_menu":
-            await show_symbols_menu(telegram_app, chat_id, user_id, callback_query)
+
             
         elif data == "position_menu":
             await show_position_menu(telegram_app, chat_id, user_id, callback_query)
@@ -603,8 +652,7 @@ async def handle_callback_query(callback_query, telegram_app):
         elif data.startswith("balance_"):
             await handle_balance_callback(telegram_app, chat_id, user_id, data, callback_query)
             
-        elif data.startswith("symbols_"):
-            await handle_symbols_callback(telegram_app, chat_id, user_id, data, callback_query)
+
             
         elif data.startswith("position_"):
             await handle_position_callback(telegram_app, chat_id, user_id, data, callback_query)
@@ -918,80 +966,7 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
             parse_mode='Markdown'
         )
 
-async def handle_symbols_callback(telegram_app, chat_id, user_id, data, callback_query):
-    """거래쌍 조회 콜백 처리"""
-    exchange = data.replace("symbols_", "")
-    user_keys = get_user_api_keys(user_id)
-    
-    # API 키 존재 여부 확인 (더 정확한 체크)
-    has_api_key = False
-    if user_keys:
-        if exchange == 'backpack':
-            has_api_key = bool(user_keys.get('backpack_api_key') and user_keys.get('backpack_private_key'))
-        else:
-            has_api_key = bool(user_keys.get(f'{exchange}_api_key') and user_keys.get(f'{exchange}_api_secret'))
-    
-    if not has_api_key:
-        exchange_names = {
-            "xt": "XT Exchange",
-            "backpack": "Backpack Exchange",
-            "hyperliquid": "Hyperliquid"
-        }
-        await telegram_app.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=callback_query.message.message_id,
-            text=f"❌ **{exchange_names.get(exchange, exchange.upper())} API 키가 설정되지 않았습니다.**\n\n"
-                 f"먼저 API 키를 설정해주세요.\n\n"
-                 f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
-            parse_mode='Markdown'
-        )
-        return
-    
-    try:
-        api_key = user_keys.get(f'{exchange}_api_key')
-        api_secret = user_keys.get(f'{exchange}_api_secret') or user_keys.get(f'{exchange}_private_key')
-        
-        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-        result = trader.get_futures_symbols()
-        
-        if result.get('status') == 'success':
-            symbols_data = result.get('symbols', [])
-            
-            # 심볼 목록을 보기 좋게 포맷팅 (최대 20개만 표시)
-            symbols_text = f"📈 **{exchange.upper()} 거래쌍** ({len(symbols_data)}개)\n\n"
-            for i, symbol in enumerate(symbols_data[:20], 1):
-                symbols_text += f"{i}. {symbol}\n"
-            
-            if len(symbols_data) > 20:
-                symbols_text += f"\n... 및 {len(symbols_data) - 20}개 더"
-            
-            keyboard = [
-                [InlineKeyboardButton("🔄 새로고침", callback_data=data)],
-                [InlineKeyboardButton("🔙 거래쌍 메뉴", callback_data="symbols_menu")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await telegram_app.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=callback_query.message.message_id,
-                text=symbols_text,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
-        else:
-            await telegram_app.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=callback_query.message.message_id,
-                text=f"❌ **거래쌍 조회 실패**\n\n오류: {result.get('message', '알 수 없는 오류')}",
-                parse_mode='Markdown'
-            )
-    except Exception as e:
-        await telegram_app.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=callback_query.message.message_id,
-            text=f"❌ **오류 발생**\n\n{str(e)}",
-            parse_mode='Markdown'
-        )
+
 
 async def handle_position_callback(telegram_app, chat_id, user_id, data, callback_query):
     """포지션 관리 콜백 처리"""
@@ -1712,78 +1687,7 @@ async def handle_balance_command(telegram_app, chat_id, user_id, text):
             parse_mode='Markdown'
         )
 
-async def handle_symbols_command(telegram_app, chat_id, user_id, text):
-    """거래쌍 조회 명령어 처리"""
-    parts = text.split()
-    if len(parts) < 2:
-        await telegram_app.bot.send_message(
-            chat_id=chat_id, 
-            text="❌ 사용법: /symbols [거래소]\n\n예시: `/symbols xt`",
-            parse_mode='Markdown'
-        )
-        return
-    
-    exchange = parts[1].lower()
-    user_keys = get_user_api_keys(user_id)
-    
-    # API 키 존재 여부 확인 (더 정확한 체크)
-    has_api_key = False
-    if user_keys:
-        if exchange == 'backpack':
-            has_api_key = bool(user_keys.get('backpack_api_key') and user_keys.get('backpack_private_key'))
-        else:
-            has_api_key = bool(user_keys.get(f'{exchange}_api_key') and user_keys.get(f'{exchange}_api_secret'))
-    
-    if not has_api_key:
-        exchange_names = {
-            "xt": "XT Exchange",
-            "backpack": "Backpack Exchange",
-            "hyperliquid": "Hyperliquid"
-        }
-        await telegram_app.bot.send_message(
-            chat_id=chat_id, 
-            text=f"❌ **{exchange_names.get(exchange, exchange.upper())} API 키가 설정되지 않았습니다.**\n\n"
-                 f"먼저 API 키를 설정해주세요.\n\n"
-                 f"🔑 API 관리로 이동하려면 /start를 입력하세요.",
-            parse_mode='Markdown'
-        )
-        return
-    
-    try:
-        api_key = user_keys.get(f'{exchange}_api_key')
-        api_secret = user_keys.get(f'{exchange}_api_secret') or user_keys.get(f'{exchange}_private_key')
-        
-        trader = UnifiedFuturesTrader(exchange, api_key=api_key, api_secret=api_secret)
-        result = trader.get_futures_symbols()
-        
-        if result.get('status') == 'success':
-            symbols_data = result.get('symbols', [])
-            
-            # 심볼 목록을 보기 좋게 포맷팅 (최대 20개만 표시)
-            symbols_text = f"📈 **{exchange.upper()} 거래쌍** ({len(symbols_data)}개)\n\n"
-            for i, symbol in enumerate(symbols_data[:20], 1):
-                symbols_text += f"{i}. {symbol}\n"
-            
-            if len(symbols_data) > 20:
-                symbols_text += f"\n... 및 {len(symbols_data) - 20}개 더"
-            
-            await telegram_app.bot.send_message(
-                chat_id=chat_id,
-                text=symbols_text,
-                parse_mode='Markdown'
-            )
-        else:
-            await telegram_app.bot.send_message(
-                chat_id=chat_id,
-                text=f"❌ **거래쌍 조회 실패**\n\n오류: {result.get('message', '알 수 없는 오류')}",
-                parse_mode='Markdown'
-            )
-    except Exception as e:
-        await telegram_app.bot.send_message(
-            chat_id=chat_id,
-            text=f"❌ **오류 발생**\n\n{str(e)}",
-            parse_mode='Markdown'
-        )
+
 
 async def handle_positions_command(telegram_app, chat_id, user_id, text):
     """포지션 조회 명령어 처리"""
@@ -1886,7 +1790,9 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
         direction = action  # long/short
         size = float(parts[5])
         price = None
-        leverage = 1  # 기본값
+        # 저장된 레버리지 설정 조회
+        leverage = get_user_leverage_setting(user_id, exchange, symbol, direction)
+        print(f"🔍 사용자 {user_id}의 레버리지 설정: {exchange} {symbol} {direction} = {leverage}x")
         if len(parts) > 6 and parts[6].lower() in ['spot', 'futures']:
             market_type = parts[6].lower()  # spot 또는 futures
     
@@ -2017,6 +1923,9 @@ async def handle_leverage_command(telegram_app, chat_id, user_id, text):
     symbol = parts[2].upper()
     direction = parts[3].lower()
     leverage = int(parts[4])
+    
+    # 레버리지 설정을 데이터베이스에 저장
+    save_user_leverage_setting(user_id, exchange, symbol, direction, leverage)
     
     # 레버리지 설정 완료 후 수량 입력 안내
     await show_futures_quantity_input(telegram_app, chat_id, user_id, exchange, direction, symbol, leverage, None)
@@ -2172,39 +2081,7 @@ async def show_balance_menu(telegram_app, chat_id, user_id, callback_query=None)
             reply_markup=reply_markup
         )
             
-async def show_symbols_menu(telegram_app, chat_id, user_id, callback_query=None):
-    """거래쌍 조회 메뉴 표시"""
-    
-    # Telegram 라이브러리 지연 로딩
-    try:
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    except ImportError:
-        print("❌ Telegram 라이브러리 import 실패")
-        return
-    
-    keyboard = [
-        [InlineKeyboardButton("XT Exchange", callback_data="symbols_xt")],
-        [InlineKeyboardButton("Backpack Exchange", callback_data="symbols_backpack")],
-        [InlineKeyboardButton("Hyperliquid", callback_data="symbols_hyperliquid")],
-        [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    if callback_query:
-        await telegram_app.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=callback_query.message.message_id,
-            text="📈 **거래쌍 조회**\n\n거래소를 선택하여 거래 가능한 심볼을 조회하세요.",
-            parse_mode='Markdown',
-            reply_markup=reply_markup
-        )
-    else:
-        await telegram_app.bot.send_message(
-            chat_id=chat_id,
-            text="📈 **거래쌍 조회**\n\n거래소를 선택하여 거래 가능한 심볼을 조회하세요.",
-            parse_mode='Markdown',
-            reply_markup=reply_markup
-        )
+
 
 async def show_position_menu(telegram_app, chat_id, user_id, callback_query=None):
     """포지션 관리 메뉴 표시"""
@@ -2321,10 +2198,9 @@ async def show_help(telegram_app, chat_id, callback_query=None):
         "**사용 방법:**\n"
         "1. 🔑 API 키 관리 - 거래소 API 키 설정\n"
         "2. 💰 잔고 조회 - 계좌 잔고 확인\n"
-        "3. 📈 거래쌍 조회 - 거래 가능한 심볼 확인\n"
-        "4. 📊 포지션 관리 - 포지션 조회/종료\n"
-        "5. 🔄 거래하기 - 포지션 오픈\n"
-        "6. 📊 시장 데이터 - 실시간 시장 정보\n\n"
+        "3. 📊 포지션 관리 - 포지션 조회/종료\n"
+        "4. 🔄 거래하기 - 포지션 오픈\n"
+        "5. 📊 시장 데이터 - 실시간 시장 정보\n\n"
         "**지원 거래소:**\n"
         "• XT Exchange (선물/스팟)\n"
         "• Backpack Exchange\n"
@@ -2333,7 +2209,6 @@ async def show_help(telegram_app, chat_id, callback_query=None):
         "**명령어:**\n"
         "• `/setapi [거래소] [API_KEY] [SECRET_KEY]` - API 키 설정\n"
         "• `/balance [거래소]` - 잔고 조회\n"
-        "• `/symbols [거래소]` - 거래쌍 조회\n"
         "• `/positions [거래소]` - 포지션 조회\n"
         "• `/trade [거래소] [심볼] [방향] [수량] [레버리지]` - 거래\n"
         "• `/close [거래소] [심볼]` - 포지션 종료\n"
@@ -2832,146 +2707,7 @@ class UnifiedFuturesTrader:
                 'message': f'선물 잔고 조회 오류: {str(e)}'
             }
 
-    def get_futures_symbols(self):
-        """선물 거래쌍 조회"""
-        try:
-            if self.exchange == 'xt':
-                # XT 선물 거래쌍 조회 - 공식 문서 기반 엔드포인트
-                # 먼저 일반 거래쌍 조회 시도
-                url = f"{self.base_url}/v4/public/symbols"
-                response = requests.get(url)
-                
-                print(f"XT 선물 거래쌍 조회 응답: {response.status_code} - {response.text}")  # 디버깅용
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    # 실제 데이터에서 심볼 추출
-                    symbols_data = data.get('result', [])
-                    symbols = []
-                    for symbol_info in symbols_data:
-                        if isinstance(symbol_info, dict) and 'symbol' in symbol_info:
-                            # 선물 거래쌍만 필터링 (PERP, SWAP 등 포함)
-                            symbol = symbol_info['symbol']
-                            if any(keyword in symbol.upper() for keyword in ['PERP', 'SWAP', 'FUTURES']):
-                                symbols.append(symbol)
-                    
-                    # 선물 거래쌍이 없으면 모든 거래쌍 반환
-                    if not symbols:
-                        symbols = [symbol_info['symbol'] for symbol_info in symbols_data if isinstance(symbol_info, dict) and 'symbol' in symbol_info]
-                    
-                    return {
-                        'status': 'success',
-                        'symbols': symbols,
-                        'message': f'XT 선물 거래쌍 {len(symbols)}개 조회 성공'
-                    }
-                else:
-                    # 대체 엔드포인트 시도
-                    url2 = f"{self.base_url}/v4/public/futures/symbols"
-                    response2 = requests.get(url2)
-                    
-                    print(f"XT 선물 거래쌍 대체 조회 응답: {response2.status_code} - {response2.text}")  # 디버깅용
-                    
-                    if response2.status_code == 200:
-                        data2 = response2.json()
-                        symbols_data2 = data2.get('result', [])
-                        symbols2 = []
-                        for symbol_info in symbols_data2:
-                            if isinstance(symbol_info, dict) and 'symbol' in symbol_info:
-                                symbols2.append(symbol_info['symbol'])
-                        
-                        return {
-                            'status': 'success',
-                            'symbols': symbols2,
-                            'message': f'XT 선물 거래쌍 {len(symbols2)}개 조회 성공 (대체 엔드포인트)'
-                        }
-                    else:
-                        return {
-                            'status': 'error',
-                            'message': f'XT 선물 거래쌍 조회 실패: {response.status_code} - {response.text}'
-                        }
-            
-            elif self.exchange == 'backpack':
-                # Backpack Exchange 실제 지원 심볼들 (API 기반)
-                # 실제 형식: BTC_USDC_PERP, ETH_USDC_PERP, SOL_USDC_PERP
-                backpack_futures_symbols = [
-                    'SOL_USDC_PERP',
-                    'BTC_USDC_PERP',
-                    'ETH_USDC_PERP',
-                    'XRP_USDC_PERP',
-                    'SUI_USDC_PERP',
-                    'DOGE_USDC_PERP',
-                    'JUP_USDC_PERP',
-                    'TRUMP_USDC_PERP',
-                    'WIF_USDC_PERP',
-                    'BERA_USDC_PERP',
-                    'LTC_USDC_PERP',
-                    'ADA_USDC_PERP',
-                    'LINK_USDC_PERP',
-                    'IP_USDC_PERP',
-                    'HYPE_USDC_PERP',
-                    'BNB_USDC_PERP',
-                    'AVAX_USDC_PERP',
-                    'S_USDC_PERP',
-                    'ONDO_USDC_PERP',
-                    'KAITO_USDC_PERP',
-                    'ARB_USDC_PERP',
-                    'ENA_USDC_PERP',
-                    'AAVE_USDC_PERP',
-                    'DOT_USDC_PERP',
-                    'FARTCOIN_USDC_PERP',
-                    'NEAR_USDC_PERP',
-                    'OP_USDC_PERP',
-                    'PENGU_USDC_PERP',
-                    'kPEPE_USDC_PERP',
-                    'TAO_USDC_PERP',
-                    'VIRTUAL_USDC_PERP',
-                    'TIA_USDC_PERP',
-                    'kBONK_USDC_PERP',
-                    'FRAG_USDC_PERP',
-                    'PUMP_USDC_PERP',
-                    'SEI_USDC_PERP'
-                ]
-                
-                return {
-                    'status': 'success',
-                    'symbols': backpack_futures_symbols,
-                    'message': f'Backpack 선물 거래쌍 {len(backpack_futures_symbols)}개 조회 성공'
-                }
-            
-            elif self.exchange == 'hyperliquid':
-                try:
-                    # Hyperliquid SDK 지연 로딩
-                    from hyperliquid.info import Info
-                    from hyperliquid.utils import constants
-                    
-                    if self.hyperliquid_info is None:
-                        self.hyperliquid_info = Info(constants.MAINNET_API_URL, skip_ws=True)
-                    
-                    # 메타데이터 조회로 사용 가능한 심볼 가져오기
-                    meta = self.hyperliquid_info.meta()
-                    symbols = []
-                    
-                    if 'universe' in meta:
-                        for asset in meta['universe']:
-                            if 'name' in asset:
-                                symbols.append(asset['name'])
-                    
-                    return {
-                        'status': 'success',
-                        'symbols': symbols,
-                        'message': f'Hyperliquid 거래쌍 {len(symbols)}개 조회 성공'
-                    }
-                except Exception as e:
-                    return {
-                        'status': 'error',
-                        'message': f'Hyperliquid 거래쌍 조회 실패: {str(e)}'
-                    }
-            
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'선물 거래쌍 조회 오류: {str(e)}'
-            }
+
 
     def open_long_position(self, symbol, size, leverage=1, order_type='market', market_type='futures'):
         """롱 포지션 오픈"""
@@ -3059,6 +2795,9 @@ class UnifiedFuturesTrader:
                 # 레버리지는 선물 거래에서만 설정
                 if market_type == 'futures' and leverage > 1:
                     params['leverage'] = str(leverage)
+                    print(f"🔍 Backpack 롱 포지션 레버리지 설정: {leverage}x")
+                else:
+                    print(f"🔍 Backpack 롱 포지션 레버리지 미설정 (기본값 1x 사용)")
                 
                 headers = self._get_headers_backpack("orderExecute", params)  # instruction을 'orderExecute'로 변경
                 response = requests.post(url, headers=headers, json=params)
@@ -3710,75 +3449,7 @@ class UnifiedFuturesTrader:
                 'message': f'스팟 잔고 조회 오류: {str(e)}'
             }
 
-    def get_spot_symbols(self):
-        """스팟 거래쌍 조회"""
-        try:
-            if self.exchange == 'xt':
-                # XT 스팟 거래쌍 조회 - 공식 문서 기반 엔드포인트
-                url = f"{self.spot_base_url}/v4/public/symbols"
-                response = requests.get(url)
-                
-                print(f"XT 스팟 거래쌍 조회 응답: {response.status_code} - {response.text}")  # 디버깅용
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    # 실제 데이터에서 심볼 추출
-                    symbols_data = data.get('result', [])
-                    symbols = []
-                    for symbol_data in symbols_data:
-                        if isinstance(symbol_data, dict) and 'symbol' in symbol_data:
-                            symbols.append(symbol_data['symbol'])
-                    
-                    return {
-                        'status': 'success',
-                        'symbols': symbols,
-                        'message': f'XT 스팟 거래쌍 {len(symbols)}개 조회 성공'
-                    }
-                else:
-                    return {
-                        'status': 'error',
-                        'message': f'XT 스팟 거래쌍 조회 실패: {response.status_code} - {response.text}'
-                    }
-            
-            elif self.exchange == 'hyperliquid':
-                try:
-                    # Hyperliquid SDK 지연 로딩
-                    from hyperliquid.info import Info
-                    from hyperliquid.utils import constants
-                    
-                    if self.hyperliquid_info is None:
-                        self.hyperliquid_info = Info(constants.MAINNET_API_URL, skip_ws=True)
-                    
-                    # 메타데이터 조회로 사용 가능한 심볼 가져오기
-                    meta = self.hyperliquid_info.meta()
-                    symbols = []
-                    
-                    if 'universe' in meta:
-                        for asset in meta['universe']:
-                            if 'name' in asset:
-                                symbols.append(asset['name'])
-                    
-                    return {
-                        'status': 'success',
-                        'symbols': symbols,
-                        'message': f'Hyperliquid 스팟 거래쌍 {len(symbols)}개 조회 성공'
-                    }
-                except Exception as e:
-                    return {
-                        'status': 'error',
-                        'message': f'Hyperliquid 스팟 거래쌍 조회 실패: {str(e)}'
-                    }
-            
-            else:
-                return {
-                    'status': 'error',
-                    'message': f'{self.exchange.capitalize()}는 스팟 거래쌍 조회를 지원하지 않습니다.'
-                }
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'스팟 거래쌍 조회 오류: {str(e)}'
-            }
+
 
     def get_market_data(self, symbol, data_type='ticker'):
         """시장 데이터 조회"""
