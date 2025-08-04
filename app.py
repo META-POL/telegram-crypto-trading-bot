@@ -87,12 +87,13 @@ class XTClient:
         try:
             print(f"🔍 Spot client type: {type(self.spot)}")
             print(f"🔍 Spot balance method: {self.spot.balance}")
-            print(f"🔍 Spot balanceList method: {self.spot.balanceList}")
             
+            # pyxt.spot.Spot의 올바른 메서드 사용
             if currency:
                 result = self.spot.balance(currency)
             else:
-                result = self.spot.balanceList()
+                # balanceList 대신 balance() 사용 (전체 잔고)
+                result = self.spot.balance()
             
             print(f"✅ Spot balance result: {result}")
             return result
