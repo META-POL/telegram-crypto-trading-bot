@@ -747,11 +747,24 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
     
     # API 키 존재 여부 확인 (더 정확한 체크)
     has_api_key = False
+    print(f"🔍 {exchange} API 키 체크 시작...")
+    print(f"🔍 user_keys: {user_keys}")
+    
     if user_keys:
         if exchange == 'backpack':
-            has_api_key = bool(user_keys.get('backpack_api_key') and user_keys.get('backpack_private_key'))
+            backpack_api_key = user_keys.get('backpack_api_key')
+            backpack_private_key = user_keys.get('backpack_private_key')
+            has_api_key = bool(backpack_api_key and backpack_private_key)
+            print(f"🔍 Backpack API 키: {backpack_api_key[:10] if backpack_api_key else 'None'}...")
+            print(f"🔍 Backpack Private 키: {backpack_private_key[:10] if backpack_private_key else 'None'}...")
         else:
-            has_api_key = bool(user_keys.get(f'{exchange}_api_key') and user_keys.get(f'{exchange}_api_secret'))
+            api_key = user_keys.get(f'{exchange}_api_key')
+            api_secret = user_keys.get(f'{exchange}_api_secret')
+            has_api_key = bool(api_key and api_secret)
+            print(f"🔍 {exchange} API 키: {api_key[:10] if api_key else 'None'}...")
+            print(f"🔍 {exchange} API Secret: {api_secret[:10] if api_secret else 'None'}...")
+    
+    print(f"🔍 {exchange} API 키 존재 여부: {has_api_key}")
     
     if not has_api_key:
         exchange_names = {
