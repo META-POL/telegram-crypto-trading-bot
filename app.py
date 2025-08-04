@@ -2465,48 +2465,38 @@ class UnifiedFuturesTrader:
 
     def _get_headers_backpack(self, instruction, params=None):
         from nacl.signing import SigningKey
+        from nacl.encoding import RawEncoder
 
-        # 1) private_key → signing_key 초기화
+        # 1) private_key → signing_key 초기화 (RawEncoder 사용)
         if self.signing_key is None and self.private_key:
-            self.signing_key = SigningKey(base64.b64decode(self.private_key))
+            self.signing_key = SigningKey(base64.b64decode(self.private_key), encoder=RawEncoder)
 
         # 2) timestamp, window
-        timestamp = str(int(time.time() * 1000))
-        window = "5000"
+        timestamp = int(time.time() * 1000)
+        window = 5000
 
-        # 3) 정렬된 파라미터 문자열 생성
+        # 3) 정렬된 파라미터 문자열 생성 (정상 작동 코드와 동일한 방식)
         params = params or {}
-        sorted_items = sorted(params.items())
-        # 예: "orderType=Limit&price=42&quantity=0.001"
-        query_str = "&".join(f"{k}={v}" for k, v in sorted_items)
-
-        # 4) 서명 대상 문자열(sign_str) 결합
-        # instruction → (파라미터 문자열 있을 때만 &) → timestamp → & → window
-        if query_str:
-            sign_str = (
-                f"instruction={instruction}&"
-                f"{query_str}&"
-                f"timestamp={timestamp}&"
-                f"window={window}"
-            )
-        else:
-            sign_str = (
-                f"instruction={instruction}&"
-                f"timestamp={timestamp}&"
-                f"window={window}"
-            )
+        items = sorted(params.items())
+        parts = [f"{k}={str(v).lower() if isinstance(v, bool) else v}" for k, v in items]
+        
+        # 4) 서명 대상 문자열(sign_str) 결합 (정상 작동 코드와 동일한 방식)
+        sign_str = f"instruction={instruction}"
+        if parts:
+            sign_str += "&" + "&".join(parts)
+        sign_str += f"&timestamp={timestamp}&window={window}"
 
         print(f"🔍 Backpack 서명 문자열: {sign_str}")
 
-        # 5) ED25519 서명 및 Base64 인코딩
-        signature_bytes = self.signing_key.sign(sign_str.encode("utf-8")).signature
-        signature_b64 = base64.b64encode(signature_bytes).decode("utf-8")
+        # 5) ED25519 서명 및 Base64 인코딩 (정상 작동 코드와 동일한 방식)
+        sig = self.signing_key.sign(sign_str.encode()).signature
+        signature_b64 = base64.b64encode(sig).decode()
 
         return {
             "X-API-Key": self.api_key,
             "X-Signature": signature_b64,
-            "X-Timestamp": timestamp,
-            "X-Window": window,
+            "X-Timestamp": str(timestamp),
+            "X-Window": str(window),
             "Content-Type": "application/json"
         }
 
