@@ -2444,46 +2444,50 @@ class UnifiedFuturesTrader:
         
         return headers
 
-    def _get_headers_backpack(self, instruction, params=None):
-        """Backpack API 헤더 생성 (ED25519 서명)"""
+        def _get_headers_backpack(self, instruction, params=None):
+        """Backpack API 헤더 생성 (ED25519 서명) - 수정된 버전"""
         try:
             # pynacl 지연 로딩
             global SigningKey
             if SigningKey is None:
                 from nacl.signing import SigningKey
-            
+
             if self.signing_key is None and self.private_key:
                 try:
                     # 개인키를 base64 디코딩
                     private_key_bytes = base64.b64decode(self.private_key)
-                    print(f"🔍 개인키 디코딩 성공, 길이: {len(private_key_bytes)}")
                     self.signing_key = SigningKey(private_key_bytes)
                 except Exception as e:
-                    print(f"⚠️ 개인키 디코딩 실패: {e}")
                     raise Exception(f"개인키 디코딩 오류: {str(e)}")
-            
-            # 타임스탬프를 정수로 생성하고 문자열로 변환
-            timestamp = str(int(time.time() * 1000))
+
+            # 🔧 CRITICAL FIX: 타임스탬프 과학적 표기법 완전 방지
+            import math
+            timestamp = f"{math.floor(time.time() * 1000)}"  # 문자열로 직접 변환
             window = "5000"
             
-            print(f"🔍 현재 타임스탬프: {timestamp}")
-            print(f"🔍 현재 시간: {datetime.now().isoformat()}")
             params = params or {}
-            
-            # Backpack API 공식 문서에 따른 서명 생성
-            # 1. body/query 파라미터들을 알파벳 순서로 정렬
-            sorted_params = sorted(params.items())
-            
-            # 2. 파라미터를 쿼리 스트링 형태로 변환
-            param_string = '&'.join([f"{key}={value}" for key, value in sorted_params])
-            
-            # 3. 서명 문자열 구성: instruction + params + timestamp + window
-            if param_string:
-                sign_str = f"instruction={instruction}&{param_string}&timestamp={timestamp}&window={window}"
-            else:
-                sign_str = f"instruction={instruction}&timestamp={timestamp}&window={window}"
 
-            print(f"🔍 서명 문자열: {sign_str}")
+            # 🔧 FIX: 공식 Backpack API 문서에 따른 올바른 서명 생성
+            # 1단계: 주문 파라미터만 알파벳 순으로 정렬
+            sorted_order_params = sorted(params.items())
+            
+            # 2단계: 주문 파라미터 쿼리 문자열 생성
+            if sorted_order_params:
+                order_params_string = '&'.join([f"{key}={value}" for key, value in sorted_order_params])
+            else:
+                order_params_string = ""
+            
+            # 3단계: 헤더 파라미터 문자열 생성 (timestamp, window)
+            header_params_string = f"timestamp={timestamp}&window={window}"
+            
+            # 4단계: 공식 형식에 따라 결합
+            # 형식: "instruction=" + instruction + "&" + (order_params ? order_params + "&" : "") + header_params
+            if order_params_string:
+                sign_str = f"instruction={instruction}&{order_params_string}&{header_params_string}"
+            else:
+                sign_str = f"instruction={instruction}&{header_params_string}"
+
+            print(f"🔍 수정된 서명 문자열: {sign_str}")
 
             # ED25519 서명 생성
             message_bytes = sign_str.encode('utf-8')
@@ -2493,13 +2497,13 @@ class UnifiedFuturesTrader:
             headers = {
                 "X-API-Key": self.api_key,
                 "X-Signature": signature_b64,
-                "X-Timestamp": timestamp,
-                "X-Window": window,
+                "X-Timestamp": timestamp,  # 이미 문자열
+                "X-Window": window,        # 이미 문자열
                 "Content-Type": "application/json"
             }
 
             return headers
-            
+
         except ImportError:
             raise ImportError("pynacl 패키지가 필요합니다. pip install pynacl로 설치해주세요.")
         except Exception as e:
