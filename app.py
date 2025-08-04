@@ -808,18 +808,47 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
                     
                     # 주요 자산만 필터링 (0이 아닌 잔고만)
                     significant_assets = []
+                    total_usd_value = 0
+                    
                     for currency, balance_info in futures_data.items():
                         if isinstance(balance_info, dict):
                             available = float(balance_info.get('available', 0))
                             if available > 0:
-                                significant_assets.append((currency, available))
+                                # USD 가치 계산 (대략적인 가치)
+                                usd_value = 0
+                                if currency == 'USDT' or currency == 'USDC':
+                                    usd_value = available
+                                elif currency == 'BTC':
+                                    usd_value = available * 65000  # 대략적인 BTC 가격
+                                elif currency == 'ETH':
+                                    usd_value = available * 3500   # 대략적인 ETH 가격
+                                elif currency == 'SOL':
+                                    usd_value = available * 100    # 대략적인 SOL 가격
+                                elif currency == 'SUI':
+                                    usd_value = available * 1.5    # 대략적인 SUI 가격
+                                elif currency == 'SEI':
+                                    usd_value = available * 0.5    # 대략적인 SEI 가격
+                                elif currency == 'PUMP':
+                                    usd_value = available * 0.01   # 대략적인 PUMP 가격
+                                elif currency == 'POINTS':
+                                    usd_value = available * 0.001  # 대략적인 POINTS 가격
+                                elif currency == 'FRAG':
+                                    usd_value = available * 0.1    # 대략적인 FRAG 가격
+                                
+                                significant_assets.append((currency, available, usd_value))
+                                total_usd_value += usd_value
                     
                     # 잔고가 많은 순으로 정렬
-                    significant_assets.sort(key=lambda x: x[1], reverse=True)
+                    significant_assets.sort(key=lambda x: x[2], reverse=True)
                     
                     if significant_assets:
-                        for currency, available in significant_assets:
-                            formatted_balance += f"• **{currency}**: {available:,.8f}\n"
+                        for currency, available, usd_value in significant_assets:
+                            if usd_value > 0:
+                                formatted_balance += f"• **{currency}**: {available:,.8f} (${usd_value:,.2f})\n"
+                            else:
+                                formatted_balance += f"• **{currency}**: {available:,.8f}\n"
+                        
+                        formatted_balance += f"\n💰 **총 USD 가치**: ${total_usd_value:,.2f}"
                     else:
                         formatted_balance += "• 잔고가 없습니다.\n"
                 else:
@@ -2443,30 +2472,36 @@ class UnifiedFuturesTrader:
                 # Backpack Exchange API 연결 테스트 - 계좌 정보 조회
                 try:
                     # pynacl 지연 로딩
+                    global SigningKey
                     if SigningKey is None:
                         from nacl.signing import SigningKey
                     
                     if self.private_key:
                         self.signing_key = SigningKey(base64.b64decode(self.private_key))
                     
-                    url = f"{self.base_url}/account"
+                    url = "https://api.backpack.exchange/api/v1/account"
                     headers = self._get_headers_backpack("accountQuery")
                     response = requests.get(url, headers=headers)
                     
                     if response.status_code == 200:
                         return {
                             'status': 'success',
-                            'message': 'Backpack 선물 API 연결 성공'
+                            'message': 'Backpack API 연결 성공'
                         }
                     else:
                         return {
                             'status': 'error',
-                            'message': f'Backpack 선물 API 연결 실패: {response.status_code}'
+                            'message': f'Backpack API 연결 실패: {response.status_code} - {response.text}'
                         }
                 except ImportError:
                     return {
                         'status': 'error',
-                        'message': 'pynacl 패키지가 필요합니다'
+                        'message': 'pynacl 패키지가 필요합니다. pip install pynacl로 설치해주세요.'
+                    }
+                except Exception as e:
+                    return {
+                        'status': 'error',
+                        'message': f'Backpack API 연결 테스트 오류: {str(e)}'
                     }
             
             elif self.exchange == 'hyperliquid':
