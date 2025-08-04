@@ -49,12 +49,14 @@ print("📝 모든 라이브러리는 필요시 로드됩니다")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# XTClient 클래스 (xt.py에서 성공한 코드)
+# XTClient 클래스 (수정된 버전)
 class XTClient:
-    """현물·선물 통합 래퍼"""
+    """현물·선물 통합 래퍼 (수정된 버전)"""
     def __init__(self, api_key, api_secret):
         self.spot = None
         self.futures = None
+        self.api_key = api_key
+        self.api_secret = api_secret
         
         if not PYXTLIB_AVAILABLE:
             print("❌ pyxt 라이브러리가 설치되지 않아 XTClient를 사용할 수 없습니다.")
@@ -62,12 +64,12 @@ class XTClient:
             
         try:
             self.spot = Spot(
-                host="https://sapi.xt.com",       # 현물 REST 엔드포인트
+                host="https://sapi.xt.com",
                 access_key=api_key,
                 secret_key=api_secret
             )
             self.futures = Perp(
-                host="https://fapi.xt.com",       # USDT-M 선물 REST 엔드포인트
+                host="https://fapi.xt.com",
                 access_key=api_key,
                 secret_key=api_secret
             )
@@ -77,33 +79,76 @@ class XTClient:
             self.spot = None
             self.futures = None
 
-    # --------- 잔고 ---------
-    def spot_balance(self, currency="usdt"):
-        """현물 특정 자산 또는 전체 잔고 반환"""
+    # --------- 잔고 (수정됨) ---------
+    def spot_balance(self, currency=None):
+        """현물 잔고 조회"""
         if not self.spot:
             print("❌ Spot client is None")
             return {"error": "Spot client not available"}
         
         try:
             print(f"🔍 Spot client type: {type(self.spot)}")
-            print(f"🔍 Spot balance method: {self.spot.balance}")
-            print(f"🔍 Spot balanceList method: {getattr(self.spot, 'balanceList', 'Not found')}")
             
-            # 공식 예제에 따라 balanceList() 사용
             if currency:
+                # 특정 통화 잔고
                 result = self.spot.balance(currency)
+                print(f"✅ Spot balance ({currency}) result: {result}")
+                return result
             else:
-                # 공식 예제: balanceList() 사용
-                result = self.spot.balanceList()
-            
-            print(f"✅ Spot balance result: {result}")
-            return result
+                # 전체 현물 잔고 - 올바른 메서드 사용
+                try:
+                    # pyxt에서 실제 사용 가능한 메서드 확인 후 사용
+                    # 가능한 메서드들: balances, get_balances, fetch_balance 등
+                    result = self.spot.balances()  # 또는 다른 올바른 메서드명
+                    print(f"✅ Spot balances() result: {result}")
+                    return result
+                except AttributeError:
+                    print("⚠️ balances() 메서드가 없습니다. REST API 직접 호출")
+                    # 메서드가 없는 경우 REST API 직접 호출
+                    return self._get_all_spot_balances()
         except Exception as e:
             print(f"❌ Spot balance error: {e}")
             return {"error": f"Spot balance error: {e}"}
 
+    def _get_all_spot_balances(self):
+        """REST API로 직접 전체 현물 잔고 조회"""
+        import requests
+        import hmac
+        import hashlib
+        import time
+        
+        try:
+            timestamp = str(int(time.time() * 1000))
+            path = "/v4/balances"
+            
+            # 서명 생성
+            header_string = f"validate-algorithms=HmacSHA256&validate-appkey={self.api_key}&validate-recvwindow=60000&validate-timestamp={timestamp}"
+            message = f"{header_string}#GET#{path}"
+            
+            signature = hmac.new(
+                self.api_secret.encode('utf-8'),
+                message.encode('utf-8'),
+                hashlib.sha256
+            ).hexdigest()
+            
+            headers = {
+                'validate-algorithms': 'HmacSHA256',
+                'validate-appkey': self.api_key,
+                'validate-recvwindow': '60000',
+                'validate-timestamp': timestamp,
+                'validate-signature': signature,
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.get(f"https://sapi.xt.com{path}", headers=headers)
+            print(f"🔍 REST API response: {response.status_code} - {response.text}")
+            return response.json()
+        except Exception as e:
+            print(f"❌ REST API error: {e}")
+            return {"error": f"REST API error: {e}"}
+
     def futures_balance(self):
-        """선물 지갑 자산(계정 자본) 반환"""
+        """선물 지갑 자산 반환"""
         if not self.futures:
             print("❌ Futures client is None")
             return {"error": "Futures client not available"}
@@ -112,7 +157,7 @@ class XTClient:
             print(f"🔍 Futures client type: {type(self.futures)}")
             print(f"🔍 Futures get_account_capital method: {self.futures.get_account_capital}")
             
-            result = self.futures.get_account_capital()   # USDT, U-마진 등 포함
+            result = self.futures.get_account_capital()
             print(f"✅ Futures balance result: {result}")
             return result
         except Exception as e:
@@ -124,15 +169,13 @@ class XTClient:
         if not PYXTLIB_AVAILABLE:
             return {"error": "pyxt library not available"}
         try:
-            # 공식 예제에 따라 직접 호출
-            spot_bal = self.spot.balanceList()
-            perp_bal = self.futures.get_account_capital()
+            spot_bal = self.spot_balance()  # 전체 현물 잔고
+            perp_bal = self.futures_balance()
             return {"spot": spot_bal, "futures": perp_bal}
         except Exception as e:
             return {"error": f"All balances error: {e}"}
 
-    # --------- 주문 ---------
-    # 현물: 시장가·지정가
+    # --------- 주문 (기존과 동일) ---------
     def spot_order(self, symbol, side, qty, order_type="MARKET", price=None):
         if not self.spot:
             return {"error": "Spot client not available"}
@@ -140,27 +183,35 @@ class XTClient:
             params = dict(symbol=symbol, side=side,
                           type=order_type, bizType="SPOT")
             if order_type == "MARKET":
-                # BUY: quoteQty(USDT) / SELL: quantity(COIN)
                 key = "quoteQty" if side.upper() == "BUY" else "quantity"
                 params[key] = qty
-            else:                                # LIMIT
+            else:
                 params.update(quantity=qty, price=price, timeInForce="GTC")
             return self.spot.place_order(**params)
         except Exception as e:
             return {"error": f"Spot order error: {e}"}
 
-    # 선물: 시장가·지정가
     def futures_order(self, symbol, side, qty, order_type="MARKET", price=None):
         if not self.futures:
             return {"error": "Futures client not available"}
         try:
             params = dict(symbol=symbol, side=side,
                           type=order_type, quantity=qty)
-            if price:                             # LIMIT
+            if price:
                 params["price"] = price
             return self.futures.place_order(**params)
         except Exception as e:
             return {"error": f"Futures order error: {e}"}
+
+# ---------- 메서드 확인 유틸리티 ----------
+def check_available_methods(obj, name="Object"):
+    """객체의 사용 가능한 메서드 확인"""
+    methods = [method for method in dir(obj) 
+               if callable(getattr(obj, method)) and not method.startswith('_')]
+    print(f"\n=== {name} 사용 가능한 메서드 ===")
+    for method in methods:
+        print(f"- {method}")
+    return methods
 
 # Flask 앱 생성
 try:
