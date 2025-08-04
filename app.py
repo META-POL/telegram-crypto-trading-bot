@@ -87,13 +87,14 @@ class XTClient:
         try:
             print(f"🔍 Spot client type: {type(self.spot)}")
             print(f"🔍 Spot balance method: {self.spot.balance}")
+            print(f"🔍 Spot balanceList method: {getattr(self.spot, 'balanceList', 'Not found')}")
             
-            # pyxt.spot.Spot의 올바른 메서드 사용
+            # 공식 예제에 따라 balanceList() 사용
             if currency:
                 result = self.spot.balance(currency)
             else:
-                # balanceList 대신 balance() 사용 (전체 잔고)
-                result = self.spot.balance()
+                # 공식 예제: balanceList() 사용
+                result = self.spot.balanceList()
             
             print(f"✅ Spot balance result: {result}")
             return result
@@ -123,8 +124,9 @@ class XTClient:
         if not PYXTLIB_AVAILABLE:
             return {"error": "pyxt library not available"}
         try:
-            spot_bal = self.spot_balance()
-            perp_bal = self.futures_balance()
+            # 공식 예제에 따라 직접 호출
+            spot_bal = self.spot.balanceList()
+            perp_bal = self.futures.get_account_capital()
             return {"spot": spot_bal, "futures": perp_bal}
         except Exception as e:
             return {"error": f"All balances error: {e}"}
