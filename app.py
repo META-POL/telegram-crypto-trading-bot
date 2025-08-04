@@ -421,8 +421,8 @@ def webhook():
             print(f"❌ 텔레그램 라이브러리 로드 실패: {e}")
             return jsonify({"status": "error", "message": "텔레그램 라이브러리 로드 실패"}), 500
         
-        # 텔레그램 봇 토큰 (환경변수에서 가져오기)
-        token = os.environ.get('TELEGRAM_BOT_TOKEN', "8356129181:AAEVDzO9MrFe150TmviHFrt_B19hyBc-Xuo")
+        # 텔레그램 봇 토큰 (강제로 새로운 토큰 사용)
+        token = "8356129181:AAEVDzO9MrFe150TmviHFrt_B19hyBc-Xuo"
         print(f"🔍 사용 중인 봇 토큰: {token}")
         print(f"🔍 토큰 길이: {len(token)}")
         print(f"🔍 토큰 시작: {token[:20]}...")
