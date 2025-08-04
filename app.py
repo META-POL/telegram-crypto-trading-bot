@@ -53,6 +53,9 @@ logger = logging.getLogger(__name__)
 class XTClient:
     """현물·선물 통합 래퍼"""
     def __init__(self, api_key, api_secret):
+        self.spot = None
+        self.futures = None
+        
         if not PYXTLIB_AVAILABLE:
             print("❌ pyxt 라이브러리가 설치되지 않아 XTClient를 사용할 수 없습니다.")
             return
@@ -2425,19 +2428,24 @@ class UnifiedFuturesTrader:
                         
                         # XTClient 클래스 생성 (xt.py에서 성공한 방식)
                         xt_client = XTClient(self.api_key, self.api_secret)
-                        balance = xt_client.futures_balance()
                         
-                        print(f"pyxt 라이브러리 선물 잔고 조회 성공: {balance}")
-                        
-                        if 'error' in balance:
-                            print(f"pyxt 라이브러리 오류: {balance['error']}")
-                            # 오류 발생 시 기존 방식으로 폴백
+                        # XTClient가 제대로 초기화되었는지 확인
+                        if xt_client.futures is None:
+                            print("XTClient 선물 클라이언트 초기화 실패")
+                            # 기존 방식으로 폴백
                         else:
-                            return {
-                                'status': 'success',
-                                'balance': balance,
-                                'message': 'XT 선물 잔고 조회 성공 (pyxt 라이브러리)'
-                            }
+                            balance = xt_client.futures_balance()
+                            print(f"pyxt 라이브러리 선물 잔고 조회 성공: {balance}")
+                            
+                            if isinstance(balance, dict) and 'error' in balance:
+                                print(f"pyxt 라이브러리 오류: {balance['error']}")
+                                # 오류 발생 시 기존 방식으로 폴백
+                            else:
+                                return {
+                                    'status': 'success',
+                                    'balance': balance,
+                                    'message': 'XT 선물 잔고 조회 성공 (pyxt 라이브러리)'
+                                }
                     except Exception as e:
                         print(f"pyxt 라이브러리 선물 잔고 조회 실패: {e}")
                         print(f"pyxt 라이브러리 사용 불가능, 기존 방식으로 폴백")
@@ -3304,19 +3312,24 @@ class UnifiedFuturesTrader:
                         
                         # XTClient 클래스 생성 (xt.py에서 성공한 방식)
                         xt_client = XTClient(self.api_key, self.api_secret)
-                        balance = xt_client.spot_balance()
                         
-                        print(f"pyxt 라이브러리 스팟 잔고 조회 성공: {balance}")
-                        
-                        if 'error' in balance:
-                            print(f"pyxt 라이브러리 오류: {balance['error']}")
-                            # 오류 발생 시 기존 방식으로 폴백
+                        # XTClient가 제대로 초기화되었는지 확인
+                        if xt_client.spot is None:
+                            print("XTClient 스팟 클라이언트 초기화 실패")
+                            # 기존 방식으로 폴백
                         else:
-                            return {
-                                'status': 'success',
-                                'balance': balance,
-                                'message': 'XT 스팟 잔고 조회 성공 (pyxt 라이브러리)'
-                            }
+                            balance = xt_client.spot_balance()
+                            print(f"pyxt 라이브러리 스팟 잔고 조회 성공: {balance}")
+                            
+                            if isinstance(balance, dict) and 'error' in balance:
+                                print(f"pyxt 라이브러리 오류: {balance['error']}")
+                                # 오류 발생 시 기존 방식으로 폴백
+                            else:
+                                return {
+                                    'status': 'success',
+                                    'balance': balance,
+                                    'message': 'XT 스팟 잔고 조회 성공 (pyxt 라이브러리)'
+                                }
                     except Exception as e:
                         print(f"pyxt 라이브러리 스팟 잔고 조회 실패: {e}")
                         # pyxt 실패 시 기존 방식으로 폴백
