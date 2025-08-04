@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 # XTClient 클래스 (수정된 버전)
 class XTClient:
-    """현물·선물 통합 래퍼 (오류 수정 포함)"""
+    """현물·선물 통합 래퍼"""
     def __init__(self, api_key, secret_key):
         try:
             if PYXTLIB_AVAILABLE:
@@ -76,7 +76,7 @@ class XTClient:
             self.futures = None
 
     def get_spot_balance(self, currency=None):
-        """현물 잔고 조회: currency 지정 시 단일 자산, 미지정 시 전체"""
+        """현물 잔고 조회"""
         try:
             if self.spot is None:
                 raise Exception("Spot 클라이언트가 초기화되지 않았습니다.")
@@ -89,7 +89,7 @@ class XTClient:
                     result = self.spot.balances()
                     return {'status': 'success', 'balance': result}
                 except AttributeError:
-                    print("⚠️ Spot.balances() 메서드 없음, REST API로 대체 호출")
+                    print("⚠️ Spot.balances() 없음, REST API로 직접 호출")
                     return self._fetch_all_spot_balances()
                     
         except Exception as e:
@@ -97,7 +97,7 @@ class XTClient:
             return {'status': 'error', 'message': str(e)}
 
     def _fetch_all_spot_balances(self):
-        """REST API 직접 호출: /v4/balances"""
+        """REST API 호출: /v4/balances"""
         try:
             import requests
             import hmac
@@ -106,24 +106,16 @@ class XTClient:
             
             timestamp = str(int(time.time() * 1000))
             path = "/v4/balances"
-            
-            # 헤더 문자열 생성
             header_string = (
                 f"validate-algorithms=HmacSHA256"
                 f"&validate-appkey={self.spot.access_key}"
                 f"&validate-recvwindow=60000"
                 f"&validate-timestamp={timestamp}"
             )
-            
-            # 서명 생성
             message = f"{header_string}#GET#{path}"
             signature = hmac.new(
-                self.spot.secret_key.encode(), 
-                message.encode(), 
-                hashlib.sha256
+                self.spot.secret_key.encode(), message.encode(), hashlib.sha256
             ).hexdigest()
-            
-            # 헤더 설정
             headers = {
                 "validate-algorithms": "HmacSHA256",
                 "validate-appkey": self.spot.access_key,
@@ -132,11 +124,8 @@ class XTClient:
                 "validate-signature": signature,
                 "Content-Type": "application/json"
             }
-            
-            # API 호출
             response = requests.get(f"https://sapi.xt.com{path}", headers=headers)
             result = response.json()
-            
             return {'status': 'success', 'balance': result}
             
         except Exception as e:
@@ -149,19 +138,19 @@ class XTClient:
             if self.futures is None:
                 raise Exception("Futures 클라이언트가 초기화되지 않았습니다.")
             
-            code, data, error = self.futures.get_account_capital()
-            if code == 200 and data and data.get("returnCode") == 0:
+            code, data, err = self.futures.get_account_capital()
+            if code == 200 and data.get("returnCode") == 0:
                 return {'status': 'success', 'balance': data.get("result", [])}
             
-            print(f"❌ 선물 잔고 조회 실패: {error or data}")
-            return {'status': 'error', 'message': f"선물 잔고 조회 실패: {error or data}"}
+            print(f"❌ 선물 잔고 조회 실패: {err or data}")
+            return {'status': 'error', 'message': f"선물 잔고 조회 실패: {err or data}"}
             
         except Exception as e:
             print(f"❌ Futures balance error: {e}")
             return {'status': 'error', 'message': str(e)}
 
     def get_all_balances(self):
-        """현물+선물 통합 잔고 요약"""
+        """통합 잔고 요약"""
         spot = self.get_spot_balance()
         futures = self.get_futures_balance()
         return {"spot": spot, "futures": futures}
@@ -802,27 +791,24 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
         # 스팟 잔고 처리
         if spot_result.get('status') == 'success':
             spot_data = spot_result.get('balance', {})
-            print(f"🔍 스팟 데이터 타입: {type(spot_data)}")
-            print(f"🔍 스팟 데이터: {spot_data}")
             
             if isinstance(spot_data, dict):
-                if 'availableAmount' in spot_data:
-                    # 단일 통화 응답
-                    available = float(spot_data.get('availableAmount', 0))
-                    currency = spot_data.get('currency', 'USDT')
-                    formatted_balance += f"💰 **스팟 잔고**: {available} {currency.upper()}\n"
-                elif 'assets' in spot_data:
+                if 'totalUsdtAmount' in spot_data:
                     # 전체 잔고 응답 (balances() 메서드)
                     total_usdt = spot_data.get('totalUsdtAmount', '0')
-                    assets = spot_data.get('assets', [])
                     formatted_balance += f"💰 **스팟 잔고**: {total_usdt} USDT\n"
                     
-                    # 주요 자산만 표시 (USDT, USDC, BTC 등)
-                    for asset in assets:
+                    # 주요 자산만 표시
+                    for asset in spot_data.get('assets', []):
                         currency = asset.get('currency', '').upper()
                         available = float(asset.get('availableAmount', 0))
                         if available > 0 and currency in ['USDT', 'USDC', 'BTC', 'ETH', 'SOL']:
                             formatted_balance += f"  - {currency}: {available}\n"
+                elif 'availableAmount' in spot_data:
+                    # 단일 통화 응답
+                    available = float(spot_data.get('availableAmount', 0))
+                    currency = spot_data.get('currency', 'USDT')
+                    formatted_balance += f"💰 **스팟 잔고**: {available} {currency.upper()}\n"
                 else:
                     formatted_balance += f"💰 **스팟 잔고**: {spot_data}\n"
             else:
