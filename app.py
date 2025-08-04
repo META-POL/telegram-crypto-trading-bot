@@ -22,8 +22,19 @@ from flask import Flask, jsonify, request
 # 라이브러리 import (지연 로딩으로 변경)
 SigningKey = None
 ccxt = None
-InlineKeyboardButton = None
-InlineKeyboardMarkup = None
+
+# Telegram 라이브러리 import
+try:
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    print("✅ Telegram 라이브러리 로드 성공")
+except ImportError as e:
+    print(f"⚠️ Telegram 라이브러리 로드 실패: {e}")
+    InlineKeyboardButton = None
+    InlineKeyboardMarkup = None
+except Exception as e:
+    print(f"⚠️ Telegram 라이브러리 로드 중 오류: {e}")
+    InlineKeyboardButton = None
+    InlineKeyboardMarkup = None
 
 # pyxt 라이브러리 임포트 시도
 try:
@@ -816,11 +827,16 @@ async def handle_balance_callback(telegram_app, chat_id, user_id, data, callback
         else:
             formatted_balance += f"💰 **스팟 잔고**: 조회 실패 - {spot_result.get('message', '알 수 없는 오류')}\n"
         
-        keyboard = [
-            [InlineKeyboardButton("🔄 새로고침", callback_data=data)],
-            [InlineKeyboardButton("🔙 잔고 메뉴", callback_data="balance_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        # InlineKeyboardButton이 사용 가능한지 확인
+        if InlineKeyboardButton is None or InlineKeyboardMarkup is None:
+            print("❌ InlineKeyboardButton 또는 InlineKeyboardMarkup이 사용할 수 없습니다.")
+            reply_markup = None
+        else:
+            keyboard = [
+                [InlineKeyboardButton("🔄 새로고침", callback_data=data)],
+                [InlineKeyboardButton("🔙 잔고 메뉴", callback_data="balance_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
         
         await telegram_app.bot.edit_message_text(
             chat_id=chat_id,
