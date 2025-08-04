@@ -1804,14 +1804,23 @@ async def handle_trade_command(telegram_app, chat_id, user_id, text):
     else:
         # 선물 거래
         market_type = 'futures'
-        direction = action  # long/short
+        direction = action  # long 또는 short
         size = float(parts[5])
         price = None
-        # 저장된 레버리지 설정 조회
-        leverage = get_user_leverage_setting(user_id, exchange, symbol, direction)
-        print(f"🔍 사용자 {user_id}의 레버리지 설정: {exchange} {symbol} {direction} = {leverage}x")
-        if len(parts) > 6 and parts[6].lower() in ['spot', 'futures']:
-            market_type = parts[6].lower()  # spot 또는 futures
+        # 레버리지 인자가 없으면 입력 유도
+        # parts[6]이 존재하지 않거나 유효하지 않으면 레버리지 입력 단계로 분기
+        if len(parts) < 7 or not parts[6].isdigit():
+            # symbol은 parts[2]
+            symbol = parts[2].upper()
+            await show_futures_leverage_input(
+                telegram_app, chat_id, user_id,
+                exchange, direction, symbol, callback_query=None
+            )
+            return
+        # 레버리지 문자열을 정수로 변환
+        leverage = int(parts[6])
+        # 기존: leverage = get_user_leverage_setting(...)
+        # leverage = get_user_leverage_setting(user_id, exchange, symbol, direction)
     
     user_keys = get_user_api_keys(user_id)
     
