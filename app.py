@@ -2443,23 +2443,29 @@ class UnifiedFuturesTrader:
             params = params or {}
             
             # Backpack API 공식 문서에 따른 서명 생성
-            # Backpack API는 매우 엄격한 서명 검증을 사용
-            # 모든 파라미터를 알파벳 순서로 정렬하여 서명 문자열 생성
+            # 1. 요청 본문 또는 쿼리 파라미터의 key/value를 알파벳 순서로 정렬하여 쿼리 문자열 형식으로 변환
+            # 2. timestamp와 window를 &timestamp=<timestamp>&window=<window> 형식으로 추가
+            # 3. instruction을 서명 문자열의 맨 앞에 prefix로 추가
             
-            # 서명용 파라미터 딕셔너리 생성
-            sign_params = {
-                'instruction': instruction,
-                'timestamp': timestamp,
-                'window': window
-            }
-            
-            # 주문 파라미터들을 문자열로 변환하여 추가
+            # 주문 파라미터들을 문자열로 변환하고 알파벳 순서로 정렬
+            order_params = {}
             for key, value in params.items():
-                sign_params[key] = str(value)
+                order_params[key] = str(value)
             
-            # 모든 파라미터를 알파벳 순서로 정렬하여 서명 문자열 생성
-            sorted_params = sorted(sign_params.items())
-            sign_str = '&'.join([f"{key}={value}" for key, value in sorted_params])
+            # 알파벳 순서로 정렬된 파라미터 문자열 생성
+            param_pairs = []
+            for key in sorted(order_params.keys()):
+                param_pairs.append(f"{key}={order_params[key]}")
+            
+            # timestamp와 window 추가
+            param_pairs.append(f"timestamp={timestamp}")
+            param_pairs.append(f"window={window}")
+            
+            # 파라미터 문자열 생성
+            params_str = '&'.join(param_pairs)
+            
+            # instruction을 맨 앞에 prefix로 추가 (문서에 따름)
+            sign_str = f"instruction={instruction}&{params_str}"
             
             print(f"🔍 Backpack 서명 문자열: {sign_str}")
             
