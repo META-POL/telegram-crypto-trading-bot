@@ -2444,7 +2444,7 @@ class UnifiedFuturesTrader:
         
         return headers
 
-        def _get_headers_backpack(self, instruction, params=None):
+    def _get_headers_backpack(self, instruction, params=None):
         """Backpack API 헤더 생성 (ED25519 서명) - 수정된 버전"""
         try:
             # pynacl 지연 로딩
