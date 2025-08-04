@@ -2436,7 +2436,14 @@ class UnifiedFuturesTrader:
                 from nacl.signing import SigningKey
             
             if self.signing_key is None and self.private_key:
-                self.signing_key = SigningKey(base64.b64decode(self.private_key))
+                try:
+                    # 개인키를 base64 디코딩
+                    private_key_bytes = base64.b64decode(self.private_key)
+                    print(f"🔍 개인키 디코딩 성공, 길이: {len(private_key_bytes)}")
+                    self.signing_key = SigningKey(private_key_bytes)
+                except Exception as e:
+                    print(f"⚠️ 개인키 디코딩 실패: {e}")
+                    raise Exception(f"개인키 디코딩 오류: {str(e)}")
             
             timestamp = str(int(time.time() * 1000))
             window = "5000"
@@ -2472,11 +2479,18 @@ class UnifiedFuturesTrader:
             # API 키와 개인키 디버깅 정보 출력
             print(f"🔍 Backpack API Key: {self.api_key[:20]}...")
             print(f"🔍 Backpack Private Key: {self.private_key[:20]}...")
+            print(f"🔍 Backpack API Key 길이: {len(self.api_key)}")
+            print(f"🔍 Backpack Private Key 길이: {len(self.private_key)}")
+            print(f"🔍 서명할 메시지 길이: {len(sign_str)}")
             
             # ED25519 서명 생성
             message_bytes = sign_str.encode('utf-8')
             signature = self.signing_key.sign(message_bytes)
             signature_b64 = base64.b64encode(signature.signature).decode('utf-8')
+            
+            print(f"🔍 서명 길이: {len(signature.signature)}")
+            print(f"🔍 Base64 서명 길이: {len(signature_b64)}")
+            print(f"🔍 서명 시작: {signature_b64[:20]}...")
             
             headers = {
                 "X-API-Key": self.api_key,
