@@ -2466,14 +2466,13 @@ class UnifiedFuturesTrader:
     def _get_headers_backpack(self, instruction, params=None):
         """Backpack API 헤더 생성 (ED25519 서명) - 정확한 사양"""
         try:
-            # ED25519 서명 준비
+            from nacl.signing import SigningKey
             global SigningKey
+            # 키 초기화
             if SigningKey is None:
-                from nacl.signing import SigningKey
-
+                SigningKey = SigningKey
             if self.signing_key is None and self.private_key:
-                private_key_bytes = base64.b64decode(self.private_key)
-                self.signing_key = SigningKey(private_key_bytes)
+                self.signing_key = SigningKey(base64.b64decode(self.private_key))
 
             # 1) timestamp, window
             timestamp = str(int(time.time() * 1000))
@@ -2481,21 +2480,20 @@ class UnifiedFuturesTrader:
 
             # 2) 정렬된 주문 파라미터 문자열
             params = params or {}
-            sorted_params = sorted(params.items())
-            order_str = "&".join(f"{k}={v}" for k, v in sorted_params)
+            sorted_items = sorted(params.items())
+            order_str = "&".join(f"{k}={v}" for k, v in sorted_items)
 
-            # 3) 서명할 문자열: instruction + order_str + header_params
-            #    반드시 '&' 구분자로만 결합하고, HTML escape(&amp;) 제거
-            sign_parts = [f"instruction={instruction}"]
+            # 3) 서명 대상 문자열
+            parts = [f"instruction={instruction}"]
             if order_str:
-                sign_parts.append(order_str)
-            sign_parts.append(f"timestamp={timestamp}")
-            sign_parts.append(f"window={window}")
-            sign_str = "&".join(sign_parts)
+                parts.append(order_str)
+            parts.append(f"timestamp={timestamp}")
+            parts.append(f"window={window}")
+            sign_str = "&".join(parts)  # HTML escape 제거, 실제 앰퍼샌드 사용
 
             print(f"🔍 Backpack 서명 문자열: {sign_str}")
 
-            # 4) ED25519 서명 생성
+            # 4) ED25519 서명
             signature = self.signing_key.sign(sign_str.encode("utf-8")).signature
             signature_b64 = base64.b64encode(signature).decode("utf-8")
 
