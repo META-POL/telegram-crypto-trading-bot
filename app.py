@@ -337,8 +337,8 @@ def get_user_leverage_setting(user_id, exchange, symbol, direction):
         conn.close()
         
         if result:
-                    return result[0]
-    return 1  # 기본값
+            return result[0]
+        return 1  # 기본값
     except Exception:
         return 1  # 기본값
 
