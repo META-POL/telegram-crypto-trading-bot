@@ -2428,10 +2428,9 @@ class UnifiedFuturesTrader:
         # 3) 서명용 파라미터 정렬
         params = params or {}
         items = sorted(params.items())
-        # Boolean은 API가 요구하는 포맷으로 명시
-        parts = [f"{k}={str(v)}" for k, v in items]
+        parts = [f"{k}={v}" for k, v in items]
 
-        # 4) 서명 문자열 결합
+        # 4) 서명 문자열 결합 (HTML 엔티티가 아닌 '&' 사용)
         sign_str = f"instruction={instruction}"
         if parts:
             sign_str += "&" + "&".join(parts)
