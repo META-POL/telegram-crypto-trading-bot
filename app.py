@@ -2430,7 +2430,7 @@ class UnifiedFuturesTrader:
         items = sorted(params.items())
         parts = [f"{k}={v}" for k, v in items]
 
-        # 4) 서명 문자열 결합: 앰퍼샌드 '&' 사용, 'timestamp' 오타 수정
+        # 4) 서명 문자열 결합: HTML 엔티티 → '&', 오타 수정
         sign_str = f"instruction={instruction}"
         if parts:
             sign_str += "&" + "&".join(parts)
