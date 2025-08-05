@@ -2340,47 +2340,25 @@ class UnifiedFuturesTrader:
             }
 
     def _get_headers_xt(self, params=None):
-        """XT API 헤더 생성 (공식 문서 기반)"""
+        """XT API 헤더 생성"""
         timestamp = str(int(time.time() * 1000))
         params = params or {}
-        
-        # XT API 서명 생성 - 공식 문서 방식
-        # 1. 파라미터를 알파벳 순으로 정렬
         sorted_params = sorted(params.items())
-        
-        # 2. 쿼리 스트링 생성 (값을 문자열로 변환)
         query_string = '&'.join([f"{k}={str(v)}" for k, v in sorted_params])
-        
-        # 3. 서명 문자열 생성 (pyxt 라이브러리 방식)
-        if query_string:
-            sign_string = f"access_key={self.api_key}&{query_string}&timestamp={timestamp}"
-        else:
-            sign_string = f"access_key={self.api_key}&timestamp={timestamp}"
-        
-        # 4. HMAC-SHA256 서명 생성
+        sign_string = f"access_key={self.api_key}&{query_string}&timestamp={timestamp}" if query_string else f"access_key={self.api_key}&timestamp={timestamp}"
         signature = hmac.new(
-            self.api_secret.encode('utf-8'), 
-            sign_string.encode('utf-8'), 
+            self.api_secret.encode('utf-8'),
+            sign_string.encode('utf-8'),
             hashlib.sha256
-        ).digest().hex()
-        
-        # 대안 서명 방식 (필요시 사용)
-        # signature = base64.b64encode(hmac.new(
-        #     self.api_secret.encode('utf-8'), 
-        #     sign_string.encode('utf-8'), 
-        #     hashlib.sha256
-        # ).digest()).decode('utf-8')
-        
-        print(f"XT 서명 디버그: sign_string={sign_string}, signature={signature}")  # 디버깅용
-        
-        # pyxt 라이브러리 방식 헤더
+        ).hexdigest()
         headers = {
             "access_key": self.api_key,
             "signature": signature,
             "timestamp": timestamp,
             "Content-Type": "application/json"
         }
-        
+        print(f"XT sign string: {sign_string}")
+        print(f"XT headers: {headers}")
         return headers
 
     def _get_headers_backpack(self, instruction, params=None):
@@ -2404,8 +2382,13 @@ class UnifiedFuturesTrader:
 
         # 3) 서명용 파라미터 정렬
         params = params or {}
-        items = sorted(params.items())
-        parts = [f"{k}={v}" for k, v in items]
+        items = sorted(params.items(), key=lambda x: x[0])  # 알파벳 순 정렬
+        parts = []
+        for k, v in items:
+            # 값이 숫자인 경우 문자열로 변환, 소수점 정규화
+            if isinstance(v, (int, float)):
+                v = str(round(float(v), 8))  # 소수점 8자리로 고정
+            parts.append(f"{k}={v}")
 
         # 4) 서명 문자열 결합
         sign_str = f"instruction={instruction}"
@@ -2413,24 +2396,25 @@ class UnifiedFuturesTrader:
             sign_str += "&" + "&".join(parts)
         sign_str += f"&timestamp={timestamp}&window={window}"
 
-        # 디버깅: 서명 문자열 출력
+        # 디버깅: 서명 문자열 및 요청 바디 출력
         print(f"Backpack signature string: {sign_str}")
+        print(f"Backpack request params: {params}")
 
         # 5) ED25519 서명 및 Base64 인코딩
         try:
-            sig = self.signing_key.sign(sign_str.encode()).signature
-            signature_b64 = base64.b64encode(sig).decode()
+            sig = self.signing_key.sign(sign_str.encode('utf-8')).signature
+            signature_b64 = base64.b64encode(sig).decode('utf-8')
         except Exception as e:
             print(f"Backpack signature creation failed: {e}")
             raise ValueError(f"Signature creation error: {e}")
 
-        # 디버깅: 요청 헤더 출력
+        # 6) 헤더 생성
         headers = {
             "X-API-Key": self.api_key,
             "X-Signature": signature_b64,
             "X-Timestamp": str(timestamp),
             "X-Window": str(window),
-            "Content-Type": "application/json"
+            "Content-Type": "application/json; charset=utf-8"
         }
         print(f"Backpack headers: {headers}")
 
