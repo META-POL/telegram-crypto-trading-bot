@@ -3238,6 +3238,13 @@ class UnifiedFuturesTrader:
                         'message': 'Backpack 스팟 매도 성공'
                     }
                 else:
+                    # Backpack 스팟 매도 에러 처리
+                    error = response.json()
+                    if response.status_code == 400 and error.get('code') == 'INSUFFICIENT_FUNDS':
+                        return {
+                            'status': 'error',
+                            'message': '잔고부족'
+                        }
                     return {
                         'status': 'error',
                         'message': f'Backpack 스팟 매도 실패: {response.status_code} - {response.text}'
