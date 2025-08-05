@@ -2430,12 +2430,10 @@ class UnifiedFuturesTrader:
         items = sorted(params.items())
         parts = [f"{k}={v}" for k, v in items]
 
-        # 4) 서명 문자열 결합: literal '&' separators
+        # 4) 서명 문자열 결합: 리터럴 '&' 사용
         sign_str = f"instruction={instruction}"
         if parts:
-            # join all body/query parameters with '&'
             sign_str += "&" + "&".join(parts)
-        # append timestamp and window with '&'
         sign_str += f"&timestamp={timestamp}&window={window}"
 
         # 5) ED25519 서명 및 Base64 인코딩
