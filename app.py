@@ -200,8 +200,6 @@ def init_database():
                 xt_api_secret TEXT,
                 backpack_api_key TEXT,
                 backpack_private_key TEXT,
-                hyperliquid_api_key TEXT,
-                hyperliquid_api_secret TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -223,8 +221,8 @@ def init_database():
         
         conn.commit()
         conn.close()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Database initialization failed: {e}")
 
 # 데이터베이스 초기화 실행
 init_database()
@@ -243,9 +241,7 @@ def get_user_api_keys(user_id):
                 'xt_api_key': result[1],
                 'xt_api_secret': result[2],
                 'backpack_api_key': result[3],
-                'backpack_private_key': result[4],
-                'hyperliquid_api_key': result[5],
-                'hyperliquid_api_secret': result[6]
+                'backpack_private_key': result[4]
             }
         return None
     except Exception:
@@ -275,12 +271,6 @@ def save_user_api_keys(user_id, exchange, api_key, api_secret):
                     SET backpack_api_key = ?, backpack_private_key = ?, updated_at = CURRENT_TIMESTAMP 
                     WHERE user_id = ?
                 ''', (api_key, api_secret, user_id))
-            elif exchange == 'hyperliquid':
-                cursor.execute('''
-                    UPDATE user_api_keys 
-                    SET hyperliquid_api_key = ?, hyperliquid_api_secret = ?, updated_at = CURRENT_TIMESTAMP 
-                    WHERE user_id = ?
-                ''', (api_key, api_secret, user_id))
             
         else:
             # 새 사용자 생성
@@ -292,11 +282,6 @@ def save_user_api_keys(user_id, exchange, api_key, api_secret):
             elif exchange == 'backpack':
                 cursor.execute('''
                     INSERT INTO user_api_keys (user_id, backpack_api_key, backpack_private_key)
-                    VALUES (?, ?, ?)
-                ''', (user_id, api_key, api_secret))
-            elif exchange == 'hyperliquid':
-                cursor.execute('''
-                    INSERT INTO user_api_keys (user_id, hyperliquid_api_key, hyperliquid_api_secret)
                     VALUES (?, ?, ?)
                 ''', (user_id, api_key, api_secret))
             
@@ -496,8 +481,7 @@ async def show_main_menu(telegram_app, chat_id):
             "버튼을 클릭하여 원하는 기능을 선택하세요!\n\n"
             "**지원 거래소:**\n"
             "• XT Exchange\n"
-            "• Backpack Exchange\n"
-            "• Hyperliquid\n\n"
+            "• Backpack Exchange\n\n"
             "먼저 API 키를 설정해주세요!"
         )
 
@@ -1987,8 +1971,7 @@ async def show_api_management_menu(telegram_app, chat_id, user_id, callback_quer
     keyboard = []
     exchanges = [
         ("xt", "XT Exchange"),
-        ("backpack", "Backpack Exchange"),
-        ("hyperliquid", "Hyperliquid")
+        ("backpack", "Backpack Exchange")
     ]
     
     for exchange, name in exchanges:
@@ -2044,7 +2027,6 @@ async def show_balance_menu(telegram_app, chat_id, user_id, callback_query=None)
     keyboard = [
         [InlineKeyboardButton("XT Exchange", callback_data="balance_xt")],
         [InlineKeyboardButton("Backpack Exchange", callback_data="balance_backpack")],
-        [InlineKeyboardButton("Hyperliquid", callback_data="balance_hyperliquid")],
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -2115,7 +2097,6 @@ async def show_trade_menu(telegram_app, chat_id, user_id, callback_query=None):
     keyboard = [
         [InlineKeyboardButton("XT Exchange", callback_data="trade_exchange_xt")],
         [InlineKeyboardButton("Backpack Exchange", callback_data="trade_exchange_backpack")],
-        [InlineKeyboardButton("Hyperliquid", callback_data="trade_exchange_hyperliquid")],
         [InlineKeyboardButton("🔙 메인 메뉴", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -2190,7 +2171,6 @@ async def show_help(telegram_app, chat_id, callback_query=None):
         "**지원 거래소:**\n"
         "• XT Exchange (선물/스팟)\n"
         "• Backpack Exchange\n"
-        "• Hyperliquid\n"
 
         "**명령어:**\n"
         "• `/setapi [거래소] [API_KEY] [SECRET_KEY]` - API 키 설정\n"
@@ -2254,14 +2234,8 @@ class UnifiedFuturesTrader:
             self.base_url = "https://api.backpack.exchange/api/v1"
             # 지연 로딩으로 변경
             self.signing_key = None
-        elif self.exchange == 'hyperliquid':
-            # Hyperliquid SDK가 설치되지 않은 경우 임시로 비활성화
-            self.account_address = kwargs.get('api_key')  # 지갑 주소
-            self.private_key = kwargs.get('api_secret')   # 개인키
-            self.sdk_available = False  # SDK 미설치로 인해 비활성화
-
         else:
-            raise ValueError('지원하지 않는 거래소입니다: xt, backpack, hyperliquid만 지원')
+            raise ValueError('지원하지 않는 거래소입니다: xt, backpack만 지원')
 
     def test_api_connection(self):
         """API 연결 테스트"""
@@ -2357,11 +2331,7 @@ class UnifiedFuturesTrader:
                         'message': f'Backpack API 연결 테스트 오류: {str(e)}'
                     }
             
-            elif self.exchange == 'hyperliquid':
-                return {
-                    'status': 'error',
-                    'message': 'Hyperliquid SDK가 설치되지 않았습니다. 패키지를 설치한 후 다시 시도해주세요.'
-                }
+
             
         except Exception as e:
             return {
@@ -2416,10 +2386,17 @@ class UnifiedFuturesTrader:
     def _get_headers_backpack(self, instruction, params=None):
         from nacl.signing import SigningKey
         from nacl.encoding import RawEncoder
+        import base64
+        import time
+        import json
 
         # 1) private_key → signing_key 초기화
         if self.signing_key is None and self.private_key:
-            self.signing_key = SigningKey(base64.b64decode(self.private_key), encoder=RawEncoder)
+            try:
+                self.signing_key = SigningKey(base64.b64decode(self.private_key), encoder=RawEncoder)
+            except Exception as e:
+                print(f"Backpack signing key initialization failed: {e}")
+                raise ValueError(f"Invalid private key: {e}")
 
         # 2) timestamp, window
         timestamp = int(time.time() * 1000)
@@ -2430,23 +2407,34 @@ class UnifiedFuturesTrader:
         items = sorted(params.items())
         parts = [f"{k}={v}" for k, v in items]
 
-        # 4) 서명 문자열 결합: 리터럴 '&' 사용
+        # 4) 서명 문자열 결합
         sign_str = f"instruction={instruction}"
         if parts:
             sign_str += "&" + "&".join(parts)
         sign_str += f"&timestamp={timestamp}&window={window}"
 
-        # 5) ED25519 서명 및 Base64 인코딩
-        sig = self.signing_key.sign(sign_str.encode()).signature
-        signature_b64 = base64.b64encode(sig).decode()
+        # 디버깅: 서명 문자열 출력
+        print(f"Backpack signature string: {sign_str}")
 
-        return {
+        # 5) ED25519 서명 및 Base64 인코딩
+        try:
+            sig = self.signing_key.sign(sign_str.encode()).signature
+            signature_b64 = base64.b64encode(sig).decode()
+        except Exception as e:
+            print(f"Backpack signature creation failed: {e}")
+            raise ValueError(f"Signature creation error: {e}")
+
+        # 디버깅: 요청 헤더 출력
+        headers = {
             "X-API-Key": self.api_key,
             "X-Signature": signature_b64,
             "X-Timestamp": str(timestamp),
             "X-Window": str(window),
             "Content-Type": "application/json"
         }
+        print(f"Backpack headers: {headers}")
+
+        return headers
 
     def _get_backpack_prices(self):
         """Backpack에서 실제 거래 가격 가져오기"""
