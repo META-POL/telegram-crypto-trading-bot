@@ -2425,12 +2425,13 @@ class UnifiedFuturesTrader:
         timestamp = int(time.time() * 1000)
         window = 5000
 
-        # 3) 정렬된 파라미터 문자열 생성
+        # 3) 서명용 파라미터 정렬
         params = params or {}
         items = sorted(params.items())
-        parts = [f"{k}={str(v).lower() if isinstance(v, bool) else v}" for k, v in items]
-        
-        # 4) 서명 대상 문자열(sign_str) 결합
+        # Boolean은 API가 요구하는 포맷으로 명시
+        parts = [f"{k}={str(v)}" for k, v in items]
+
+        # 4) 서명 문자열 결합
         sign_str = f"instruction={instruction}"
         if parts:
             sign_str += "&" + "&".join(parts)
@@ -2763,25 +2764,18 @@ class UnifiedFuturesTrader:
                     if not symbol.endswith('_PERP'):
                         backpack_symbol = f"{symbol}_USDC_PERP"
                 
-                # 정상 작동하는 코드와 동일한 파라미터 구조
+                # 서명 대상 파라미터와 전송 바디 동기화
                 body = {
-                    "side": "Bid",
                     "symbol": backpack_symbol,
+                    "side": "Bid",
                     "orderType": backpack_order_type,
-                    "autoBorrow": False,
-                    "autoBorrowRepay": False,
-                    "autoLend": False,
-                    "autoLendRedeem": False,
-                    "selfTradePrevention": "RejectTaker"
+                    "quantity": float(size)
                 }
                 
-                if backpack_order_type == "Market":
-                    body["quantity"] = float(size)
-                else:
+                # 지정가 주문의 경우 추가 필드
+                if backpack_order_type == "Limit":
                     body.update({
-                        "quantity": float(size),
-                        "timeInForce": "GTC",
-                        "postOnly": False
+                        "timeInForce": "GTC"
                     })
                 
                 # 레버리지는 선물 거래에서만 설정
@@ -2919,25 +2913,18 @@ class UnifiedFuturesTrader:
                     if not symbol.endswith('_PERP'):
                         backpack_symbol = f"{symbol}_USDC_PERP"
                 
-                # 정상 작동하는 코드와 동일한 파라미터 구조
+                # 서명 대상 파라미터와 전송 바디 동기화
                 body = {
-                    "side": "Ask",
                     "symbol": backpack_symbol,
+                    "side": "Ask",
                     "orderType": backpack_order_type,
-                    "autoBorrow": False,
-                    "autoBorrowRepay": False,
-                    "autoLend": False,
-                    "autoLendRedeem": False,
-                    "selfTradePrevention": "RejectTaker"
+                    "quantity": float(size)
                 }
                 
-                if backpack_order_type == "Market":
-                    body["quantity"] = float(size)
-                else:
+                # 지정가 주문의 경우 추가 필드
+                if backpack_order_type == "Limit":
                     body.update({
-                        "quantity": float(size),
-                        "timeInForce": "GTC",
-                        "postOnly": False
+                        "timeInForce": "GTC"
                     })
                 
                 # 레버리지는 선물 거래에서만 설정
@@ -3086,19 +3073,21 @@ class UnifiedFuturesTrader:
                 if not symbol.endswith('_USDC'):
                     backpack_symbol = f"{symbol}_USDC"
                 
-                params = {
-                    'symbol': backpack_symbol,
-                    'side': 'Bid',  # 매수
-                    'orderType': backpack_order_type,
-                    'quantity': str(size)
+                # 서명 대상 파라미터와 전송 바디 동기화
+                body = {
+                    "symbol": backpack_symbol,
+                    "side": "Bid",  # 매수
+                    "orderType": backpack_order_type,
+                    "quantity": float(size)
                 }
                 
                 # 지정가 주문의 경우 가격 추가
                 if order_type == 'limit' and price:
-                    params['price'] = str(price)
+                    body["price"] = float(price)
+                    body["timeInForce"] = "GTC"
                 
-                headers = self._get_headers_backpack("orderExecute", params)
-                response = requests.post(url, headers=headers, json=params)
+                headers = self._get_headers_backpack("orderExecute", body)
+                response = requests.post(url, headers=headers, json=body)
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -3108,6 +3097,13 @@ class UnifiedFuturesTrader:
                         'message': 'Backpack 스팟 매수 성공'
                     }
                 else:
+                    # Backpack 스팟 매수 에러 처리
+                    error = response.json()
+                    if response.status_code == 400 and error.get('code') == 'INSUFFICIENT_FUNDS':
+                        return {
+                            'status': 'error',
+                            'message': '잔고부족'
+                        }
                     return {
                         'status': 'error',
                         'message': f'Backpack 스팟 매수 실패: {response.status_code} - {response.text}'
@@ -3218,19 +3214,21 @@ class UnifiedFuturesTrader:
                 if not symbol.endswith('_USDC'):
                     backpack_symbol = f"{symbol}_USDC"
                 
-                params = {
-                    'symbol': backpack_symbol,
-                    'side': 'Ask',  # 매도
-                    'orderType': backpack_order_type,
-                    'quantity': str(size)
+                # 서명 대상 파라미터와 전송 바디 동기화
+                body = {
+                    "symbol": backpack_symbol,
+                    "side": "Ask",  # 매도
+                    "orderType": backpack_order_type,
+                    "quantity": float(size)
                 }
                 
                 # 지정가 주문의 경우 가격 추가
                 if order_type == 'limit' and price:
-                    params['price'] = str(price)
+                    body["price"] = float(price)
+                    body["timeInForce"] = "GTC"
                 
-                headers = self._get_headers_backpack("orderExecute", params)
-                response = requests.post(url, headers=headers, json=params)
+                headers = self._get_headers_backpack("orderExecute", body)
+                response = requests.post(url, headers=headers, json=body)
                 
                 if response.status_code == 200:
                     data = response.json()
